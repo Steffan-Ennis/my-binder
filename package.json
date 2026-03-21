@@ -1,0 +1,11 @@
+{
+  "name": "my-binder",
+  "version": "1.0.0",
+  "description": "Personal Card Binder",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "steffanennis87@gmail.com",
+  "license": "ISC"
+}
