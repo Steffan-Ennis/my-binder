@@ -1,0 +1,17 @@
+export const ERROR_CODES = {
+  NOT_FOUND: 'NOT_FOUND',
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+} as const;
+
+export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
+
+export const HTTP_STATUS = {
+  OK: 200,
+  CREATED: 201,
+  NO_CONTENT: 204,
+  BAD_REQUEST: 400,
+  NOT_FOUND: 404,
+  INTERNAL_ERROR: 500,
+  SERVICE_UNAVAILABLE: 503,
+} as const;

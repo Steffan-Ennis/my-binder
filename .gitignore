@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+out/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/settings.json
+.idea/
+
+# DuckDB data files
+*.duckdb
+*.duckdb.wal
+
+# Test coverage
+coverage/
+
+# Turbo cache
+.turbo/

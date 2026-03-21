@@ -1,11 +1,10 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.0.0 → 1.1.0 → 1.2.0 → 1.3.0 → 1.4.0 → 1.5.0
-Bump type: MINOR — TypeScript adopted as the project-wide language for all workspaces.
-  Replaces JavaScript + JSDoc @ts-check approach across apps/server, apps/mobile, and
-  packages/core. Principle VII updated to reference TypeScript strict mode. Technology
-  Stack workspace descriptions updated accordingly.
+Version change: 1.8.0 → 1.9.0
+Bump type: MINOR — Task verification documentation rule added to Development Workflow.
+  Every task MUST include a documentation step as part of its verification criteria.
+  Package documentation lives in <package>/docs/*.md.
 Last amended: 2026-03-21
 
 Modified principles:
@@ -66,6 +65,16 @@ Tests MUST be written before implementation code (Red-Green-Refactor). A feature
 considered complete until its automated tests pass. The `main` branch MUST remain green at
 all times. No code reaches `main` without a corresponding test exercising its primary
 behaviour.
+
+**Test co-location rule**: Unit and integration tests MUST live in the same directory as
+the file they test, named `<filename>.test.ts`. For example, `src/services/cardService.ts`
+MUST be tested by `src/services/cardService.test.ts`. The only exception is **E2E tests**,
+which MUST live in a dedicated `tests/e2e/` directory at the workspace root (since they
+exercise the full system, not a single file). No other `tests/` directories are permitted.
+
+Rationale: co-located tests are discovered immediately alongside the code they cover, making
+it obvious when a file has no test and preventing tests from becoming detached from the module
+they exercise when files are moved or renamed.
 
 ### IV. Single Responsibility
 
@@ -130,6 +139,40 @@ in `packages/core` and MUST NOT be duplicated across workspaces.
 Rationale: TypeScript's type system is erased at runtime. Boundary validation is the runtime
 complement to compile-time typing — both are required. Shared types in `packages/core` ensure
 mobile and server agree on the same shapes without copy-paste drift.
+
+**File purity rule**: `.ts` and `.js` source files MUST NOT coexist within the same workspace
+`src/` directory. Every workspace is either fully TypeScript (`.ts` source, compiled to `dist/`)
+or fully JavaScript — never mixed. Import paths inside TypeScript source MUST NOT include `.js`
+extensions when using `"module": "CommonJS"` resolution; extensions are only required under
+`"module": "NodeNext"` / `"Node16"` ESM resolution. Violating either rule is a constitution
+breach requiring explicit justification in the Complexity Tracking table.
+
+**Path alias rule**: Every workspace MUST declare two TypeScript path aliases in its
+`tsconfig.json` `compilerOptions.paths`:
+
+- `@root/*` — maps to the package root (e.g., `["./*"]` in `apps/server/tsconfig.json`)
+- `@src/*` — maps to the `src/` directory (e.g., `["./src/*"]` in `apps/server/tsconfig.json`)
+
+Aliased paths MUST be used in place of any import that would traverse upward (`../`) out of
+the current file's directory. Relative imports (e.g., `./sibling`) are permitted within the
+same directory or into a subdirectory. The rule is: if an import path contains `../`, it MUST
+be rewritten using `@src/` or `@root/` instead.
+
+```jsonc
+// apps/server/tsconfig.json — example
+{
+  "compilerOptions": {
+    "paths": {
+      "@root/*": ["./*"],
+      "@src/*": ["./src/*"]
+    }
+  }
+}
+```
+
+Rationale: upward-traversing relative paths (`../../db/client`) obscure the structural position
+of the importing file and break silently when files are moved. Named aliases make every import
+self-documenting and refactoring-safe.
 
 ## Technology Stack
 
@@ -197,6 +240,52 @@ be atomic and their messages MUST describe the intent of the change (not just th
 Breaking changes to card data structures MUST include a documented migration path before
 merging.
 
+### Feature Design Documentation
+
+Every feature MUST be fully designed and documented before implementation begins. The following
+artifacts are required in `specs/<feature>/` before any implementation task is written or
+executed:
+
+| Artifact | Purpose |
+|---|---|
+| `spec.md` | User-facing requirements and acceptance criteria (technology-agnostic) |
+| `plan.md` | Technical approach, tech stack, file structure, Constitution Check |
+| `data-model.md` | Entity definitions, field types, validation rules, relationships |
+| `contracts/` | Interface contracts for every API boundary the feature exposes |
+| `quickstart.md` | Concrete integration scenarios and end-to-end success criteria |
+
+`research.md` is required when the plan references unresolved technology decisions. A feature
+plan that leaves any of the mandatory artifacts absent MUST NOT proceed to task generation.
+
+Rationale: implementation without a written design produces code that cannot be reviewed
+against intent, makes schema drift undetectable, and forces rework when boundary contracts
+are discovered late.
+
+### Task Verification Documentation
+
+Every task is not considered complete until a corresponding documentation step has been
+fulfilled as part of its verification criteria. Documentation MUST be written or updated
+before the task is marked done — it is not a follow-up activity.
+
+Documentation files MUST live in `<package>/docs/*.md` (e.g.,
+`apps/server/docs/database.md`, `packages/core/docs/schemas.md`). The `README.md` at the
+package root covers orientation and startup; `docs/` is for deeper reference material that
+would make `README.md` unwieldy:
+
+- Architecture and design decisions for the component
+- Data model and migration notes
+- API contract details (beyond what `contracts/` specifies at spec time)
+- Configuration reference
+- Operational runbooks
+
+A task that introduces a new module, API route, data model change, or configuration option
+MUST produce or update at least one `docs/*.md` file that describes what was added. Tasks
+that are purely mechanical (dependency bumps, formatting, rename-only refactors) are exempt.
+
+Rationale: documentation written after the fact is rarely written at all. Embedding it as a
+verification gate inside each task ensures the codebase and its docs stay in sync
+incrementally rather than drifting apart over time.
+
 ## Governance
 
 This constitution supersedes all informal practices and verbal agreements. Amendments require
@@ -209,4 +298,4 @@ Each feature plan MUST include a Constitution Check (as defined in
 `.specify/templates/plan-template.md`) verifying compliance with all seven principles before
 implementation begins. Violations MUST be justified in the plan's Complexity Tracking table.
 
-**Version**: 1.5.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-03-21
+**Version**: 1.9.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-03-21

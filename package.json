@@ -1,11 +1,21 @@
 {
   "name": "my-binder",
-  "version": "1.0.0",
-  "description": "Personal Card Binder",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=9"
   },
-  "author": "steffanennis87@gmail.com",
-  "license": "ISC"
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "test": "turbo test",
+    "typecheck": "turbo typecheck",
+    "lint": "turbo lint"
+  },
+  "devDependencies": {
+    "turbo": "latest",
+    "typescript": "^5.7.0"
+  }
 }
