@@ -71,5 +71,6 @@ Stores the card collection.
 
 ## In-memory mode
 
-Set `DB_PATH=:memory:` (or `NODE_ENV=test`) to use an in-memory DuckDB instance. The database
+The default path in development is `./binder.duckdb` (relative to the `apps/server/`
+directory). Set `DB_PATH=:memory:` (or `NODE_ENV=test`) to use an in-memory DuckDB instance. The database
 is destroyed when the process exits. This is the default for the test runner.

@@ -10,7 +10,7 @@ export function loadConfig(): Config {
   return {
     port: parseInt(process.env['PORT'] ?? '3000', 10),
     // In test mode, always use in-memory DuckDB — no files written to disk.
-    dbPath: nodeEnv === 'test' ? ':memory:' : (process.env['DB_PATH'] ?? '/data/binder.duckdb'),
+    dbPath: nodeEnv === 'test' ? ':memory:' : (process.env['DB_PATH'] ?? './binder.duckdb'),
     nodeEnv,
   };
 }

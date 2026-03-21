@@ -82,7 +82,7 @@ DB_PATH=/data/binder.duckdb pnpm --filter=@my-binder/server start
 | Variable | Default | Description |
 |---|---|---|
 | `PORT` | `3000` | Port the server listens on |
-| `DB_PATH` | `/data/binder.duckdb` | Path to the DuckDB database file. Use `:memory:` for an in-memory instance |
+| `DB_PATH` | `./binder.duckdb` | Path to the DuckDB database file. Use `:memory:` for an in-memory instance |
 | `NODE_ENV` | `development` | Set to `test` to force an in-memory database regardless of `DB_PATH` |
 
 ## Database
