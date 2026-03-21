@@ -1,5 +1,9 @@
-import { Card, CardList, CreateCardBody, UpdateCardBody } from '@my-binder/core';
+import type {
+  Card, CardList, CreateCardBody, UpdateCardBody,
+  CardRecord, CardNotFoundResult, LegalityResult, SearchQuery, SearchResult,
+} from '@my-binder/core';
 import * as repo from '@src/repositories/cardRepository';
+import { registry } from '@src/providers/registry';
 
 export class NotFoundError extends Error {
   constructor(id: string) {
@@ -32,4 +36,73 @@ export async function updateCard(id: string, body: UpdateCardBody): Promise<Card
 export async function deleteCard(id: string): Promise<void> {
   const deleted = await repo.remove(id);
   if (!deleted) throw new NotFoundError(id);
+}
+
+// ─── Provider-backed card operations (spec 004) ───────────────────────────────
+
+export class CardNotFoundError extends Error {
+  constructor(name: string) {
+    super(`No card found with name "${name}".`);
+    this.name = 'CardNotFoundError';
+  }
+}
+
+export class ProviderUnavailableError extends Error {
+  constructor() {
+    super('The card data provider is currently unavailable. Please try again.');
+    this.name = 'ProviderUnavailableError';
+  }
+}
+
+export async function lookupCard(
+  name: string,
+  opts: { fuzzy?: boolean; set?: string; number?: string } = {},
+): Promise<CardRecord[] | CardNotFoundResult> {
+  try {
+    return await registry.getActive().lookup(name, opts);
+  } catch (err) {
+    if (err instanceof Error && (err as NodeJS.ErrnoException).code !== 'CARD_NOT_FOUND') {
+      throw new ProviderUnavailableError();
+    }
+    throw err;
+  }
+}
+
+export async function checkCommanderLegality(
+  name: string,
+  commanderColors?: string[],
+): Promise<LegalityResult> {
+  try {
+    return await registry.getActive().checkLegality(name, commanderColors);
+  } catch (err) {
+    if (err instanceof Error) {
+      const typed = err as NodeJS.ErrnoException;
+      if (typed.code === 'CARD_NOT_FOUND') throw new CardNotFoundError(name);
+    }
+    throw new ProviderUnavailableError();
+  }
+}
+
+export async function searchCards(query: SearchQuery): Promise<SearchResult> {
+  const page = Math.max(1, query.page ?? 1);
+  const limit = Math.min(100, Math.max(1, query.limit ?? 20));
+
+  let allCards: CardRecord[];
+  try {
+    allCards = await registry.getActive().search(query);
+  } catch {
+    throw new ProviderUnavailableError();
+  }
+
+  const total = allCards.length;
+  const offset = (page - 1) * limit;
+  const cards = allCards.slice(offset, offset + limit);
+
+  return {
+    cards,
+    total,
+    page,
+    limit,
+    totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+  };
 }

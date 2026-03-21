@@ -1,8 +1,8 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.8.0 → 1.9.0
-Bump type: MINOR — Task verification documentation rule added to Development Workflow.
+Version change: 1.9.0 → 1.9.1
+Bump type: PATCH — TypeScript naming conventions added to Principle VII.
   Every task MUST include a documentation step as part of its verification criteria.
   Package documentation lives in <package>/docs/*.md.
 Last amended: 2026-03-21
@@ -139,6 +139,21 @@ in `packages/core` and MUST NOT be duplicated across workspaces.
 Rationale: TypeScript's type system is erased at runtime. Boundary validation is the runtime
 complement to compile-time typing — both are required. Shared types in `packages/core` ensure
 mobile and server agree on the same shapes without copy-paste drift.
+
+**Naming rule**: TypeScript type and interface names MUST NOT use Hungarian-style prefixes.
+Specifically, the `I` prefix (e.g., `ICardProvider`) is prohibited — names MUST be plain
+descriptive nouns (e.g., `CardProvider`). Similarly, suffixes such as `Interface` or `Type`
+are not permitted.
+
+**`type` over `interface` rule**: `type` aliases MUST be preferred over `interface` declarations
+for all new TypeScript definitions. `interface` is only permitted when declaration merging is
+explicitly required (e.g., augmenting a third-party module). All domain types in
+`packages/core` and all server/mobile types MUST be declared with `type`.
+
+Rationale: `type` is strictly more expressive than `interface` (it supports unions, intersections,
+mapped types, and conditional types that `interface` cannot). Using `type` consistently avoids
+the need to decide case-by-case, and eliminates accidental declaration merging which can produce
+hard-to-debug type widening.
 
 **File purity rule**: `.ts` and `.js` source files MUST NOT coexist within the same workspace
 `src/` directory. Every workspace is either fully TypeScript (`.ts` source, compiled to `dist/`)
@@ -298,4 +313,4 @@ Each feature plan MUST include a Constitution Check (as defined in
 `.specify/templates/plan-template.md`) verifying compliance with all seven principles before
 implementation begins. Violations MUST be justified in the plan's Complexity Tracking table.
 
-**Version**: 1.9.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-03-21
+**Version**: 1.9.1 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-03-21

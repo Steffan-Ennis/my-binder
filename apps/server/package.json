@@ -12,7 +12,8 @@
   "dependencies": {
     "@duckdb/node-api": "latest",
     "@my-binder/core": "workspace:*",
-    "fastify": "^4.29.0"
+    "fastify": "^4.29.0",
+    "mtgjson-sdk": "^0.1.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

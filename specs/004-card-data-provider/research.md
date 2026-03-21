@@ -53,14 +53,20 @@ ruled out per Principle VI resilience requirement).
 
 ## 3. SDK Query Methods Relevant to This Feature
 
-### Card Lookup (FR-001 – FR-005)
+### Card Lookup (FR-001 – FR-005b)
 
 | Method | Use case |
 |--------|----------|
-| `sdk.cards.getByName(name)` | Exact name lookup; returns first match |
-| `sdk.cards.search({ name: { fuzzy: name } })` | Fuzzy/partial search via Jaro-Winkler |
+| `sdk.cards.getByName(name, { setCode? })` | Exact name lookup, optionally scoped to a set |
+| `sdk.cards.search({ fuzzyName: name })` | Fuzzy/partial search via Jaro-Winkler |
 | `sdk.cards.getPrintings(name)` | All printings of a card across sets |
 | `sdk.cards.getAtomic(name)` | Name-level (atomic) card data — shared across all printings |
+
+**Set + number narrowing** (FR-005a, FR-005b): `getByName(name, { setCode })` returns all
+cards with that name in the given set. Number filtering is not a native SDK filter — when
+`number` is provided, the service layer filters the result in-process:
+`results.filter(c => c.number === number)`. Set-scoped queries return at most a handful of
+results so in-process filtering is negligible.
 
 ### Commander Legality (FR-006 – FR-008)
 

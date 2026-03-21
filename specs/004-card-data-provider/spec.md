@@ -34,6 +34,12 @@ confirming an unknown name returns a clear "not found" result.
    list of matching cards is returned so the caller can present options to the user.
 4. **Given** multiple printings of the same card exist (different sets), **When** a lookup is
    performed, **Then** all printings are returned with their respective set and card number.
+5. **Given** a card name and set code are submitted, **When** the card exists in that set,
+   **Then** only printings from that set are returned, narrowing the result to one or more
+   cards within a single set.
+6. **Given** a card name, set code, and collector number are submitted, **When** a matching
+   printing exists, **Then** exactly that printing is returned — unambiguously identifying a
+   single physical card.
 
 ---
 
@@ -153,6 +159,11 @@ provider rather than the previous one.
   multiple exist.
 - **FR-005**: Card lookup MUST return a clear "not found" result (not an error) when no
   match exists.
+- **FR-005a**: Card lookup MUST accept an optional set code filter. When provided, only
+  printings from the specified set are returned.
+- **FR-005b**: Card lookup MUST accept an optional collector number filter. When provided
+  alongside a set code, only the matching printing is returned. Collector number without a
+  set code is ignored.
 
 **Commander Legality**
 

@@ -79,7 +79,7 @@ my-binder/                          # Repo root
 │   └── server/                     # This workspace
 │       ├── src/
 │       │   ├── providers/
-│       │   │   ├── interface.ts    # ICardProvider TypeScript interface definition
+│       │   │   ├── interface.ts    # CardProvider type: lookup(name, opts?), checkLegality, search, isReachable
 │       │   │   ├── registry.ts     # Provider registry: registration + active provider
 │       │   │   └── mtgjson/
 │       │   │       ├── index.ts    # MtgjsonProvider: implements ICardProvider
