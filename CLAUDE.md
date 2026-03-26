@@ -46,7 +46,12 @@ pnpm turbo dev       # Start all dev servers
 - **`@duckdb/node-api`** — DuckDB Node.js driver (`apps/server`)
 - **`mtgjson-sdk`** — MTGJSON card data SDK; ships compiled JS + `.d.ts` (`apps/server`)
 - **DuckDB** — embedded file-based database; Docker volume mount at `DB_PATH`
+- **`google-auth-library`** — Google ID token verification (`apps/server`); verifies audience, expiry, `email_verified` claim
+- **`jsonwebtoken`** — HS256 session JWT issuance and verification (`apps/server/src/auth/sessionJwt.ts`)
+- **`fastify-plugin`** — used by auth plugin to share `request.identity` decoration across Fastify scopes
+- DuckDB (existing embedded file-based database in `apps/server`); platform secure storage on mobile (Keychain / Keystore) (007-google-oauth-auth)
 
 ## Recent Changes
 - Adopted TypeScript 5 (strict) project-wide — replaces JavaScript + JSDoc approach
 - Adopted pnpm monorepo with Turborepo: `apps/server`, `apps/mobile`, `packages/core`
+- **007-google-oauth-auth**: Added Google OAuth + guest mode — `POST /auth/google`, `GET /auth/me`, `POST /auth/signout`; auth plugin decorates `request.identity`; users table in DuckDB; session JWTs (HS256, 7-day TTL)

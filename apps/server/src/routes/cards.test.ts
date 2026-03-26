@@ -274,3 +274,35 @@ describe('Cards API — provider routes', () => {
     });
   });
 });
+
+// ─── US2 Regression guard: card read routes accessible without Authorization ──
+// These tests confirm that GET /cards and GET /cards/:id require no Bearer token.
+// No source code change expected — this is a regression guard only.
+
+describe('Cards API — guest access (US2 regression guard)', () => {
+  const fastify = Fastify();
+
+  before(async () => {
+    await initDb(':memory:');
+    await fastify.register(cardRoutes);
+    await fastify.ready();
+  });
+
+  after(async () => {
+    await fastify.close();
+  });
+
+  test('GET /cards is accessible without Authorization header', async () => {
+    const response = await fastify.inject({ method: 'GET', url: '/cards' });
+    assert.equal(response.statusCode, 200);
+  });
+
+  test('GET /cards/:id is accessible without Authorization header', async () => {
+    const response = await fastify.inject({
+      method: 'GET',
+      url: '/cards/00000000-0000-0000-0000-000000000000',
+    });
+    // 404 is expected (card doesn't exist), but NOT 401 — route is open to guests.
+    assert.notEqual(response.statusCode, 401);
+  });
+});

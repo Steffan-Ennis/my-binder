@@ -1,4 +1,5 @@
 export * from './card';
+export * from './auth';
 
 export interface Card {
   id: string;

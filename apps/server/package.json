@@ -13,9 +13,13 @@
     "@duckdb/node-api": "latest",
     "@my-binder/core": "workspace:*",
     "fastify": "^4.29.0",
+    "fastify-plugin": "^4.5.0",
+    "google-auth-library": "^9.0.0",
+    "jsonwebtoken": "^9.0.0",
     "mtgjson-sdk": "^0.1.1"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.0",
     "@types/node": "^22.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"

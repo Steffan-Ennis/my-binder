@@ -1,3 +1,19 @@
+export const AUTH_ERROR_CODES = {
+  INVALID_GOOGLE_TOKEN: 'INVALID_GOOGLE_TOKEN',
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+} as const;
+
+export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[keyof typeof AUTH_ERROR_CODES];
+
+export const SESSION_JWT_TTL_DAYS = 7 as const;
+
+export const AUTH_IDENTITY_KIND = {
+  GUEST: 'guest',
+  AUTHENTICATED: 'authenticated',
+} as const;
+
 export const ERROR_CODES = {
   NOT_FOUND: 'NOT_FOUND',
   VALIDATION_ERROR: 'VALIDATION_ERROR',
