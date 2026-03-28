@@ -7,6 +7,9 @@ export type Config = {
   // Comma-separated list of Google OAuth client IDs (iOS, Android, Web).
   // Passed as `audience` to OAuth2Client.verifyIdToken() — primary defence against token substitution.
   googleClientIds: string[];
+  // Web-specific OAuth client ID used by the /auth/login browser login page (GIS SDK).
+  // Must also be included in googleClientIds so verifyIdToken() accepts web-issued tokens.
+  googleWebClientId: string;
   // Secret for signing/verifying server-issued session JWTs. Min 32 chars.
   sessionJwtSecret: string;
 };
@@ -20,6 +23,7 @@ export function loadConfig(): Config {
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 
+  const googleWebClientId = process.env['GOOGLE_WEB_CLIENT_ID'] ?? '';
   const sessionJwtSecret = process.env['SESSION_JWT_SECRET'] ?? '';
 
   return {
@@ -31,6 +35,7 @@ export function loadConfig(): Config {
     // Mount this path as a persistent Docker volume to avoid re-syncing on restart.
     mtgjsonCacheDir: process.env['MTGJSON_CACHE_DIR'] ?? './data/mtgjson-cache',
     googleClientIds,
+    googleWebClientId,
     sessionJwtSecret,
   };
 }

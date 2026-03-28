@@ -50,6 +50,8 @@ pnpm turbo dev       # Start all dev servers
 - **`jsonwebtoken`** — HS256 session JWT issuance and verification (`apps/server/src/auth/sessionJwt.ts`)
 - **`fastify-plugin`** — used by auth plugin to share `request.identity` decoration across Fastify scopes
 - DuckDB (existing embedded file-based database in `apps/server`); platform secure storage on mobile (Keychain / Keystore) (007-google-oauth-auth)
+- TypeScript 5 / Node 22 + Fastify v4, `@fastify/swagger@^8`, `@fastify/swagger-ui@^5`, `fastify-plugin@^4` (existing) (008-swagger-ui-auth)
+- N/A — no new database tables or persistent state (008-swagger-ui-auth)
 
 ## Recent Changes
 - Adopted TypeScript 5 (strict) project-wide — replaces JavaScript + JSDoc approach

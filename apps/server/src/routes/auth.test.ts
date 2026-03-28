@@ -1,6 +1,7 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import Fastify from 'fastify';
+import fastifyCookie from '@fastify/cookie';
 import { initDb } from '@src/db/client';
 import authPlugin from '@src/auth/plugin';
 import { authRoutes } from './auth';
@@ -33,6 +34,7 @@ describe('Auth API', () => {
     process.env['SESSION_JWT_SECRET'] = TEST_SECRET;
     process.env['GOOGLE_CLIENT_IDS'] = 'test-client-id';
     await initDb(':memory:');
+    await fastify.register(fastifyCookie);
     await fastify.register(authPlugin);
     await fastify.register(authRoutes, { signIn: mockSignInSuccess });
     await fastify.ready();
@@ -75,6 +77,7 @@ describe('Auth API', () => {
     const failFastify = Fastify();
 
     before(async () => {
+      await failFastify.register(fastifyCookie);
       await failFastify.register(authPlugin);
       await failFastify.register(authRoutes, { signIn: mockSignInFailure });
       await failFastify.ready();

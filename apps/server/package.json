@@ -4,13 +4,16 @@
   "private": true,
   "scripts": {
     "build": "tsc && cp -r src/db/migrations dist/db/",
-    "dev": "tsx watch index.ts",
+    "dev": "node --env-file=.env --import tsx --watch index.ts",
     "start": "node dist/index.js",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@duckdb/node-api": "latest",
+    "@fastify/cookie": "^9.0.0",
+    "@fastify/swagger": "^8.0.0",
+    "@fastify/swagger-ui": "^4.0.0",
     "@my-binder/core": "workspace:*",
     "fastify": "^4.29.0",
     "fastify-plugin": "^4.5.0",

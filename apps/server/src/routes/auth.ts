@@ -33,6 +33,15 @@ export async function authRoutes(
   }, async (request, reply) => {
     try {
       const result = await signIn(request.body.idToken);
+      // Set HttpOnly session cookie for browser navigation to /docs.
+      // maxAge matches the 7-day JWT TTL.
+      reply.setCookie('session', result.token, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60,
+      });
       return reply.code(200).send(result);
     } catch (err) {
       if (err instanceof InvalidGoogleTokenError) {

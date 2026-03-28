@@ -1,10 +1,13 @@
 import Fastify from 'fastify';
+import fastifyCookie from '@fastify/cookie';
 import { loadConfig } from '@src/config';
 import { initDb } from '@src/db/client';
 import { healthRoutes } from '@src/routes/health';
 import { cardRoutes } from '@src/routes/cards';
 import { providerRoutes } from '@src/routes/provider';
 import { authRoutes } from '@src/routes/auth';
+import { loginRoutes } from '@src/routes/login';
+import { docsPlugin } from '@src/routes/docs';
 import authPlugin from '@src/auth/plugin';
 import { MtgjsonProvider } from '@src/providers/mtgjson/index';
 import { registry } from '@src/providers/registry';
@@ -26,8 +29,15 @@ async function main(): Promise<void> {
     await mtgjsonProvider.close();
   });
 
+  // Cookie plugin must be registered before authPlugin so cookies are parsed
+  // before the auth preHandler reads request.cookies['session'].
+  await fastify.register(fastifyCookie);
   // Auth plugin must be registered before route plugins — decorates request.identity.
   await fastify.register(authPlugin);
+  // docsPlugin must be registered before other routes so @fastify/swagger
+  // captures all route schemas as they are registered.
+  await fastify.register(docsPlugin);
+  await fastify.register(loginRoutes);
   await fastify.register(healthRoutes);
   await fastify.register(cardRoutes);
   await fastify.register(providerRoutes);

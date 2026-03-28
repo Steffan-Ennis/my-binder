@@ -27,12 +27,16 @@ const authPlugin: FastifyPluginCallback = (fastify: FastifyInstance, _options, d
   fastify.addHook('preHandler', async (request) => {
     const authHeader = request.headers['authorization'];
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      request.identity = { kind: 'guest' };
-      return;
+    // Token resolution order: Bearer header → session cookie → guest.
+    // Cookies handle browser navigation (GET requests can't set custom headers);
+    // Bearer tokens handle API clients and Swagger UI "Try it out" XHR calls.
+    let token: string | undefined;
+    if (authHeader?.startsWith('Bearer ')) {
+      token = authHeader.slice('Bearer '.length).trim() || undefined;
+    } else {
+      token = (request.cookies as Record<string, string> | undefined)?.['session'];
     }
 
-    const token = authHeader.slice('Bearer '.length).trim();
     if (!token) {
       request.identity = { kind: 'guest' };
       return;
