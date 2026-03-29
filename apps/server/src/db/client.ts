@@ -1,6 +1,7 @@
 import { DuckDBInstance, DuckDBConnection, DuckDBResult } from '@duckdb/node-api';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 // Singleton connection — initialised once at startup via initDb().
 let _connection: DuckDBConnection | null = null;
@@ -24,6 +25,9 @@ export async function initDb(dbPath: string): Promise<void> {
     try {
       const instance = await DuckDBInstance.create(dbPath);
       const conn = await instance.connect();
+      // Direct DuckDB temp files to the OS temp dir (never to EFS) to avoid
+      // "Stale file handle" errors on Lambda with EFS-backed DB files.
+      await conn.run(`SET temp_directory='${tmpdir()}'`);
       await runMigrations(conn);
       _connection = conn;
       return;

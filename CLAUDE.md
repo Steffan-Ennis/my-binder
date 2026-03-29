@@ -15,6 +15,7 @@ This is a **pnpm + Turborepo monorepo**. Workspaces:
 | `apps/server` | `@my-binder/server` | Fastify API server (spec 001) |
 | `apps/mobile` | `@my-binder/mobile` | Mobile app — iOS + Android (spec 002) |
 | `packages/core` | `@my-binder/core` | Shared schemas, types, constants |
+| `packages/infrastructure` | `@my-binder/infrastructure` | AWS CDK v2 infrastructure (spec 009) |
 
 ## Setup
 
@@ -49,9 +50,9 @@ pnpm turbo dev       # Start all dev servers
 - **`google-auth-library`** — Google ID token verification (`apps/server`); verifies audience, expiry, `email_verified` claim
 - **`jsonwebtoken`** — HS256 session JWT issuance and verification (`apps/server/src/auth/sessionJwt.ts`)
 - **`fastify-plugin`** — used by auth plugin to share `request.identity` decoration across Fastify scopes
-- DuckDB (existing embedded file-based database in `apps/server`); platform secure storage on mobile (Keychain / Keystore) (007-google-oauth-auth)
-- TypeScript 5 / Node 22 + Fastify v4, `@fastify/swagger@^8`, `@fastify/swagger-ui@^5`, `fastify-plugin@^4` (existing) (008-swagger-ui-auth)
-- N/A — no new database tables or persistent state (008-swagger-ui-auth)
+- **`@fastify/aws-lambda`** v6 — Lambda adapter wrapping the Fastify app (`apps/server/src/lambda.ts`)
+- **AWS CDK v2** (`aws-cdk-lib`) — infrastructure as code in `packages/infrastructure`
+- **EFS** — persistent storage for DuckDB file and MTGJSON parquet cache on Lambda
 
 ## Recent Changes
 - Adopted TypeScript 5 (strict) project-wide — replaces JavaScript + JSDoc approach

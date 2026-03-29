@@ -1,29 +1,70 @@
-import { MtgjsonSDK } from 'mtgjson-sdk';
-import type { CardSet } from 'mtgjson-sdk';
+import { DuckDBConnection } from '@duckdb/node-api';
+import type { DuckDBValue } from '@duckdb/node-api';
 import type { CardRecord, CardNotFoundResult, LegalityResult, SearchQuery } from '@my-binder/core';
 import type { CardProvider, LookupOptions } from '@src/providers/interface';
-import { mapCardSetToCardRecord } from './mapper';
+import { fetchRows } from '@src/db/client';
 
-// A card is physical if "paper" is in its availability list.
-// isOnlineOnly is unreliable (frequently null for physical cards).
-const isPhysical = (c: CardSet): boolean =>
-  Array.isArray(c.availability) && c.availability.includes('paper');
+// ---------------------------------------------------------------------------
+// Internal row type returned from mtgjson_cards queries
+// ---------------------------------------------------------------------------
+
+type CardRow = {
+  uuid: string;
+  name: string;
+  setCode: string;
+  number: string;
+  availability: string; // comma-space separated, e.g. "paper" or "mtgo, paper"
+  colorIdentity: string; // comma-space separated, e.g. "R" or "B, G"
+  manaCost: string | null;
+  manaValue: number | null;
+};
+
+function parseCommaSeparated(value: string | null | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+function rowToCardRecord(
+  row: CardRow,
+  scryfallId: string | null,
+  commanderLegal: boolean,
+): CardRecord {
+  return {
+    name: row.name,
+    set: row.setCode,
+    cardNumber: row.number,
+    manaCost: row.manaCost ?? null,
+    colorIdentity: parseCommaSeparated(row.colorIdentity),
+    commanderLegal,
+    imageRef: scryfallId,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Provider
+// ---------------------------------------------------------------------------
 
 export class MtgjsonProvider implements CardProvider {
-  private readonly sdk: MtgjsonSDK;
+  private readonly db: DuckDBConnection;
 
-  private constructor(sdk: MtgjsonSDK) {
-    this.sdk = sdk;
+  private constructor(db: DuckDBConnection) {
+    this.db = db;
   }
 
-  // Use the factory to ensure the SDK (and its DuckDB) is fully initialised before use.
-  static async create(options?: { cacheDir?: string }): Promise<MtgjsonProvider> {
-    const sdk = await MtgjsonSDK.create(options);
-    return new MtgjsonProvider(sdk);
+  /**
+   * Create a provider backed by an already-open DuckDB connection.
+   * The connection must have the mtgjson_cards, mtgjson_card_identifiers, and
+   * mtgjson_card_legalities tables available (populated by the card importer).
+   */
+  static create(db: DuckDBConnection): MtgjsonProvider {
+    return new MtgjsonProvider(db);
   }
 
   async close(): Promise<void> {
-    await this.sdk.close();
+    // DuckDB connection is managed externally — nothing to close here.
   }
 
   // ─── CardProvider ────────────────────────────────────────────────────────────
@@ -31,41 +72,61 @@ export class MtgjsonProvider implements CardProvider {
   async lookup(name: string, opts: LookupOptions = {}): Promise<CardRecord[] | CardNotFoundResult> {
     const { fuzzy = true, set, number } = opts;
 
-    let results: CardSet[];
+    let rows: CardRow[];
 
     if (set !== undefined) {
-      // Set-scoped lookup always uses exact name matching (fuzzy flag is irrelevant).
-      results = await this.sdk.cards.getByName(name, { setCode: set });
       if (number !== undefined) {
-        results = results.filter((c) => c.number === number);
+        rows = await this.queryCards(
+          `WHERE LOWER(name) = LOWER(?) AND setCode = ? AND number = ? AND availability LIKE '%paper%'`,
+          [name, set, number],
+        );
+      } else {
+        rows = await this.queryCards(
+          `WHERE LOWER(name) = LOWER(?) AND setCode = ? AND availability LIKE '%paper%'`,
+          [name, set],
+        );
       }
+    } else if (fuzzy) {
+      rows = await this.queryCards(
+        `WHERE LOWER(name) LIKE LOWER(?) AND availability LIKE '%paper%'`,
+        [`%${name}%`],
+      );
     } else {
-      results = fuzzy
-        ? await this.sdk.cards.search({ fuzzyName: name })
-        : await this.sdk.cards.getPrintings(name);
+      rows = await this.queryCards(
+        `WHERE LOWER(name) = LOWER(?) AND availability LIKE '%paper%'`,
+        [name],
+      );
     }
 
-    const physical = results.filter(isPhysical);
-    if (physical.length === 0) {
+    if (rows.length === 0) {
       return { found: false, name };
     }
-    return Promise.all(physical.map((card) => this.enrichCard(card)));
+    return Promise.all(rows.map((row) => this.enrichRow(row)));
   }
 
   async checkLegality(name: string, commanderColors?: string[]): Promise<LegalityResult> {
-    const cards = await this.sdk.cards.getByName(name);
-    const physical = cards.filter(isPhysical);
+    const rows = await this.queryCards(
+      `WHERE LOWER(name) = LOWER(?) AND availability LIKE '%paper%' LIMIT 1`,
+      [name],
+    );
 
-    if (physical.length === 0) {
-      // Propagate as an Error so the service layer can map it to a 404.
-      throw Object.assign(new Error(`No card found with name "${name}".`), { code: 'CARD_NOT_FOUND' });
+    if (rows.length === 0) {
+      throw Object.assign(new Error(`No card found with name "${name}".`), {
+        code: 'CARD_NOT_FOUND',
+      });
     }
 
-    // Legality is name-level — any printing's UUID gives the same result.
-    const { uuid, colorIdentity: cardColorIdentity } = physical[0]!;
-    const formats = await this.sdk.legalities.formatsForCard(uuid);
+    const row = rows[0]!;
+    const cardColorIdentity = parseCommaSeparated(row.colorIdentity);
 
-    if (formats['commander'] === 'Banned') {
+    const legalitiesResult = await this.db.run(
+      `SELECT commander FROM mtgjson_card_legalities WHERE uuid = ?`,
+      [row.uuid],
+    );
+    const legalitiesRows = await fetchRows(legalitiesResult);
+    const commanderStatus = String(legalitiesRows[0]?.['commander'] ?? '');
+
+    if (commanderStatus === 'Banned') {
       return {
         cardName: name,
         legal: false,
@@ -74,7 +135,6 @@ export class MtgjsonProvider implements CardProvider {
       };
     }
 
-    // Check colour identity against the Commander's colours (if provided).
     if (commanderColors !== undefined && commanderColors.length > 0) {
       const commanderColorSet = new Set(commanderColors.map((c) => c.toUpperCase()));
       const conflict = cardColorIdentity.some((c) => !commanderColorSet.has(c));
@@ -88,7 +148,7 @@ export class MtgjsonProvider implements CardProvider {
       }
     }
 
-    if (formats['commander'] !== 'Legal') {
+    if (commanderStatus !== 'Legal') {
       return {
         cardName: name,
         legal: false,
@@ -101,21 +161,48 @@ export class MtgjsonProvider implements CardProvider {
   }
 
   async search(query: SearchQuery): Promise<CardRecord[]> {
-    const results = await this.sdk.cards.search({
-      ...(query.name !== undefined && { fuzzyName: query.name }),
-      ...(query.set !== undefined && { setCode: query.set }),
-      ...(query.colorIdentity !== undefined && { colorIdentity: query.colorIdentity }),
-      ...(query.cmcMin !== undefined && { manaValueGte: query.cmcMin }),
-      ...(query.cmcMax !== undefined && { manaValueLte: query.cmcMax }),
-      availability: 'paper',
-    });
-    return Promise.all(results.map((card) => this.enrichCard(card)));
+    const conditions: string[] = ["availability LIKE '%paper%'"];
+    const params: DuckDBValue[] = [];
+
+    if (query.name !== undefined) {
+      conditions.push('LOWER(name) LIKE LOWER(?)');
+      params.push(`%${query.name}%`);
+    }
+    if (query.set !== undefined) {
+      conditions.push('setCode = ?');
+      params.push(query.set);
+    }
+    if (query.cmcMin !== undefined) {
+      conditions.push('manaValue >= ?');
+      params.push(query.cmcMin);
+    }
+    if (query.cmcMax !== undefined) {
+      conditions.push('manaValue <= ?');
+      params.push(query.cmcMax);
+    }
+
+    const where = `WHERE ${conditions.join(' AND ')}`;
+    let rows = await this.queryCards(where, params);
+
+    // colorIdentity filter: card's identity must be a subset of the allowed colors.
+    if (query.colorIdentity !== undefined && query.colorIdentity.length > 0) {
+      const allowed = new Set(query.colorIdentity.map((c) => c.toUpperCase()));
+      rows = rows.filter((row) => {
+        const cardColors = parseCommaSeparated(row.colorIdentity);
+        return cardColors.every((c) => allowed.has(c));
+      });
+    }
+
+    return Promise.all(rows.map((row) => this.enrichRow(row)));
   }
 
   async isReachable(): Promise<boolean> {
     try {
-      await this.sdk.cards.getByName('Lightning Bolt');
-      return true;
+      const result = await this.db.run(
+        `SELECT 1 FROM mtgjson_cards WHERE name = 'Lightning Bolt' LIMIT 1`,
+      );
+      const rows = await fetchRows(result);
+      return rows.length > 0;
     } catch {
       return false;
     }
@@ -123,14 +210,38 @@ export class MtgjsonProvider implements CardProvider {
 
   // ─── Private ─────────────────────────────────────────────────────────────────
 
-  // Fetch the enrichment data for a single card that cannot be obtained from the
-  // cards Parquet alone — legalities and identifiers live in separate Parquet files.
-  private async enrichCard(card: CardSet): Promise<CardRecord> {
-    const [ids, commanderLegal] = await Promise.all([
-      this.sdk.identifiers.getIdentifiers(card.uuid),
-      this.sdk.legalities.isLegal(card.uuid, 'commander'),
+  private async queryCards(whereClause: string, params: DuckDBValue[]): Promise<CardRow[]> {
+    const result = await this.db.run(
+      `SELECT uuid, name, setCode, number, availability, colorIdentity, manaCost, manaValue
+       FROM mtgjson_cards ${whereClause}`,
+      params,
+    );
+    const rows = await fetchRows(result);
+    return rows as unknown as CardRow[];
+  }
+
+  private async enrichRow(row: CardRow): Promise<CardRecord> {
+    const [identifierRows, legalityRows] = await Promise.all([
+      fetchRows(
+        await this.db.run(
+          `SELECT scryfallId FROM mtgjson_card_identifiers WHERE uuid = ?`,
+          [row.uuid],
+        ),
+      ),
+      fetchRows(
+        await this.db.run(
+          `SELECT commander FROM mtgjson_card_legalities WHERE uuid = ?`,
+          [row.uuid],
+        ),
+      ),
     ]);
-    const scryfallId = typeof ids?.scryfallId === 'string' ? ids.scryfallId : null;
-    return mapCardSetToCardRecord(card, { commanderLegal, scryfallId });
+
+    const scryfallId =
+      typeof identifierRows[0]?.['scryfallId'] === 'string'
+        ? identifierRows[0]['scryfallId']
+        : null;
+    const commanderLegal = String(legalityRows[0]?.['commander'] ?? '') === 'Legal';
+
+    return rowToCardRecord(row, scryfallId, commanderLegal);
   }
 }
