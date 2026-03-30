@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.0.0",
     "@duckdb/node-api": "latest",
     "@fastify/aws-lambda": "^6.0.0",
     "@fastify/cookie": "^9.0.0",

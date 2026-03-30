@@ -94,9 +94,11 @@ export class MyBinderStack extends cdk.Stack {
         MTGJSON_CACHE_DIR: '/mnt/data/mtgjson-cache',
         CARD_PROVIDER: 'mtgjson',
         EFS_PATH: '/mnt/data',
-        SESSION_JWT_SECRET: jwtSecret.secretValue.unsafeUnwrap(),
-        GOOGLE_CLIENT_IDS: googleClientIds.secretValue.unsafeUnwrap(),
-        GOOGLE_WEB_CLIENT_ID: googleWebClientId.secretValue.unsafeUnwrap(),
+        // Secret names only — values are fetched at runtime via the AWS SDK.
+        // This keeps plaintext secrets out of Lambda environment variables.
+        SESSION_JWT_SECRET_NAME: jwtSecret.secretName,
+        GOOGLE_CLIENT_IDS_SECRET_NAME: googleClientIds.secretName,
+        GOOGLE_WEB_CLIENT_ID_SECRET_NAME: googleWebClientId.secretName,
       },
     });
 

@@ -3,7 +3,7 @@ import type { OAuth2Client } from 'google-auth-library';
 import { verifyGoogleToken } from '@src/auth/googleVerifier';
 import { issueToken } from '@src/auth/sessionJwt';
 import { upsertUser } from '@src/repositories/userRepository';
-import { loadConfig } from '@src/config';
+import { getConfig } from '@src/config';
 
 export class InvalidGoogleTokenError extends Error {
   constructor(cause?: unknown) {
@@ -32,7 +32,7 @@ export async function signIn(
   idToken: string,
   deps: SignInDeps = {},
 ): Promise<GoogleSignInResponse> {
-  const { googleClientIds, sessionJwtSecret } = loadConfig();
+  const { googleClientIds, sessionJwtSecret } = getConfig();
 
   let user: AuthUser;
   try {

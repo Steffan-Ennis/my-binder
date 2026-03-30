@@ -53,6 +53,8 @@ pnpm turbo dev       # Start all dev servers
 - **`@fastify/aws-lambda`** v6 — Lambda adapter wrapping the Fastify app (`apps/server/src/lambda.ts`)
 - **AWS CDK v2** (`aws-cdk-lib`) — infrastructure as code in `packages/infrastructure`
 - **EFS** — persistent storage for DuckDB file and MTGJSON parquet cache on Lambda
+- TypeScript 5, Node 22 + `mtgjson-sdk@0.1.1`, `@duckdb/node-api` (app DB only — user collection), `fastify@4` (010-revert-mtgjson-infra)
+- DuckDB (app data only, `binder.duckdb`); EFS volume for SDK parquet cache (010-revert-mtgjson-infra)
 
 ## Recent Changes
 - Adopted TypeScript 5 (strict) project-wide — replaces JavaScript + JSDoc approach

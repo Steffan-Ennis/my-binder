@@ -68,10 +68,14 @@ Same as deploy — re-run `npx cdk deploy` from `packages/infrastructure`.
 
 ## Cold Start Behaviour
 
+On the first cold start, the MTGJSON SDK downloads its parquet files (~200 MB) into the
+EFS-backed `mtgjson-cache` subdirectory. Subsequent cold starts read directly from the
+existing EFS cache — no re-download occurs.
+
 | Scenario | Expected latency |
 |----------|-----------------|
-| First ever cold start (no EFS data) | 30–60 s (parquet download + import) |
-| Cold start with cached EFS data | 5–15 s (timestamp check only) |
+| First ever cold start (no EFS cache) | 30–60 s (parquet download) |
+| Cold start with EFS cache present | 5–15 s |
 | Warm invocation | < 1 s |
 
 ## Cost

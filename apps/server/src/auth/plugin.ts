@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyPluginCallback } from 'fastify';
 import fp from 'fastify-plugin';
 import type { AuthState } from '@my-binder/core';
 import { verifyToken } from './sessionJwt';
-import { loadConfig } from '@src/config';
+import { getConfig } from '@src/config';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -20,7 +20,7 @@ declare module 'fastify' {
  * Route handlers read `request.identity` to decide whether to return 401.
  */
 const authPlugin: FastifyPluginCallback = (fastify: FastifyInstance, _options, done) => {
-  const { sessionJwtSecret } = loadConfig();
+  const { sessionJwtSecret } = getConfig();
 
   fastify.decorateRequest('identity', null);
 

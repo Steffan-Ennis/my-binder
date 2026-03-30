@@ -1,9 +1,8 @@
 import Fastify, { FastifyInstance } from 'fastify';
 import fastifyCookie from '@fastify/cookie';
 import { MtgjsonSDK } from 'mtgjson-sdk';
-import { loadConfig } from '@src/config';
-import { initDb, getDb } from '@src/db/client';
-import { importCardDataIfStale } from '@src/db/cardImporter';
+import { loadConfig, type Config } from '@src/config';
+import { initDb } from '@src/db/client';
 import { healthRoutes } from '@src/routes/health';
 import { cardRoutes } from '@src/routes/cards';
 import { providerRoutes } from '@src/routes/provider';
@@ -14,25 +13,21 @@ import authPlugin from '@src/auth/plugin';
 import { MtgjsonProvider } from '@src/providers/mtgjson/index';
 import { registry } from '@src/providers/registry';
 
-export async function buildApp(): Promise<FastifyInstance> {
-  const config = loadConfig();
+export type AppResult = { fastify: FastifyInstance; config: Config };
+
+export async function buildApp(): Promise<AppResult> {
+  // 0. Load config — fetches secrets from Secrets Manager in production.
+  const config = await loadConfig();
 
   // 1. Open DB and run migrations.
   await initDb(config.dbPath);
 
-  // 2. Ensure MTGJSON parquet files are downloaded/cached.
-  //    The SDK is only used here for its download logic; card lookups go to DuckDB.
-  if (config.nodeEnv !== 'test') {
-    const sdk = await MtgjsonSDK.create({ cacheDir: config.mtgjsonCacheDir });
-    await sdk.close();
+  // 2. Initialise MTGJSON SDK — downloads parquet files on first cold start,
+  //    reads from EFS cache on subsequent starts.
+  const sdk = await MtgjsonSDK.create({ cacheDir: config.mtgjsonCacheDir });
 
-    // 3. Import card data from parquet into DuckDB if parquet is newer than last import.
-    const efsPath = process.env['EFS_PATH'];
-    await importCardDataIfStale(getDb(), config.mtgjsonCacheDir, efsPath);
-  }
-
-  // 4. Register the card provider (queries DuckDB directly).
-  const mtgjsonProvider = MtgjsonProvider.create(getDb());
+  // 3. Register the card provider backed by the SDK.
+  const mtgjsonProvider = new MtgjsonProvider(sdk);
   registry.register('mtgjson', mtgjsonProvider);
   await registry.setActive(config.cardProvider);
 
@@ -53,5 +48,5 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(providerRoutes);
   await fastify.register(authRoutes);
 
-  return fastify;
+  return { fastify, config };
 }
