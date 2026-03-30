@@ -118,6 +118,7 @@ pnpm turbo dev       # Start all dev servers
 - **AWS CDK v2** (`aws-cdk-lib`) — infrastructure as code in `packages/infrastructure`
 - **EFS** — persistent storage for DuckDB file (`binder.duckdb`) and MTGJSON SDK parquet cache (`mtgjson-cache/`) on Lambda; `mtgjsonCacheDir` derived from `EFS_PATH` env var when set
 - **NAT instance** (`t4g.nano`, ~$3/month) — replaces Managed NAT Gateway (~$32/month); provisioned via `ec2.NatProvider.instanceV2()` in the CDK stack; provides Lambda internet access for MTGJSON downloads and Google OAuth
+- **Secrets Manager** — all 3 secrets created by CDK (`RemovalPolicy.RETAIN`); `SESSION_JWT_SECRET` is auto-generated; `GOOGLE_CLIENT_IDS` and `GOOGLE_WEB_CLIENT_ID` are created with `REPLACE_ME` placeholder and must be overwritten manually after first deploy via `aws secretsmanager put-secret-value`
 
 ## Recent Changes
 - Adopted TypeScript 5 (strict) project-wide — replaces JavaScript + JSDoc approach

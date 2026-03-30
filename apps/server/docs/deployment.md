@@ -11,28 +11,26 @@ See also: `specs/009-infrastructure/contracts/deployment.md` for the full contra
 
 ## One-Time Setup
 
-### 1. Create secrets in AWS Secrets Manager
-
-```bash
-aws secretsmanager create-secret \
-  --name my-binder/SESSION_JWT_SECRET \
-  --secret-string "$(openssl rand -base64 48)"
-
-aws secretsmanager create-secret \
-  --name my-binder/GOOGLE_CLIENT_IDS \
-  --secret-string "your-ios-client-id,your-android-client-id,your-web-client-id"
-
-aws secretsmanager create-secret \
-  --name my-binder/GOOGLE_WEB_CLIENT_ID \
-  --secret-string "your-web-client-id"
-```
-
-### 2. Bootstrap CDK (first time only)
+### 1. Bootstrap CDK (first time only)
 
 ```bash
 cd packages/infrastructure
 pnpm install
 npx cdk bootstrap
+```
+
+### 2. Set real Google OAuth values (after first deploy)
+
+CDK creates all secrets automatically. `SESSION_JWT_SECRET` is auto-generated and ready to use. The Google secrets are created with a `REPLACE_ME` placeholder — overwrite them after the first deploy:
+
+```bash
+aws secretsmanager put-secret-value \
+  --secret-id my-binder/GOOGLE_CLIENT_IDS \
+  --secret-string "your-ios-client-id,your-android-client-id,your-web-client-id"
+
+aws secretsmanager put-secret-value \
+  --secret-id my-binder/GOOGLE_WEB_CLIENT_ID \
+  --secret-string "your-web-client-id"
 ```
 
 ## Deploy
@@ -92,4 +90,4 @@ cd packages/infrastructure
 npx cdk destroy
 ```
 
-Note: EFS filesystem and ECR repository use `RemovalPolicy.RETAIN` — they are NOT deleted on `cdk destroy`. Delete them manually if needed.
+Note: EFS filesystem, ECR repository, and all three Secrets Manager secrets use `RemovalPolicy.RETAIN` — they are NOT deleted on `cdk destroy`. Delete them manually if needed.
