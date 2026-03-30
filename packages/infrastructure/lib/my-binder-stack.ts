@@ -14,11 +14,20 @@ export class MyBinderStack extends cdk.Stack {
     super(scope, id, props);
 
     // ─── VPC ────────────────────────────────────────────────────────────────
-    // 2 AZs, private subnets with NAT Gateway for Lambda internet access
-    // (MTGJSON API downloads, Google OAuth verification).
+    // 2 AZs, private subnets with a NAT instance for Lambda internet access
+    // (MTGJSON parquet downloads, Google OAuth token verification).
+    //
+    // NAT instance (t4g.nano, ~$3/month) replaces Managed NAT Gateway (~$32/month).
+    // CDK NatProvider.instanceV2 uses Amazon Linux 2023 with iptables-based NAT;
+    // it creates the instance in the public subnet and configures routing automatically.
+    const natProvider = ec2.NatProvider.instanceV2({
+      instanceType: ec2.InstanceType.of(ec2.InstanceClass.T4G, ec2.InstanceSize.NANO),
+    });
+
     const vpc = new ec2.Vpc(this, 'Vpc', {
       maxAzs: 2,
       natGateways: 1,
+      natGatewayProvider: natProvider,
     });
 
     // ─── EFS ────────────────────────────────────────────────────────────────

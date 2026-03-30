@@ -117,6 +117,7 @@ pnpm turbo dev       # Start all dev servers
 - **`@fastify/aws-lambda`** v6 — Lambda adapter wrapping the Fastify app (`apps/server/src/lambda.ts`)
 - **AWS CDK v2** (`aws-cdk-lib`) — infrastructure as code in `packages/infrastructure`
 - **EFS** — persistent storage for DuckDB file (`binder.duckdb`) and MTGJSON SDK parquet cache (`mtgjson-cache/`) on Lambda; `mtgjsonCacheDir` derived from `EFS_PATH` env var when set
+- **NAT instance** (`t4g.nano`, ~$3/month) — replaces Managed NAT Gateway (~$32/month); provisioned via `ec2.NatProvider.instanceV2()` in the CDK stack; provides Lambda internet access for MTGJSON downloads and Google OAuth
 
 ## Recent Changes
 - Adopted TypeScript 5 (strict) project-wide — replaces JavaScript + JSDoc approach
