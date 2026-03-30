@@ -12,6 +12,7 @@ import { docsPlugin } from '@src/routes/docs';
 import authPlugin from '@src/auth/plugin';
 import { MtgjsonProvider } from '@src/providers/mtgjson/index';
 import { registry } from '@src/providers/registry';
+import { initEfs } from '@src/services/efsService';
 
 export type AppResult = { fastify: FastifyInstance; config: Config };
 
@@ -19,14 +20,19 @@ export async function buildApp(): Promise<AppResult> {
   // 0. Load config — fetches secrets from Secrets Manager in production.
   const config = await loadConfig();
 
-  // 1. Open DB and run migrations.
+  // 1. Ensure EFS subdirectories exist (Lambda only — no-op locally).
+  if (process.env['EFS_PATH']) {
+    await initEfs(process.env['EFS_PATH']);
+  }
+
+  // 2. Open DB and run migrations.
   await initDb(config.dbPath);
 
-  // 2. Initialise MTGJSON SDK — downloads parquet files on first cold start,
+  // 3. Initialise MTGJSON SDK — downloads parquet files on first cold start,
   //    reads from EFS cache on subsequent starts.
   const sdk = await MtgjsonSDK.create({ cacheDir: config.mtgjsonCacheDir });
 
-  // 3. Register the card provider backed by the SDK.
+  // 4. Register the card provider backed by the SDK.
   const mtgjsonProvider = new MtgjsonProvider(sdk);
   registry.register('mtgjson', mtgjsonProvider);
   await registry.setActive(config.cardProvider);

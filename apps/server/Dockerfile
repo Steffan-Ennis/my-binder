@@ -3,7 +3,7 @@
 # ─── Stage 1: Build ───────────────────────────────────────────────────────────
 # Build inside the Lambda base image so native binaries (DuckDB) are compiled
 # for Amazon Linux 2023 / glibc 2.34 — matching the Lambda execution environment.
-FROM public.ecr.aws/lambda/nodejs:22 AS builder
+FROM --platform=linux/amd64 public.ecr.aws/lambda/nodejs:22 AS builder
 
 WORKDIR /build
 
@@ -33,7 +33,7 @@ RUN pnpm --filter @my-binder/server build
 RUN pnpm deploy --filter @my-binder/server --prod /deploy/server --legacy
 
 # ─── Stage 2: Production image ────────────────────────────────────────────────
-FROM public.ecr.aws/lambda/nodejs:22
+FROM --platform=linux/amd64 public.ecr.aws/lambda/nodejs:22
 
 WORKDIR ${LAMBDA_TASK_ROOT}
 

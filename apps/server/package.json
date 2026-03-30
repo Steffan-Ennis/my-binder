@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build": "tsc && tsc-alias && cp -r src/db/migrations dist/db/",
+    "build": "tsc && tsc-alias && cp -r src/db/migrations dist/src/db/",
     "dev": "node --env-file=.env --import tsx --watch index.ts",
     "start": "node dist/index.js",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
