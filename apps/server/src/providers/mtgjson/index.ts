@@ -1,4 +1,4 @@
-import type { MtgjsonSDK } from 'mtgjson-sdk';
+import type {CardSet, MtgjsonSDK} from 'mtgjson-sdk';
 import type { CardRecord, CardNotFoundResult, LegalityResult, SearchQuery } from '@my-binder/core';
 import type { CardProvider, LookupOptions } from '@src/providers/interface';
 import { mapCardSetToCardRecord } from '@src/providers/mtgjson/mapper';
@@ -101,21 +101,11 @@ export class MtgjsonProvider implements CardProvider {
       ...(query.set !== undefined && { setCode: query.set }),
       ...(query.cmcMin !== undefined && { manaValueGte: query.cmcMin }),
       ...(query.cmcMax !== undefined && { manaValueLte: query.cmcMax }),
+      ...(query.colorIdentity !== undefined) && { colorIdentity: query.colorIdentity },
       availability: 'paper',
     });
 
-    let filtered = cards;
-    if (query.colorIdentity !== undefined && query.colorIdentity.length > 0) {
-      const allowed = new Set(query.colorIdentity.map((c) => c.toUpperCase()));
-      filtered = cards.filter((card) => card.colorIdentity.every((c) => allowed.has(c)));
-    }
-
-    return filtered.map((card) =>
-      mapCardSetToCardRecord(card, {
-        scryfallId: card.identifiers.scryfallId,
-        commanderLegal: card.legalities.commander === 'Legal',
-      }),
-    );
+    return await Promise.all(cards.map(card => this.enrichCard(card)));
   }
 
   async isReachable(): Promise<boolean> {
@@ -125,5 +115,16 @@ export class MtgjsonProvider implements CardProvider {
     } catch {
       return false;
     }
+  }
+
+  // Fetch the enrichment data for a single card that cannot be obtained from the
+  // cards Parquet alone — legalities and identifiers live in separate Parquet files.
+  private async enrichCard(card: CardSet): Promise<CardRecord> {
+    const [ids, commanderLegal] = await Promise.all([
+      this.sdk.identifiers.getIdentifiers(card.uuid),
+      this.sdk.legalities.isLegal(card.uuid, 'commander'),
+    ]);
+    const scryfallId = typeof ids?.scryfallId === 'string' ? ids.scryfallId : null;
+    return mapCardSetToCardRecord(card, { commanderLegal, scryfallId });
   }
 }
