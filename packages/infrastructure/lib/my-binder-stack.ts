@@ -7,6 +7,8 @@ import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import * as apigwv2Integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as rds from 'aws-cdk-lib/aws-rds'
+import { Duration } from "aws-cdk-lib"
 import { Construct } from 'constructs';
 
 export class MyBinderStack extends cdk.Stack {
@@ -38,6 +40,39 @@ export class MyBinderStack extends cdk.Stack {
       throughputMode: efs.ThroughputMode.ELASTIC,
       removalPolicy: cdk.RemovalPolicy.RETAIN, // Never delete data on stack destroy.
     });
+
+    const rdsUserName = 'my_binder_rds'
+
+    // ─── RDS Aurora ─────────────────────────────────────────────────────────
+    // Aurora Serverless V2 PostgreSQL for user and card collection storage.
+    const rdsCredentials = new rds.DatabaseSecret(this, 'my-binder-rds-credentials', {
+      username: rdsUserName,
+    });
+    rdsCredentials.applyRemovalPolicy(cdk.RemovalPolicy.RETAIN);
+
+    // Security group for RDS — allows inbound on 5432 from within the VPC.
+    const rdsSg = new ec2.SecurityGroup(this, 'RdsSg', {
+      vpc,
+      description: 'Aurora PostgreSQL security group',
+      allowAllOutbound: false,
+    });
+    rdsSg.addIngressRule(ec2.Peer.ipv4(vpc.vpcCidrBlock), ec2.Port.tcp(5432), 'Lambda → RDS');
+
+    // Persistence for user data and card collections.
+    const userRDS = new rds.DatabaseCluster(this, 'DatabaseCluster', {
+      engine: rds.DatabaseClusterEngine.auroraPostgres({ version: rds.AuroraPostgresEngineVersion.VER_17_7 }),
+      writer: rds.ClusterInstance.serverlessV2('writerInstance'),
+      vpc,
+      credentials: rds.Credentials.fromSecret(rdsCredentials),
+      defaultDatabaseName: 'my_binder',
+      autoMinorVersionUpgrade: true,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroups: [rdsSg],
+      serverlessV2MinCapacity: 0,
+      serverlessV2MaxCapacity: 2,
+      serverlessV2AutoPauseDuration: Duration.minutes(30),
+    });
+
 
     // Access point at /lambda with POSIX user 1001:1001.
     // Lambda mounts at /mnt/data — maps to /lambda on EFS.
@@ -130,6 +165,10 @@ export class MyBinderStack extends cdk.Stack {
         SESSION_JWT_SECRET_NAME: jwtSecret.secretName,
         GOOGLE_CLIENT_IDS_SECRET_NAME: googleClientIds.secretName,
         GOOGLE_WEB_CLIENT_ID_SECRET_NAME: googleWebClientId.secretName,
+        DATABASE_URL: userRDS.clusterEndpoint.hostname,
+        DATABASE_PORT: userRDS.clusterEndpoint.port.toString(),
+        DATABASE_USER: rdsUserName,
+        DATABASE_SECRET_NAME: rdsCredentials.secretName,
       },
     });
 
@@ -137,6 +176,10 @@ export class MyBinderStack extends cdk.Stack {
     jwtSecret.grantRead(serverFunction);
     googleClientIds.grantRead(serverFunction);
     googleWebClientId.grantRead(serverFunction);
+    rdsCredentials.grantRead(serverFunction)
+
+    // Grant Lambda connect access to the rds cluster
+    userRDS.grantConnect(serverFunction, rdsUserName)
 
     // ─── API Gateway HTTP API ────────────────────────────────────────────────
     // $default catch-all route — Fastify handles all routing internally.
