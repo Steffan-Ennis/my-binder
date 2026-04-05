@@ -1,9 +1,9 @@
 import { join } from 'node:path';
+import { DataSourceOptions } from "typeorm";
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
 
 export type Config = {
   port: number;
-  dbPath: string;
   nodeEnv: 'development' | 'test' | 'production';
   cardProvider: string;
   mtgjsonCacheDir: string;
@@ -13,6 +13,15 @@ export type Config = {
   googleWebClientId: string;
   // Secret for signing/verifying server-issued session JWTs. Min 32 chars.
   sessionJwtSecret: string;
+  // PostgreSQL connection config
+  pgHost: string;
+  pgPort: number;
+  pgUser: string;
+  pgPassword: string;
+  pgDatabase: string;
+
+  // DatabaseType
+  dbType?: DataSourceOptions['type'],
 };
 
 // Set once by loadConfig() after secrets are resolved; read everywhere via getConfig().
@@ -42,17 +51,17 @@ export function getConfig(): Config {
  * return the same already-resolved values without hitting Secrets Manager again.
  */
 export async function loadConfig(): Promise<Config> {
-  const [sessionJwtSecret, googleClientIdsRaw, googleWebClientId] = await Promise.all([
+  const [sessionJwtSecret, googleClientIdsRaw, googleWebClientId, pgPassword] = await Promise.all([
     resolveSecret('SESSION_JWT_SECRET_NAME', 'SESSION_JWT_SECRET'),
     resolveSecret('GOOGLE_CLIENT_IDS_SECRET_NAME', 'GOOGLE_CLIENT_IDS'),
     resolveSecret('GOOGLE_WEB_CLIENT_ID_SECRET_NAME', 'GOOGLE_WEB_CLIENT_ID'),
+    resolveSecret('DATABASE_SECRET_NAME', 'DATABASE_PASSWORD'),
   ]);
 
   const nodeEnv = (process.env['NODE_ENV'] ?? 'development') as Config['nodeEnv'];
 
   _config = {
     port: parseInt(process.env['PORT'] ?? '3000', 10),
-    dbPath: nodeEnv === 'test' ? ':memory:' : (process.env['DB_PATH'] ?? './binder.duckdb'),
     nodeEnv,
     cardProvider: process.env['CARD_PROVIDER'] ?? 'mtgjson',
     mtgjsonCacheDir: process.env['EFS_PATH']
@@ -64,6 +73,11 @@ export async function loadConfig(): Promise<Config> {
       .filter((s) => s.length > 0),
     googleWebClientId,
     sessionJwtSecret,
+    pgHost: process.env['DATABASE_URL'] ?? 'localhost',
+    pgPort: parseInt(process.env['DATABASE_PORT'] ?? '5432', 10),
+    pgUser: process.env['DATABASE_USER'] ?? 'postgres',
+    pgPassword,
+    pgDatabase: process.env['DATABASE_NAME'] ?? 'my_binder',
   };
 
   return _config;
@@ -80,7 +94,6 @@ function buildConfigFromEnv(): Config {
   const googleClientIdsRaw = process.env['GOOGLE_CLIENT_IDS'] ?? '';
   return {
     port: parseInt(process.env['PORT'] ?? '3000', 10),
-    dbPath: nodeEnv === 'test' ? ':memory:' : (process.env['DB_PATH'] ?? './binder.duckdb'),
     nodeEnv,
     cardProvider: process.env['CARD_PROVIDER'] ?? 'mtgjson',
     mtgjsonCacheDir: process.env['EFS_PATH']
@@ -92,6 +105,11 @@ function buildConfigFromEnv(): Config {
       .filter((s) => s.length > 0),
     googleWebClientId: process.env['GOOGLE_WEB_CLIENT_ID'] ?? '',
     sessionJwtSecret: process.env['SESSION_JWT_SECRET'] ?? '',
+    pgHost: process.env['DATABASE_URL'] ?? 'localhost',
+    pgPort: parseInt(process.env['DATABASE_PORT'] ?? '5432', 10),
+    pgUser: process.env['DATABASE_USER'] ?? 'postgres',
+    pgPassword: process.env['DATABASE_PASSWORD'] ?? '',
+    pgDatabase: process.env['DATABASE_NAME'] ?? 'my_binder',
   };
 }
 

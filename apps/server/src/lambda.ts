@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import awsLambdaFastify from '@fastify/aws-lambda';
 import type { APIGatewayProxyEventV2, Context } from 'aws-lambda';
 import { buildApp } from './app';

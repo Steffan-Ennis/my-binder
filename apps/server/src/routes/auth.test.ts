@@ -2,26 +2,19 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import Fastify from 'fastify';
 import fastifyCookie from '@fastify/cookie';
-import { initDb } from '@src/db/client';
-import authPlugin from '@src/auth/plugin';
+import authPlugin from '@src/auth/authPlugin';
 import { authRoutes } from './auth';
-import { InvalidGoogleTokenError } from '@src/services/authService';
+import {InvalidGoogleTokenError, signIn} from '@src/services/authService';
 import { issueToken } from '@src/auth/sessionJwt';
-import { upsertUser } from '@src/repositories/userRepository';
+import {getDataSource, initDataSource} from "@src/db/dataSource";
+import {AllowedUserEntity} from "@src/entities/AllowedUserEntity";
+import {DataSource, } from "typeorm";
+import {UserEntity} from "@src/entities/UserEntity";
+import {initRepositories} from "@src/db/repositories";
 
 const TEST_SECRET = 'a-test-secret-that-is-at-least-32-characters-long!!';
+const TEST_USER_ID = 'f353ca91-4fc5-49f2-9b9e-304f83d11914';
 
-const MOCK_USER = {
-  id: 'test-user-uuid-0001',
-  email: 'user@gmail.com',
-  displayName: 'Jane Doe',
-  avatarUrl: 'https://lh3.googleusercontent.com/photo.jpg',
-};
-
-const mockSignInSuccess = async (_idToken: string) => ({
-  token: 'mock-session-jwt',
-  user: MOCK_USER,
-});
 
 const mockSignInFailure = async (_idToken: string): Promise<never> => {
   throw new InvalidGoogleTokenError(new Error('Token is invalid'));
@@ -29,28 +22,48 @@ const mockSignInFailure = async (_idToken: string): Promise<never> => {
 
 describe('Auth API', () => {
   const fastify = Fastify();
+  let dataSource: DataSource
 
   before(async () => {
+    await initDataSource({
+      pgDatabase: 'MY-BINDER-UNIT-TEST',
+      pgHost: '',
+      pgUser: '',
+      pgPassword: '',
+      pgPort: 5432
+    })
+
+    dataSource = getDataSource()
+
+
+    await dataSource.runMigrations({
+      transaction: 'all'
+    })
+
+    initRepositories(dataSource)
+
     process.env['SESSION_JWT_SECRET'] = TEST_SECRET;
     process.env['GOOGLE_CLIENT_IDS'] = 'test-client-id';
-    await initDb(':memory:');
     await fastify.register(fastifyCookie);
     await fastify.register(authPlugin);
-    await fastify.register(authRoutes, { signIn: mockSignInSuccess });
+    await fastify.register(authRoutes, { signIn });
     await fastify.ready();
   });
 
   after(async () => {
     await fastify.close();
+    await getDataSource().getRepository(UserEntity).clear()
+    await getDataSource().getRepository(AllowedUserEntity).clear()
   });
 
-  // ─── US1: POST /auth/google ─────────────────────────────────────────────────
+  // ─── POST /auth/google ──────────────────────────────────────────────────────
 
   describe('POST /auth/google', () => {
     test('happy path: returns 200 with token and user', async () => {
       const response = await fastify.inject({
         method: 'POST',
         url: '/auth/google',
+        // Mock the module
         payload: { idToken: 'valid-google-id-token' },
       });
 
@@ -100,18 +113,17 @@ describe('Auth API', () => {
     });
   });
 
-  // ─── US1: GET /auth/me (authenticated) ─────────────────────────────────────
+  // ─── GET /auth/me (authenticated) ──────────────────────────────────────────
 
   describe('GET /auth/me (authenticated)', () => {
     test('returns 200 with authenticated identity when valid Bearer token present', async () => {
-      // Insert a real user in the in-memory DB and issue a real JWT for them.
-      const user = await upsertUser({
-        googleSub: 'auth-me-test-sub',
-        email: 'authme@gmail.com',
-        displayName: 'Auth Me',
-        avatarUrl: null,
-      });
-      const token = issueToken(user.id, TEST_SECRET);
+      const token = issueToken(TEST_USER_ID, TEST_SECRET);
+
+      await dataSource.getRepository(UserEntity).upsert({
+        id: TEST_USER_ID,
+        email: 'user@gmail.com',
+        displayName: 'Test-User'
+      }, ['id'])
 
       const response = await fastify.inject({
         method: 'GET',
@@ -122,11 +134,11 @@ describe('Auth API', () => {
       assert.equal(response.statusCode, 200);
       const body = response.json<{ kind: string; user: { email: string } }>();
       assert.equal(body.kind, 'authenticated');
-      assert.equal(body.user.email, 'authme@gmail.com');
+      assert.equal(body.user.email, 'user@gmail.com');
     });
   });
 
-  // ─── US2: GET /auth/me (guest) ──────────────────────────────────────────────
+  // ─── GET /auth/me (guest) ───────────────────────────────────────────────────
 
   describe('GET /auth/me (guest)', () => {
     test('returns 200 with guest identity when no Authorization header', async () => {
@@ -162,17 +174,11 @@ describe('Auth API', () => {
     });
   });
 
-  // ─── US3: POST /auth/signout ─────────────────────────────────────────────────
+  // ─── POST /auth/signout ──────────────────────────────────────────────────────
 
   describe('POST /auth/signout', () => {
     test('returns 204 with valid Bearer token', async () => {
-      const user = await upsertUser({
-        googleSub: 'signout-test-sub',
-        email: 'signout@gmail.com',
-        displayName: 'Sign Out User',
-        avatarUrl: null,
-      });
-      const token = issueToken(user.id, TEST_SECRET);
+      const token = issueToken(TEST_USER_ID, TEST_SECRET);
 
       const response = await fastify.inject({
         method: 'POST',

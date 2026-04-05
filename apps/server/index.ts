@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { buildApp } from '@src/app';
 
 async function main(): Promise<void> {

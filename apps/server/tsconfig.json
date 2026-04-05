@@ -10,8 +10,11 @@
     "paths": {
       "@root/*": ["./*"],
       "@src/*": ["./src/*"]
-    }
+    },
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "useDefineForClassFields": false
   },
-  "include": ["src/**/*", "index.ts"],
+  "include": ["src/**/*", "index.ts", "testing/*"],
   "exclude": ["dist", "node_modules"]
 }

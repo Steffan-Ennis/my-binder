@@ -1,14 +1,32 @@
-import { test, describe, before, after } from 'node:test';
+import { test, describe, before, after, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import Fastify from 'fastify';
 import fastifyCookie from '@fastify/cookie';
-import { initDb } from '@src/db/client';
 import authPlugin from '@src/auth/plugin';
-import { upsertUser } from '@src/repositories/userRepository';
 import { issueToken } from '@src/auth/sessionJwt';
 import { docsPlugin } from './docs';
 
 const TEST_SECRET = 'a-test-secret-that-is-at-least-32-characters-long!!';
+const TEST_USER_ID = 'docs-test-user-uuid';
+
+const MOCK_USER = {
+  id: TEST_USER_ID,
+  email: 'docs@gmail.com',
+  displayName: 'Docs User',
+  avatarUrl: null,
+};
+
+// Mock repositories so auth plugin can resolve the user from a JWT
+mock.module('@src/db/repositories', {
+  namedExports: {
+    getRepositories: () => ({
+      user: {
+        findUserById: async (id: string) => (id === TEST_USER_ID ? MOCK_USER : null),
+        upsertUser: async () => MOCK_USER,
+      },
+    }),
+  },
+});
 
 async function buildApp() {
   const fastify = Fastify();
@@ -26,25 +44,18 @@ describe('Docs API', () => {
     process.env['SESSION_JWT_SECRET'] = TEST_SECRET;
     process.env['GOOGLE_CLIENT_IDS'] = 'test-client-id';
     process.env['GOOGLE_WEB_CLIENT_ID'] = 'test-web-client-id.apps.googleusercontent.com';
-    await initDb(':memory:');
 
     fastify = await buildApp();
     await fastify.ready();
 
-    const user = await upsertUser({
-      googleSub: 'docs-test-sub',
-      email: 'docs@gmail.com',
-      displayName: 'Docs User',
-      avatarUrl: null,
-    });
-    authToken = issueToken(user.id, TEST_SECRET);
+    authToken = issueToken(TEST_USER_ID, TEST_SECRET);
   });
 
   after(async () => {
     await fastify.close();
   });
 
-  // ─── US1: Authenticated access ──────────────────────────────────────────────
+  // ─── Authenticated access ───────────────────────────────────────────────────
 
   describe('GET /docs (authenticated)', () => {
     test('returns 200 or 302 with Bearer token', async () => {
@@ -93,7 +104,7 @@ describe('Docs API', () => {
     });
   });
 
-  // ─── US2: Unauthenticated gate ──────────────────────────────────────────────
+  // ─── Unauthenticated gate ───────────────────────────────────────────────────
 
   describe('GET /docs/json (unauthenticated)', () => {
     test('returns 401 with UNAUTHORIZED code when no credentials', async () => {
@@ -123,7 +134,7 @@ describe('Docs API', () => {
     });
   });
 
-  // ─── US3: bearerAuth security scheme ────────────────────────────────────────
+  // ─── bearerAuth security scheme ─────────────────────────────────────────────
 
   describe('GET /docs/json — security scheme (authenticated)', () => {
     test('response contains components.securitySchemes.bearerAuth', async () => {

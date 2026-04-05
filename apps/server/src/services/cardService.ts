@@ -2,7 +2,7 @@ import type {
   Card, CardList, CreateCardBody, UpdateCardBody,
   CardRecord, CardNotFoundResult, LegalityResult, SearchQuery, SearchResult,
 } from '@my-binder/core';
-import * as repo from '@src/repositories/cardRepository';
+import { getRepositories } from '@src/db/repositories';
 import { registry } from '@src/providers/registry';
 
 export class NotFoundError extends Error {
@@ -12,29 +12,29 @@ export class NotFoundError extends Error {
   }
 }
 
-export async function getCards(): Promise<CardList> {
-  const cards = await repo.findAll();
+export async function getCards(userId: string): Promise<CardList> {
+  const cards = await getRepositories().card.findAll(userId);
   return { cards, total: cards.length };
 }
 
-export async function getCard(id: string): Promise<Card> {
-  const card = await repo.findById(id);
+export async function getCard(id: string, userId: string): Promise<Card> {
+  const card = await getRepositories().card.findById(id, userId);
   if (card === null) throw new NotFoundError(id);
   return card;
 }
 
-export async function createCard(body: CreateCardBody): Promise<Card> {
-  return repo.create(body);
+export async function createCard(body: CreateCardBody, userId: string): Promise<Card> {
+  return getRepositories().card.create(body, userId);
 }
 
-export async function updateCard(id: string, body: UpdateCardBody): Promise<Card> {
-  const card = await repo.update(id, body);
+export async function updateCard(id: string, body: UpdateCardBody, userId: string): Promise<Card> {
+  const card = await getRepositories().card.update(id, body, userId);
   if (card === null) throw new NotFoundError(id);
   return card;
 }
 
-export async function deleteCard(id: string): Promise<void> {
-  const deleted = await repo.remove(id);
+export async function deleteCard(id: string, userId: string): Promise<void> {
+  const deleted = await getRepositories().card.remove(id, userId);
   if (!deleted) throw new NotFoundError(id);
 }
 

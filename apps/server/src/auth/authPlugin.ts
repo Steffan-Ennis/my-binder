@@ -1,12 +1,16 @@
-import type { FastifyInstance, FastifyPluginCallback } from 'fastify';
+import type { FastifyInstance, FastifyPluginCallback, FastifyRequest, FastifyReply } from 'fastify';
 import fp from 'fastify-plugin';
 import type { AuthState } from '@my-binder/core';
 import { verifyToken } from './sessionJwt';
 import { getConfig } from '@src/config';
+import { getRepositories } from '@src/db/repositories';
 
 declare module 'fastify' {
   interface FastifyRequest {
     identity: AuthState;
+  }
+  interface FastifyInstance {
+    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 }
 
@@ -23,6 +27,12 @@ const authPlugin: FastifyPluginCallback = (fastify: FastifyInstance, _options, d
   const { sessionJwtSecret } = getConfig();
 
   fastify.decorateRequest('identity', null);
+
+  fastify.decorate('authenticate', async (request: FastifyRequest, reply: FastifyReply) => {
+    if (request.identity.kind !== 'authenticated') {
+      return reply.code(401).send({ error: 'UNAUTHORIZED', message: 'Authentication required.' });
+    }
+  });
 
   fastify.addHook('preHandler', async (request) => {
     const authHeader = request.headers['authorization'];
@@ -44,15 +54,13 @@ const authPlugin: FastifyPluginCallback = (fastify: FastifyInstance, _options, d
 
     try {
       const userId = verifyToken(token, sessionJwtSecret);
-      // Import here to avoid circular dependency issues at module load time.
-      const { findUserById } = await import('@src/repositories/userRepository');
-      const user = await findUserById(userId);
+      const user = await getRepositories().user.findUserById(userId);
       if (user === null) {
         request.identity = { kind: 'guest' };
       } else {
         request.identity = { kind: 'authenticated', user };
       }
-    } catch {
+    } catch (error) {
       // Invalid, expired, or tampered token — fall back to guest. Must NOT throw.
       request.identity = { kind: 'guest' };
     }

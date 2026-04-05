@@ -7,7 +7,7 @@ import {
   AUTH_ERROR_CODES,
 } from '@my-binder/core';
 import type { GoogleSignInBody, GoogleSignInResponse } from '@my-binder/core';
-import { signIn as defaultSignIn, InvalidGoogleTokenError } from '@src/services/authService';
+import { signIn as defaultSignIn, InvalidGoogleTokenError, AccessDeniedError } from '@src/services/authService';
 
 type AuthRoutesOpts = {
   signIn?: (idToken: string) => Promise<GoogleSignInResponse>;
@@ -28,6 +28,7 @@ export async function authRoutes(
         200: GOOGLE_SIGN_IN_RESPONSE_SCHEMA,
         400: AUTH_ERROR_RESPONSE_SCHEMA,
         401: AUTH_ERROR_RESPONSE_SCHEMA,
+        403: AUTH_ERROR_RESPONSE_SCHEMA,
       },
     },
   }, async (request, reply) => {
@@ -44,6 +45,12 @@ export async function authRoutes(
       });
       return reply.code(200).send(result);
     } catch (err) {
+      if (err instanceof AccessDeniedError) {
+        return reply.code(403).send({
+          error: 'ACCESS_DENIED',
+          message: 'This email address is not permitted to sign in.',
+        });
+      }
       if (err instanceof InvalidGoogleTokenError) {
         return reply.code(401).send({
           code: AUTH_ERROR_CODES.INVALID_GOOGLE_TOKEN,

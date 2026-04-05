@@ -1,8 +1,12 @@
 import Fastify, { FastifyInstance } from 'fastify';
+import fastifyCaching from '@fastify/caching';
 import fastifyCookie from '@fastify/cookie';
 import { MtgjsonSDK } from 'mtgjson-sdk';
 import { loadConfig, type Config } from '@src/config';
-import { initDb } from '@src/db/client';
+import { initDataSource, getDataSource } from '@src/db/dataSource';
+import { initRepositories } from '@src/db/repositories';
+import { appCache } from '@src/db/cache';
+import { reposPlugin } from '@src/plugins/reposPlugin';
 import { healthRoutes } from '@src/routes/health';
 import { cardRoutes } from '@src/routes/cards';
 import { providerRoutes } from '@src/routes/provider';
@@ -25,24 +29,35 @@ export async function buildApp(): Promise<AppResult> {
     await initEfs(process.env['EFS_PATH']);
   }
 
-  // 2. Open DB and run migrations.
-  await initDb(config.dbPath);
+  // 2. Initialise PostgreSQL DataSource.
+  await initDataSource(config);
 
-  // 3. Initialise MTGJSON SDK — downloads parquet files on first cold start,
+  // 3. Initialise repository singletons — must run after DataSource is ready.
+  initRepositories(getDataSource());
+
+  // 4. Initialise MTGJSON SDK — downloads parquet files on first cold start,
   //    reads from EFS cache on subsequent starts.
   const sdk = await MtgjsonSDK.create({ cacheDir: config.mtgjsonCacheDir });
 
-  // 4. Register the card provider backed by the SDK.
+  // 5. Register the card provider backed by the SDK.
   const mtgjsonProvider = new MtgjsonProvider(sdk);
   registry.register('mtgjson', mtgjsonProvider);
   await registry.setActive(config.cardProvider);
 
-  // 5. Build the Fastify instance.
+  // 6. Build the Fastify instance.
   const fastify = Fastify({ logger: true });
 
+  // Cache plugin must be registered early — sets Cache-Control headers via middleware.
+  await fastify.register(fastifyCaching, {
+    privacy: fastifyCaching.privacy.PRIVATE,
+    expiresIn: 300,
+    cache: appCache,
+  });
   // Cookie plugin must be registered before authPlugin so cookies are parsed
   // before the auth preHandler reads request.cookies['session'].
   await fastify.register(fastifyCookie);
+  // Repos plugin decorates fastify.repos.* — must run before authPlugin.
+  await fastify.register(reposPlugin);
   // Auth plugin must be registered before route plugins — decorates request.identity.
   await fastify.register(authPlugin);
   // docsPlugin must be registered before other routes so @fastify/swagger

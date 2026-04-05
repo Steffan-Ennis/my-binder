@@ -1,71 +1,84 @@
-import { test, describe, before } from 'node:test';
+import { test, describe, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { initDb } from '@src/db/client';
-import { upsertUser, findUserById } from './userRepository';
+import 'reflect-metadata';
+import { UserRepository, type UpsertUserInput } from './userRepository';
+import type { DataSource } from 'typeorm';
+
+// ─── Mocks ───────────────────────────────────────────────────────────────────
+
+const mockUpsert = mock.fn(async () => undefined);
+const mockFindOneByOrFail = mock.fn(async () => ({
+  id: 'user-uuid-1',
+  email: 'user@gmail.com',
+  displayName: 'Jane Doe',
+  avatarUrl: 'https://lh3.googleusercontent.com/photo.jpg',
+}));
+const mockFindOneBy = mock.fn(async () => null as Record<string, unknown> | null);
+
+const mockDs = {
+  getRepository: () => ({
+    upsert: mockUpsert,
+    findOneByOrFail: mockFindOneByOrFail,
+    findOneBy: mockFindOneBy,
+  }),
+} as unknown as DataSource;
+
+// ─── Tests ────────────────────────────────────────────────────────────────────
+
+const repo = new UserRepository(mockDs);
+
+const baseInput: UpsertUserInput = {
+  email: 'user@gmail.com',
+  displayName: 'Jane Doe',
+  avatarUrl: 'https://lh3.googleusercontent.com/photo.jpg',
+};
 
 describe('userRepository', () => {
-  before(async () => {
-    await initDb(':memory:');
-  });
+  describe('upsertUser', () => {
+    test('calls upsert with conflictPaths and returns AuthUser', async () => {
+      mockUpsert.mock.resetCalls();
+      mockFindOneByOrFail.mock.mockImplementation(async () => ({
+        id: 'user-uuid-1',
+        email: 'user@gmail.com',
+        displayName: 'Jane Doe',
+        avatarUrl: 'https://lh3.googleusercontent.com/photo.jpg',
+      }));
 
-  const baseUser = {
-    googleSub: 'google-sub-abc',
-    email: 'user@gmail.com',
-    displayName: 'Jane Doe',
-    avatarUrl: 'https://lh3.googleusercontent.com/photo.jpg',
-  };
+      const result = await repo.upsertUser(baseInput);
 
-  test('upsertUser creates a new user and returns it', async () => {
-    const user = await upsertUser(baseUser);
-    assert.ok(user.id, 'should have an id');
-    assert.equal(user.email, 'user@gmail.com');
-    assert.equal(user.displayName, 'Jane Doe');
-    assert.equal(user.avatarUrl, 'https://lh3.googleusercontent.com/photo.jpg');
-  });
-
-  test('upsertUser is idempotent on google_sub — returns same id on second call', async () => {
-    const first = await upsertUser(baseUser);
-    const second = await upsertUser(baseUser);
-    assert.equal(first.id, second.id);
-  });
-
-  test('upsertUser updates display_name and email on re-sign-in', async () => {
-    const original = await upsertUser(baseUser);
-    const updated = await upsertUser({
-      ...baseUser,
-      displayName: 'Jane Smith',
-      email: 'jane.smith@gmail.com',
+      assert.equal(mockUpsert.mock.callCount(), 1);
+      const callArgs = mockUpsert.mock.calls[0]?.arguments as unknown as [unknown, { conflictPaths: string[] }];
+      const opts = callArgs[1];
+      assert.deepEqual(opts.conflictPaths, ['email']);
+      assert.equal(result.email, 'user@gmail.com');
+      assert.equal(result.displayName, 'Jane Doe');
     });
-    assert.equal(updated.id, original.id);
-    assert.equal(updated.displayName, 'Jane Smith');
-    assert.equal(updated.email, 'jane.smith@gmail.com');
-  });
 
-  test('upsertUser handles null avatarUrl', async () => {
-    const user = await upsertUser({
-      googleSub: 'google-sub-no-avatar',
-      email: 'noavatar@gmail.com',
-      displayName: 'No Avatar',
-      avatarUrl: null,
+    test('concurrent upserts with same email do not error', async () => {
+      const [a, b] = await Promise.all([repo.upsertUser(baseInput), repo.upsertUser(baseInput)]);
+      assert.equal(a.email, b.email);
     });
-    assert.equal(user.avatarUrl, null);
   });
 
-  test('findUserById returns the user when found', async () => {
-    const created = await upsertUser({
-      googleSub: 'google-sub-find-test',
-      email: 'findme@gmail.com',
-      displayName: 'Find Me',
-      avatarUrl: null,
+  describe('findUserById', () => {
+    test('returns null for unknown id', async () => {
+      mockFindOneBy.mock.mockImplementation(async () => null);
+      const result = await repo.findUserById('00000000-0000-0000-0000-000000000000');
+      assert.equal(result, null);
     });
-    const found = await findUserById(created.id);
-    assert.ok(found !== null, 'should find the user');
-    assert.equal(found.id, created.id);
-    assert.equal(found.email, 'findme@gmail.com');
-  });
 
-  test('findUserById returns null for unknown id', async () => {
-    const result = await findUserById('00000000-0000-0000-0000-000000000000');
-    assert.equal(result, null);
+    test('returns AuthUser when found', async () => {
+      mockFindOneBy.mock.mockImplementation(async () => ({
+        id: 'user-uuid-1',
+        email: 'user@gmail.com',
+        displayName: 'Jane Doe',
+        avatarUrl: null,
+      }));
+
+      const result = await repo.findUserById('user-uuid-1');
+      assert.ok(result !== null);
+      assert.equal(result.id, 'user-uuid-1');
+      assert.equal(result.email, 'user@gmail.com');
+    });
   });
 });

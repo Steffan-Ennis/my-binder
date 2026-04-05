@@ -1,4 +1,4 @@
-import { test, describe, before } from 'node:test';
+import { test, describe, before, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import type { CardProvider } from '@src/providers/interface';
 import { registry } from '@src/providers/registry';
@@ -6,30 +6,72 @@ import {
   lookupCard,
   checkCommanderLegality,
   searchCards,
+  getCards,
+  getCard,
+  createCard,
+  deleteCard,
+  NotFoundError,
   CardNotFoundError,
   ProviderUnavailableError,
 } from './cardService';
 import type { CardRecord } from '@my-binder/core';
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const LIGHTNING_BOLT: CardRecord = {
-  name: 'Lightning Bolt',
-  set: 'M11',
-  cardNumber: '149',
-  manaCost: '{R}',
-  colorIdentity: ['R'],
-  commanderLegal: true,
-  imageRef: null,
+  name: 'Lightning Bolt', set: 'M11', cardNumber: '149',
+  manaCost: '{R}', colorIdentity: ['R'], commanderLegal: true, imageRef: null,
+};
+const SOL_RING: CardRecord = {
+  name: 'Sol Ring', set: 'C11', cardNumber: '58',
+  manaCost: '{1}', colorIdentity: [], commanderLegal: true, imageRef: null,
 };
 
-const SOL_RING: CardRecord = {
-  name: 'Sol Ring',
-  set: 'C11',
-  cardNumber: '58',
-  manaCost: '{1}',
-  colorIdentity: [],
-  commanderLegal: true,
-  imageRef: null,
+// ─── Mock repositories via @src/db/repositories ──────────────────────────────
+
+const USER_A = 'user-a-uuid';
+const USER_B = 'user-b-uuid';
+
+type CardRow = { id: string; name: string; userId: string; createdAt: string; updatedAt: string };
+let mockCardStore: CardRow[] = [];
+let nextId = 1;
+
+const mockCardRepo = {
+  findAll: async (userId: string) => mockCardStore.filter((c) => c.userId === userId),
+  findById: async (id: string, userId: string) =>
+    mockCardStore.find((c) => c.id === id && c.userId === userId) ?? null,
+  create: async (body: { name: string }, userId: string) => {
+    const row: CardRow = {
+      id: `card-${nextId++}`,
+      name: body.name,
+      userId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    mockCardStore.push(row);
+    return row;
+  },
+  update: async (id: string, body: { name: string }, userId: string) => {
+    const row = mockCardStore.find((c) => c.id === id && c.userId === userId);
+    if (!row) return null;
+    row.name = body.name;
+    return row;
+  },
+  remove: async (id: string, userId: string) => {
+    const idx = mockCardStore.findIndex((c) => c.id === id && c.userId === userId);
+    if (idx === -1) return false;
+    mockCardStore.splice(idx, 1);
+    return true;
+  },
 };
+
+mock.module('@src/db/repositories', {
+  namedExports: {
+    getRepositories: () => ({ card: mockCardRepo }),
+  },
+});
+
+// ─── Provider helpers ─────────────────────────────────────────────────────────
 
 function makeProvider(overrides: Partial<CardProvider> = {}): CardProvider {
   return {
@@ -41,13 +83,52 @@ function makeProvider(overrides: Partial<CardProvider> = {}): CardProvider {
   };
 }
 
+// ─── Collection functions ─────────────────────────────────────────────────────
+
+describe('cardService — collection functions', () => {
+  before(() => {
+    mockCardStore = [];
+    nextId = 1;
+  });
+
+  test('getCards returns only cards for the calling user', async () => {
+    mockCardStore = [
+      { id: 'c1', name: 'Lightning Bolt', userId: USER_A, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+      { id: 'c2', name: 'Sol Ring', userId: USER_B, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    ];
+    const result = await getCards(USER_A);
+    assert.equal(result.cards.length, 1);
+    assert.equal(result.cards[0]?.name, 'Lightning Bolt');
+    assert.equal(result.total, 1);
+  });
+
+  test('getCard throws NotFoundError for unknown id', async () => {
+    mockCardStore = [];
+    await assert.rejects(() => getCard('unknown-id', USER_A), NotFoundError);
+  });
+
+  test('createCard creates and returns card', async () => {
+    mockCardStore = [];
+    const card = await createCard({ name: 'Black Lotus' }, USER_A);
+    assert.equal(card.name, 'Black Lotus');
+    assert.ok(card.id);
+  });
+
+  test('deleteCard throws NotFoundError when card not found', async () => {
+    mockCardStore = [];
+    await assert.rejects(() => deleteCard('missing', USER_A), NotFoundError);
+  });
+});
+
+// ─── Provider-backed functions ────────────────────────────────────────────────
+// Collection functions (getCards, getCard, createCard, updateCard, deleteCard)
+// are also tested end-to-end via src/routes/cards.test.ts.
+
 describe('cardService — provider-backed functions', () => {
   before(async () => {
     registry.register('test', makeProvider());
     await registry.setActive('test');
   });
-
-  // ─── lookupCard ─────────────────────────────────────────────────────────────
 
   describe('lookupCard', () => {
     test('returns CardRecord array when cards are found', async () => {
@@ -57,66 +138,44 @@ describe('cardService — provider-backed functions', () => {
     });
 
     test('returns CardNotFoundResult when no match', async () => {
-      registry.register('notfound', makeProvider({
-        lookup: async (name) => ({ found: false, name }),
-      }));
+      registry.register('notfound', makeProvider({ lookup: async (name) => ({ found: false, name }) }));
       await registry.setActive('notfound');
-
       const result = await lookupCard('ZZZFake');
       assert.ok(!Array.isArray(result));
       assert.equal((result as { found: boolean }).found, false);
-
-      // Restore
       await registry.setActive('test');
     });
 
     test('throws ProviderUnavailableError when provider errors', async () => {
-      registry.register('broken', makeProvider({
-        lookup: async () => { throw new Error('connection lost'); },
-        isReachable: async () => true,
-      }));
+      registry.register('broken', makeProvider({ lookup: async () => { throw new Error('connection lost'); } }));
       await registry.setActive('broken');
-
       await assert.rejects(() => lookupCard('anything'), ProviderUnavailableError);
-
       await registry.setActive('test');
     });
 
     test('passes set option through to provider', async () => {
       let capturedOpts: Parameters<CardProvider['lookup']>[1] = {};
       registry.register('set-test', makeProvider({
-        lookup: async (_name, opts) => {
-          capturedOpts = opts ?? {};
-          return [LIGHTNING_BOLT];
-        },
+        lookup: async (_name, opts) => { capturedOpts = opts ?? {}; return [LIGHTNING_BOLT]; },
       }));
       await registry.setActive('set-test');
-
       await lookupCard('Lightning Bolt', { set: 'M11' });
       assert.equal(capturedOpts.set, 'M11');
-
       await registry.setActive('test');
     });
 
     test('passes number option through to provider', async () => {
       let capturedOpts: Parameters<CardProvider['lookup']>[1] = {};
       registry.register('number-test', makeProvider({
-        lookup: async (_name, opts) => {
-          capturedOpts = opts ?? {};
-          return [LIGHTNING_BOLT];
-        },
+        lookup: async (_name, opts) => { capturedOpts = opts ?? {}; return [LIGHTNING_BOLT]; },
       }));
       await registry.setActive('number-test');
-
       await lookupCard('Lightning Bolt', { set: 'M11', number: '149' });
       assert.equal(capturedOpts.set, 'M11');
       assert.equal(capturedOpts.number, '149');
-
       await registry.setActive('test');
     });
   });
-
-  // ─── checkCommanderLegality ─────────────────────────────────────────────────
 
   describe('checkCommanderLegality', () => {
     test('returns legal result for a legal card', async () => {
@@ -124,7 +183,6 @@ describe('cardService — provider-backed functions', () => {
         checkLegality: async (name) => ({ cardName: name, legal: true, reason: null, colorIdentity: [] }),
       }));
       await registry.setActive('legal');
-
       const result = await checkCommanderLegality('Sol Ring');
       assert.equal(result.legal, true);
       assert.equal(result.reason, null);
@@ -132,12 +190,9 @@ describe('cardService — provider-backed functions', () => {
 
     test('returns banned result', async () => {
       registry.register('banned-test', makeProvider({
-        checkLegality: async (name) => ({
-          cardName: name, legal: false, reason: 'Banned in Commander', colorIdentity: [],
-        }),
+        checkLegality: async (name) => ({ cardName: name, legal: false, reason: 'Banned in Commander', colorIdentity: [] }),
       }));
       await registry.setActive('banned-test');
-
       const result = await checkCommanderLegality('Black Lotus');
       assert.equal(result.legal, false);
       assert.equal(result.reason, 'Banned in Commander');
@@ -150,21 +205,15 @@ describe('cardService — provider-backed functions', () => {
         },
       }));
       await registry.setActive('missing-card');
-
       await assert.rejects(() => checkCommanderLegality('Nonexistent Card'), CardNotFoundError);
     });
 
     test('throws ProviderUnavailableError when provider errors with non-CARD_NOT_FOUND', async () => {
-      registry.register('unavailable', makeProvider({
-        checkLegality: async () => { throw new Error('timeout'); },
-      }));
+      registry.register('unavailable', makeProvider({ checkLegality: async () => { throw new Error('timeout'); } }));
       await registry.setActive('unavailable');
-
       await assert.rejects(() => checkCommanderLegality('Any Card'), ProviderUnavailableError);
     });
   });
-
-  // ─── searchCards ────────────────────────────────────────────────────────────
 
   describe('searchCards', () => {
     before(async () => {
@@ -210,21 +259,16 @@ describe('cardService — provider-backed functions', () => {
     test('returns totalPages=0 for empty result set', async () => {
       registry.register('empty', makeProvider({ search: async () => [] }));
       await registry.setActive('empty');
-
       const result = await searchCards({ name: 'nothing' });
       assert.equal(result.total, 0);
       assert.equal(result.totalPages, 0);
       assert.deepEqual(result.cards, []);
-
       await registry.setActive('search');
     });
 
     test('throws ProviderUnavailableError when provider errors', async () => {
-      registry.register('search-broken', makeProvider({
-        search: async () => { throw new Error('disk error'); },
-      }));
+      registry.register('search-broken', makeProvider({ search: async () => { throw new Error('disk error'); } }));
       await registry.setActive('search-broken');
-
       await assert.rejects(() => searchCards({ name: 'x' }), ProviderUnavailableError);
     });
   });

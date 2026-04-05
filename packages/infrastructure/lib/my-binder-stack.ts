@@ -50,23 +50,30 @@ export class MyBinderStack extends cdk.Stack {
     });
     rdsCredentials.applyRemovalPolicy(cdk.RemovalPolicy.RETAIN);
 
-    // Security group for RDS — allows inbound on 5432 from within the VPC.
+    // Security group for RDS — allows inbound on 5432 from VPC (Lambda) and
+    // from the internet (local developer access).
+    // TODO: restrict 0.0.0.0/0 to your static IP for production hardening.
     const rdsSg = new ec2.SecurityGroup(this, 'RdsSg', {
       vpc,
       description: 'Aurora PostgreSQL security group',
       allowAllOutbound: false,
     });
     rdsSg.addIngressRule(ec2.Peer.ipv4(vpc.vpcCidrBlock), ec2.Port.tcp(5432), 'Lambda → RDS');
+    rdsSg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(5432), 'Local developer access');
 
     // Persistence for user data and card collections.
+    // Placed in public subnets with publiclyAccessible so developers can
+    // connect directly from a local machine via a standard psql client.
     const userRDS = new rds.DatabaseCluster(this, 'DatabaseCluster', {
       engine: rds.DatabaseClusterEngine.auroraPostgres({ version: rds.AuroraPostgresEngineVersion.VER_17_7 }),
-      writer: rds.ClusterInstance.serverlessV2('writerInstance'),
+      writer: rds.ClusterInstance.serverlessV2('writerInstance', {
+        publiclyAccessible: true,
+      }),
       vpc,
       credentials: rds.Credentials.fromSecret(rdsCredentials),
       defaultDatabaseName: 'my_binder',
       autoMinorVersionUpgrade: true,
-      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
       securityGroups: [rdsSg],
       serverlessV2MinCapacity: 0,
       serverlessV2MaxCapacity: 2,

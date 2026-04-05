@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { HEALTH_RESPONSE_SCHEMA } from '@my-binder/core';
-import { getDb } from '@src/db/client';
+import { getDataSource } from '@src/db/dataSource';
 
 export async function healthRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get('/health', {
@@ -12,7 +12,7 @@ export async function healthRoutes(fastify: FastifyInstance): Promise<void> {
     },
   }, async (_request, reply) => {
     try {
-      getDb();
+      getDataSource();
       return reply.code(200).send({ status: 'ok', database: 'connected' });
     } catch {
       return reply.code(503).send({ status: 'degraded', database: 'unavailable' });
