@@ -2,7 +2,7 @@ import { test, describe, before, after, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import Fastify from 'fastify';
 import fastifyCookie from '@fastify/cookie';
-import authPlugin from '@src/auth/plugin';
+import authPlugin from '@src/auth/authPlugin';
 import { issueToken } from '@src/auth/sessionJwt';
 import { docsPlugin } from './docs';
 

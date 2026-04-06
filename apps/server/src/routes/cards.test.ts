@@ -2,7 +2,7 @@ import { test, describe, before, after, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import Fastify from 'fastify';
 import fastifyCookie from '@fastify/cookie';
-import authPlugin from '@src/auth/plugin';
+import authPlugin from '@src/auth/authPlugin';
 import { cardRoutes } from '@src/routes/cards';
 import { registry } from '@src/providers/registry';
 import type { CardProvider } from '@src/providers/interface';

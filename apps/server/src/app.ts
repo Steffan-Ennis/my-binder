@@ -13,7 +13,7 @@ import { providerRoutes } from '@src/routes/provider';
 import { authRoutes } from '@src/routes/auth';
 import { loginRoutes } from '@src/routes/login';
 import { docsPlugin } from '@src/routes/docs';
-import authPlugin from '@src/auth/plugin';
+import authPlugin from '@src/auth/authPlugin';
 import { MtgjsonProvider } from '@src/providers/mtgjson/index';
 import { registry } from '@src/providers/registry';
 import { initEfs } from '@src/services/efsService';

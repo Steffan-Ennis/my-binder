@@ -1,20 +1,24 @@
-import { test, describe, before, after } from 'node:test';
+import { test, describe, before, after, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import Fastify from 'fastify';
 import fastifyCookie from '@fastify/cookie';
 import authPlugin from '@src/auth/authPlugin';
 import { authRoutes } from './auth';
-import {InvalidGoogleTokenError, signIn} from '@src/services/authService';
+import { InvalidGoogleTokenError } from '@src/services/authService';
 import { issueToken } from '@src/auth/sessionJwt';
-import {getDataSource, initDataSource} from "@src/db/dataSource";
-import {AllowedUserEntity} from "@src/entities/AllowedUserEntity";
-import {DataSource, } from "typeorm";
-import {UserEntity} from "@src/entities/UserEntity";
-import {initRepositories} from "@src/db/repositories";
+import { getDataSource, initDataSource } from "@src/db/dataSource";
+import { AllowedUserEntity } from "@src/entities/AllowedUserEntity";
+import { DataSource, } from "typeorm";
+import { UserEntity } from "@src/entities/UserEntity";
+import { initRepositories } from "@src/db/repositories";
+import { type VerifyIdTokenOptions } from "google-auth-library";
 
 const TEST_SECRET = 'a-test-secret-that-is-at-least-32-characters-long!!';
 const TEST_USER_ID = 'f353ca91-4fc5-49f2-9b9e-304f83d11914';
-
+const ID_TOKEN = 'valid-google-id-token'
+const TEST_USER_EMAIL = 'user@gmail.com'
+const TEST_USER_NAME = 'test-user'
+const TEST_EMAIL_VERIFIED = true
 
 const mockSignInFailure = async (_idToken: string): Promise<never> => {
   throw new InvalidGoogleTokenError(new Error('Token is invalid'));
@@ -23,6 +27,32 @@ const mockSignInFailure = async (_idToken: string): Promise<never> => {
 describe('Auth API', () => {
   const fastify = Fastify();
   let dataSource: DataSource
+  let verifyIdTokenSpy: typeof mock.fn
+  let googleMock:  ReturnType<typeof mock.module>
+
+  verifyIdTokenSpy = mock.fn(({
+    idToken: _idToken,
+  }: VerifyIdTokenOptions) => {
+    if(_idToken && _idToken === ID_TOKEN){
+      return {
+        sub: 'google',
+        email: TEST_USER_EMAIL,
+        email_verified: TEST_EMAIL_VERIFIED,
+        name: TEST_USER_NAME,
+        picture: ''
+      }
+    }
+
+    return undefined
+  })
+  function Oauth2Client () {}
+  Oauth2Client.prototype.verifyIdToken = verifyIdTokenSpy
+  googleMock = mock.module('google-auth-library', {
+    namedExports: {
+      Oauth2Client: Oauth2Client
+    },
+    defaultExport: mock.fn()
+  })
 
   before(async () => {
     await initDataSource({
@@ -44,6 +74,8 @@ describe('Auth API', () => {
 
     process.env['SESSION_JWT_SECRET'] = TEST_SECRET;
     process.env['GOOGLE_CLIENT_IDS'] = 'test-client-id';
+
+    const { signIn } = await import('@src/services/authService')
     await fastify.register(fastifyCookie);
     await fastify.register(authPlugin);
     await fastify.register(authRoutes, { signIn });
@@ -54,6 +86,7 @@ describe('Auth API', () => {
     await fastify.close();
     await getDataSource().getRepository(UserEntity).clear()
     await getDataSource().getRepository(AllowedUserEntity).clear()
+    googleMock.restore()
   });
 
   // ─── POST /auth/google ──────────────────────────────────────────────────────

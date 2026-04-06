@@ -24,12 +24,11 @@ pnpm-debug.log*
 .vscode/settings.json
 .idea/
 
-# DuckDB data files
-*.duckdb
-*.duckdb.wal
-
 # Test coverage
 coverage/
 
 # Turbo cache
 .turbo/
+
+# CDK cache
+cdk.out/
