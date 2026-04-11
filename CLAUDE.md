@@ -121,6 +121,7 @@ pnpm turbo dev       # Start all dev servers
 - **Secrets Manager** — all 3 secrets created by CDK (`RemovalPolicy.RETAIN`); `SESSION_JWT_SECRET` is auto-generated; `GOOGLE_CLIENT_IDS` and `GOOGLE_WEB_CLIENT_ID` are created with `REPLACE_ME` placeholder and must be overwritten manually after first deploy via `aws secretsmanager put-secret-value`
 - TypeScript 5, Node 22 + Fastify v4, TypeORM 0.3.x, `pg` (PostgreSQL driver), `reflect-metadata` (011-postgres-migration)
 - AWS Aurora Serverless V2 PostgreSQL 17 — public subnet, developer-accessible (011-postgres-migration)
+- Jest 29 + ts-jest 29 + @types/jest — test framework for `apps/server` (013-migrate-jest-tests)
 
 ## Recent Changes
 - Adopted TypeScript 5 (strict) project-wide — replaces JavaScript + JSDoc approach

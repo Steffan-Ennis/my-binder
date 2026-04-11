@@ -1,24 +1,43 @@
-import { test, describe, before, after, mock } from 'node:test';
-import assert from 'node:assert/strict';
+import 'reflect-metadata';
 import Fastify from 'fastify';
 import fastifyCookie from '@fastify/cookie';
 import authPlugin from '@src/auth/authPlugin';
-import { authRoutes } from './auth';
 import { InvalidGoogleTokenError } from '@src/services/authService';
 import { issueToken } from '@src/auth/sessionJwt';
-import { getDataSource, initDataSource } from "@src/db/dataSource";
-import { AllowedUserEntity } from "@src/entities/AllowedUserEntity";
-import { DataSource, } from "typeorm";
-import { UserEntity } from "@src/entities/UserEntity";
-import { initRepositories } from "@src/db/repositories";
-import { type VerifyIdTokenOptions } from "google-auth-library";
+import { getDataSource, initDataSource } from '@src/db/dataSource';
+import { AllowedUserEntity } from '@src/entities/AllowedUserEntity';
+import { DataSource } from 'typeorm';
+import { UserEntity } from '@src/entities/UserEntity';
+import { initRepositories } from '@src/db/repositories';
+import { authRoutes } from '@src/routes/auth';
 
 const TEST_SECRET = 'a-test-secret-that-is-at-least-32-characters-long!!';
 const TEST_USER_ID = 'f353ca91-4fc5-49f2-9b9e-304f83d11914';
-const ID_TOKEN = 'valid-google-id-token'
-const TEST_USER_EMAIL = 'user@gmail.com'
-const TEST_USER_NAME = 'test-user'
-const TEST_EMAIL_VERIFIED = true
+const ID_TOKEN = 'valid-google-id-token';
+const TEST_USER_EMAIL = 'user@gmail.com';
+const TEST_USER_NAME = 'test-user';
+const TEST_EMAIL_VERIFIED = true;
+
+const mockVerifyIdToken = jest.fn(({ idToken: _idToken }: { idToken: string }) => {
+  if (_idToken && _idToken === ID_TOKEN) {
+    return {
+      getPayload: () => ({
+        sub: 'google',
+        email: TEST_USER_EMAIL,
+        email_verified: TEST_EMAIL_VERIFIED,
+        name: TEST_USER_NAME,
+        picture: '',
+      }),
+    };
+  }
+  return { getPayload: () => undefined };
+});
+
+jest.mock('google-auth-library', () => {
+  function OAuth2Client() {}
+  OAuth2Client.prototype.verifyIdToken = (...args: unknown[]) => mockVerifyIdToken(...(args as [{ idToken: string }]));
+  return { OAuth2Client };
+});
 
 const mockSignInFailure = async (_idToken: string): Promise<never> => {
   throw new InvalidGoogleTokenError(new Error('Token is invalid'));
@@ -26,67 +45,44 @@ const mockSignInFailure = async (_idToken: string): Promise<never> => {
 
 describe('Auth API', () => {
   const fastify = Fastify();
-  let dataSource: DataSource
-  let verifyIdTokenSpy: typeof mock.fn
-  let googleMock:  ReturnType<typeof mock.module>
+  let dataSource: DataSource;
 
-  verifyIdTokenSpy = mock.fn(({
-    idToken: _idToken,
-  }: VerifyIdTokenOptions) => {
-    if(_idToken && _idToken === ID_TOKEN){
-      return {
-        sub: 'google',
-        email: TEST_USER_EMAIL,
-        email_verified: TEST_EMAIL_VERIFIED,
-        name: TEST_USER_NAME,
-        picture: ''
-      }
-    }
-
-    return undefined
-  })
-  function Oauth2Client () {}
-  Oauth2Client.prototype.verifyIdToken = verifyIdTokenSpy
-  googleMock = mock.module('google-auth-library', {
-    namedExports: {
-      Oauth2Client: Oauth2Client
-    },
-    defaultExport: mock.fn()
-  })
-
-  before(async () => {
+  beforeAll(async () => {
     await initDataSource({
       pgDatabase: 'MY-BINDER-UNIT-TEST',
       pgHost: '',
       pgUser: '',
       pgPassword: '',
-      pgPort: 5432
-    })
+      pgPort: 5432,
+    });
 
-    dataSource = getDataSource()
-
+    dataSource = getDataSource();
 
     await dataSource.runMigrations({
-      transaction: 'all'
-    })
+      transaction: 'all',
+    });
 
-    initRepositories(dataSource)
+    initRepositories(dataSource);
+
+    // Seed the allowlist so signIn does not reject with AccessDeniedError
+    await dataSource.getRepository(AllowedUserEntity).save({ email: TEST_USER_EMAIL });
 
     process.env['SESSION_JWT_SECRET'] = TEST_SECRET;
     process.env['GOOGLE_CLIENT_IDS'] = 'test-client-id';
 
-    const { signIn } = await import('@src/services/authService')
+    const { signIn } = await import('@src/services/authService');
     await fastify.register(fastifyCookie);
     await fastify.register(authPlugin);
     await fastify.register(authRoutes, { signIn });
     await fastify.ready();
   });
 
-  after(async () => {
+  afterAll(async () => {
     await fastify.close();
-    await getDataSource().getRepository(UserEntity).clear()
-    await getDataSource().getRepository(AllowedUserEntity).clear()
-    googleMock.restore()
+    const ds = getDataSource();
+    await ds.query('TRUNCATE TABLE "allowed_user_entity", "users" CASCADE');
+    await ds.destroy();
+    jest.restoreAllMocks();
   });
 
   // ─── POST /auth/google ──────────────────────────────────────────────────────
@@ -96,14 +92,15 @@ describe('Auth API', () => {
       const response = await fastify.inject({
         method: 'POST',
         url: '/auth/google',
-        // Mock the module
         payload: { idToken: 'valid-google-id-token' },
       });
 
-      assert.equal(response.statusCode, 200);
+      expect(response.statusCode).toBe(200);
       const body = response.json<{ token: string; user: { id: string; email: string } }>();
-      assert.ok(body.token, 'should have token');
-      assert.equal(body.user.email, 'user@gmail.com');
+      expect(body.token).toBeTruthy();
+      expect(body.user.email).toBe('user@gmail.com');
+      // KEY VALIDATION: verify the mock spy was actually called
+      expect(mockVerifyIdToken.mock.calls.length).toBeGreaterThanOrEqual(1);
     });
 
     test('returns 400 when idToken is missing', async () => {
@@ -113,7 +110,7 @@ describe('Auth API', () => {
         payload: {},
       });
 
-      assert.equal(response.statusCode, 400);
+      expect(response.statusCode).toBe(400);
     });
   });
 
@@ -122,14 +119,14 @@ describe('Auth API', () => {
   describe('POST /auth/google (failure cases)', () => {
     const failFastify = Fastify();
 
-    before(async () => {
+    beforeAll(async () => {
       await failFastify.register(fastifyCookie);
       await failFastify.register(authPlugin);
       await failFastify.register(authRoutes, { signIn: mockSignInFailure });
       await failFastify.ready();
     });
 
-    after(async () => {
+    afterAll(async () => {
       await failFastify.close();
     });
 
@@ -140,9 +137,9 @@ describe('Auth API', () => {
         payload: { idToken: 'not-a-real-token' },
       });
 
-      assert.equal(response.statusCode, 401);
+      expect(response.statusCode).toBe(401);
       const body = response.json<{ code: string }>();
-      assert.equal(body.code, 'INVALID_GOOGLE_TOKEN');
+      expect(body.code).toBe('INVALID_GOOGLE_TOKEN');
     });
   });
 
@@ -155,8 +152,8 @@ describe('Auth API', () => {
       await dataSource.getRepository(UserEntity).upsert({
         id: TEST_USER_ID,
         email: 'user@gmail.com',
-        displayName: 'Test-User'
-      }, ['id'])
+        displayName: 'Test-User',
+      }, ['email']);
 
       const response = await fastify.inject({
         method: 'GET',
@@ -164,10 +161,10 @@ describe('Auth API', () => {
         headers: { authorization: `Bearer ${token}` },
       });
 
-      assert.equal(response.statusCode, 200);
+      expect(response.statusCode).toBe(200);
       const body = response.json<{ kind: string; user: { email: string } }>();
-      assert.equal(body.kind, 'authenticated');
-      assert.equal(body.user.email, 'user@gmail.com');
+      expect(body.kind).toBe('authenticated');
+      expect(body.user.email).toBe('user@gmail.com');
     });
   });
 
@@ -177,9 +174,9 @@ describe('Auth API', () => {
     test('returns 200 with guest identity when no Authorization header', async () => {
       const response = await fastify.inject({ method: 'GET', url: '/auth/me' });
 
-      assert.equal(response.statusCode, 200);
+      expect(response.statusCode).toBe(200);
       const body = response.json<{ kind: string }>();
-      assert.equal(body.kind, 'guest');
+      expect(body.kind).toBe('guest');
     });
 
     test('returns 200 with guest identity when Authorization header is malformed', async () => {
@@ -189,9 +186,9 @@ describe('Auth API', () => {
         headers: { authorization: 'not-a-bearer-token' },
       });
 
-      assert.equal(response.statusCode, 200);
+      expect(response.statusCode).toBe(200);
       const body = response.json<{ kind: string }>();
-      assert.equal(body.kind, 'guest');
+      expect(body.kind).toBe('guest');
     });
 
     test('returns 200 with guest identity when Bearer token is invalid', async () => {
@@ -201,9 +198,9 @@ describe('Auth API', () => {
         headers: { authorization: 'Bearer invalid.token.here' },
       });
 
-      assert.equal(response.statusCode, 200);
+      expect(response.statusCode).toBe(200);
       const body = response.json<{ kind: string }>();
-      assert.equal(body.kind, 'guest');
+      expect(body.kind).toBe('guest');
     });
   });
 
@@ -219,7 +216,7 @@ describe('Auth API', () => {
         headers: { authorization: `Bearer ${token}` },
       });
 
-      assert.equal(response.statusCode, 204);
+      expect(response.statusCode).toBe(204);
     });
 
     test('returns 204 even with no Authorization header (server-side no-op)', async () => {
@@ -228,7 +225,7 @@ describe('Auth API', () => {
         url: '/auth/signout',
       });
 
-      assert.equal(response.statusCode, 204);
+      expect(response.statusCode).toBe(204);
     });
   });
 });

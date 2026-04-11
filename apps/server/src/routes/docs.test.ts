@@ -1,5 +1,3 @@
-import { test, describe, before, after, mock } from 'node:test';
-import assert from 'node:assert/strict';
 import Fastify from 'fastify';
 import fastifyCookie from '@fastify/cookie';
 import authPlugin from '@src/auth/authPlugin';
@@ -9,24 +7,15 @@ import { docsPlugin } from './docs';
 const TEST_SECRET = 'a-test-secret-that-is-at-least-32-characters-long!!';
 const TEST_USER_ID = 'docs-test-user-uuid';
 
-const MOCK_USER = {
-  id: TEST_USER_ID,
-  email: 'docs@gmail.com',
-  displayName: 'Docs User',
-  avatarUrl: null,
-};
-
 // Mock repositories so auth plugin can resolve the user from a JWT
-mock.module('@src/db/repositories', {
-  namedExports: {
-    getRepositories: () => ({
-      user: {
-        findUserById: async (id: string) => (id === TEST_USER_ID ? MOCK_USER : null),
-        upsertUser: async () => MOCK_USER,
-      },
-    }),
-  },
-});
+jest.mock('@src/db/repositories', () => ({
+  getRepositories: () => ({
+    user: {
+      findUserById: async (id: string) => (id === 'docs-test-user-uuid' ? { id: 'docs-test-user-uuid', email: 'docs@gmail.com', displayName: 'Docs User', avatarUrl: null } : null),
+      upsertUser: async () => ({ id: 'docs-test-user-uuid', email: 'docs@gmail.com', displayName: 'Docs User', avatarUrl: null }),
+    },
+  }),
+}));
 
 async function buildApp() {
   const fastify = Fastify();
@@ -40,7 +29,7 @@ describe('Docs API', () => {
   let fastify: Awaited<ReturnType<typeof buildApp>>;
   let authToken: string;
 
-  before(async () => {
+  beforeAll(async () => {
     process.env['SESSION_JWT_SECRET'] = TEST_SECRET;
     process.env['GOOGLE_CLIENT_IDS'] = 'test-client-id';
     process.env['GOOGLE_WEB_CLIENT_ID'] = 'test-web-client-id.apps.googleusercontent.com';
@@ -51,7 +40,7 @@ describe('Docs API', () => {
     authToken = issueToken(TEST_USER_ID, TEST_SECRET);
   });
 
-  after(async () => {
+  afterAll(async () => {
     await fastify.close();
   });
 
@@ -64,10 +53,9 @@ describe('Docs API', () => {
         url: '/docs',
         headers: { authorization: `Bearer ${authToken}` },
       });
-      assert.ok(
+      expect(
         response.statusCode === 200 || response.statusCode === 302,
-        `expected 200 or 302, got ${response.statusCode}`,
-      );
+      ).toBe(true);
     });
 
     test('returns 200 or 302 with session cookie', async () => {
@@ -76,10 +64,9 @@ describe('Docs API', () => {
         url: '/docs',
         headers: { cookie: `session=${authToken}` },
       });
-      assert.ok(
+      expect(
         response.statusCode === 200 || response.statusCode === 302,
-        `expected 200 or 302, got ${response.statusCode}`,
-      );
+      ).toBe(true);
     });
   });
 
@@ -90,7 +77,7 @@ describe('Docs API', () => {
         url: '/docs/json',
         headers: { authorization: `Bearer ${authToken}` },
       });
-      assert.equal(response.statusCode, 200);
+      expect(response.statusCode).toBe(200);
     });
 
     test('OpenAPI object has info.title === "my-binder API"', async () => {
@@ -100,7 +87,7 @@ describe('Docs API', () => {
         headers: { authorization: `Bearer ${authToken}` },
       });
       const body = response.json<{ info: { title: string } }>();
-      assert.equal(body.info.title, 'my-binder API');
+      expect(body.info.title).toBe('my-binder API');
     });
   });
 
@@ -109,9 +96,9 @@ describe('Docs API', () => {
   describe('GET /docs/json (unauthenticated)', () => {
     test('returns 401 with UNAUTHORIZED code when no credentials', async () => {
       const response = await fastify.inject({ method: 'GET', url: '/docs/json' });
-      assert.equal(response.statusCode, 401);
+      expect(response.statusCode).toBe(401);
       const body = response.json<{ code: string }>();
-      assert.equal(body.code, 'UNAUTHORIZED');
+      expect(body.code).toBe('UNAUTHORIZED');
     });
   });
 
@@ -122,15 +109,15 @@ describe('Docs API', () => {
         url: '/docs',
         headers: { accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
       });
-      assert.equal(response.statusCode, 302);
-      assert.equal(response.headers['location'], '/auth/login');
+      expect(response.statusCode).toBe(302);
+      expect(response.headers['location']).toBe('/auth/login');
     });
   });
 
   describe('GET /docs/yaml (unauthenticated)', () => {
     test('returns 401 when no credentials', async () => {
       const response = await fastify.inject({ method: 'GET', url: '/docs/yaml' });
-      assert.equal(response.statusCode, 401);
+      expect(response.statusCode).toBe(401);
     });
   });
 
@@ -147,8 +134,8 @@ describe('Docs API', () => {
         components: { securitySchemes: { bearerAuth: { type: string; scheme: string } } };
         security: Array<Record<string, unknown>>;
       }>();
-      assert.equal(body.components.securitySchemes.bearerAuth.type, 'http');
-      assert.equal(body.components.securitySchemes.bearerAuth.scheme, 'bearer');
+      expect(body.components.securitySchemes.bearerAuth.type).toBe('http');
+      expect(body.components.securitySchemes.bearerAuth.scheme).toBe('bearer');
     });
 
     test('response contains top-level security: [{ bearerAuth: [] }]', async () => {
@@ -158,11 +145,10 @@ describe('Docs API', () => {
         headers: { authorization: `Bearer ${authToken}` },
       });
       const body = response.json<{ security: Array<Record<string, unknown>> }>();
-      assert.ok(Array.isArray(body.security), 'expected security array');
-      assert.ok(
+      expect(Array.isArray(body.security)).toBe(true);
+      expect(
         body.security.some((s) => 'bearerAuth' in s),
-        'expected bearerAuth in security array',
-      );
+      ).toBe(true);
     });
   });
 });

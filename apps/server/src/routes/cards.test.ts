@@ -1,5 +1,3 @@
-import { test, describe, before, after, mock } from 'node:test';
-import assert from 'node:assert/strict';
 import Fastify from 'fastify';
 import fastifyCookie from '@fastify/cookie';
 import authPlugin from '@src/auth/authPlugin';
@@ -21,49 +19,48 @@ let cardStore: CardRow[] = [];
 let nextId = 1;
 
 function makeCardRow(name: string, userId: string): CardRow {
-  return { id: `card-${nextId++}`, name, userId, createdAt: new Date(), updatedAt: new Date() };
+  const id = `00000000-0000-0000-0000-${String(nextId++).padStart(12, '0')}`;
+  return { id, name, userId, createdAt: new Date(), updatedAt: new Date() };
 }
 
 function toCardJson(row: CardRow) {
   return { id: row.id, name: row.name, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
 }
 
-mock.module('@src/db/repositories', {
-  namedExports: {
-    getRepositories: () => ({
-      user: {
-        findUserById: async (id: string) => (id === TEST_USER_ID ? MOCK_USER : null),
-        upsertUser: async () => MOCK_USER,
+jest.mock('@src/db/repositories', () => ({
+  getRepositories: () => ({
+    user: {
+      findUserById: async (id: string) => (id === 'test-user-uuid-0001' ? { id: 'test-user-uuid-0001', email: 'user@example.com', displayName: 'Test User', avatarUrl: null } : null),
+      upsertUser: async () => ({ id: 'test-user-uuid-0001', email: 'user@example.com', displayName: 'Test User', avatarUrl: null }),
+    },
+    card: {
+      findAll: async (userId: string) =>
+        cardStore.filter((c) => c.userId === userId).map(toCardJson),
+      findById: async (id: string, userId: string) => {
+        const card = cardStore.find((c) => c.id === id && c.userId === userId);
+        return card ? toCardJson(card) : null;
       },
-      card: {
-        findAll: async (userId: string) =>
-          cardStore.filter((c) => c.userId === userId).map(toCardJson),
-        findById: async (id: string, userId: string) => {
-          const card = cardStore.find((c) => c.id === id && c.userId === userId);
-          return card ? toCardJson(card) : null;
-        },
-        create: async (body: { name: string }, userId: string) => {
-          const row = makeCardRow(body.name, userId);
-          cardStore.push(row);
-          return toCardJson(row);
-        },
-        update: async (id: string, body: { name: string }, userId: string) => {
-          const card = cardStore.find((c) => c.id === id && c.userId === userId);
-          if (!card) return null;
-          card.name = body.name;
-          card.updatedAt = new Date();
-          return toCardJson(card);
-        },
-        remove: async (id: string, userId: string) => {
-          const idx = cardStore.findIndex((c) => c.id === id && c.userId === userId);
-          if (idx === -1) return false;
-          cardStore.splice(idx, 1);
-          return true;
-        },
+      create: async (body: { name: string }, userId: string) => {
+        const row = makeCardRow(body.name, userId);
+        cardStore.push(row);
+        return toCardJson(row);
       },
-    }),
-  },
-});
+      update: async (id: string, body: { name: string }, userId: string) => {
+        const card = cardStore.find((c) => c.id === id && c.userId === userId);
+        if (!card) return null;
+        card.name = body.name;
+        card.updatedAt = new Date();
+        return toCardJson(card);
+      },
+      remove: async (id: string, userId: string) => {
+        const idx = cardStore.findIndex((c) => c.id === id && c.userId === userId);
+        if (idx === -1) return false;
+        cardStore.splice(idx, 1);
+        return true;
+      },
+    },
+  }),
+}));
 
 // ─── Provider stubs ───────────────────────────────────────────────────────────
 
@@ -95,9 +92,11 @@ async function buildAuthApp() {
 describe('Cards API — collection CRUD (authenticated)', () => {
   const fastify = Fastify();
 
-  before(async () => {
+  beforeAll(async () => {
     process.env['SESSION_JWT_SECRET'] = TEST_SECRET;
     cardStore = [];
+    // Provide a no-op authenticate so cardRoutes can register its preHandler
+    fastify.decorate('authenticate', async () => {});
     fastify.addHook('onRequest', async (req) => {
       // Manually set identity to avoid full auth plugin DB lookup complexity
       (req as unknown as { identity: unknown }).identity = { kind: 'authenticated', user: MOCK_USER };
@@ -106,41 +105,41 @@ describe('Cards API — collection CRUD (authenticated)', () => {
     await fastify.ready();
   });
 
-  after(async () => {
+  afterAll(async () => {
     await fastify.close();
   });
 
   test('GET /cards returns empty list initially', async () => {
     cardStore = [];
     const response = await fastify.inject({ method: 'GET', url: '/cards' });
-    assert.equal(response.statusCode, 200);
+    expect(response.statusCode).toBe(200);
     const body = response.json<{ cards: unknown[]; total: number }>();
-    assert.deepEqual(body.cards, []);
-    assert.equal(body.total, 0);
+    expect(body.cards).toEqual([]);
+    expect(body.total).toBe(0);
   });
 
   test('POST /cards creates a card and returns 201', async () => {
     const response = await fastify.inject({
       method: 'POST', url: '/cards', payload: { name: 'Black Lotus' },
     });
-    assert.equal(response.statusCode, 201);
+    expect(response.statusCode).toBe(201);
     const card = response.json<{ id: string; name: string }>();
-    assert.equal(card.name, 'Black Lotus');
-    assert.ok(card.id);
+    expect(card.name).toBe('Black Lotus');
+    expect(card.id).toBeTruthy();
   });
 
   test('POST /cards returns 400 for missing name', async () => {
     const response = await fastify.inject({
       method: 'POST', url: '/cards', payload: {},
     });
-    assert.equal(response.statusCode, 400);
+    expect(response.statusCode).toBe(400);
   });
 
   test('GET /cards/:id returns 404 for unknown id', async () => {
     const response = await fastify.inject({
       method: 'GET', url: '/cards/00000000-0000-0000-0000-000000000000',
     });
-    assert.equal(response.statusCode, 404);
+    expect(response.statusCode).toBe(404);
   });
 
   test('full CRUD lifecycle', async () => {
@@ -149,24 +148,24 @@ describe('Cards API — collection CRUD (authenticated)', () => {
     const created = await fastify.inject({
       method: 'POST', url: '/cards', payload: { name: 'Mox Ruby' },
     });
-    assert.equal(created.statusCode, 201);
+    expect(created.statusCode).toBe(201);
     const { id } = created.json<{ id: string }>();
 
     const fetched = await fastify.inject({ method: 'GET', url: `/cards/${id}` });
-    assert.equal(fetched.statusCode, 200);
-    assert.equal(fetched.json<{ name: string }>().name, 'Mox Ruby');
+    expect(fetched.statusCode).toBe(200);
+    expect(fetched.json<{ name: string }>().name).toBe('Mox Ruby');
 
     const updated = await fastify.inject({
       method: 'PUT', url: `/cards/${id}`, payload: { name: 'Mox Pearl' },
     });
-    assert.equal(updated.statusCode, 200);
-    assert.equal(updated.json<{ name: string }>().name, 'Mox Pearl');
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json<{ name: string }>().name).toBe('Mox Pearl');
 
     const deleted = await fastify.inject({ method: 'DELETE', url: `/cards/${id}` });
-    assert.equal(deleted.statusCode, 204);
+    expect(deleted.statusCode).toBe(204);
 
     const gone = await fastify.inject({ method: 'GET', url: `/cards/${id}` });
-    assert.equal(gone.statusCode, 404);
+    expect(gone.statusCode).toBe(404);
   });
 });
 
@@ -175,29 +174,29 @@ describe('Cards API — collection CRUD (authenticated)', () => {
 describe('Cards API — collection routes require authentication', () => {
   let fastify: Awaited<ReturnType<typeof buildAuthApp>>;
 
-  before(async () => {
+  beforeAll(async () => {
     process.env['SESSION_JWT_SECRET'] = TEST_SECRET;
     fastify = await buildAuthApp();
     await fastify.ready();
   });
 
-  after(async () => {
+  afterAll(async () => {
     await fastify.close();
   });
 
   test('GET /cards returns 401 without auth', async () => {
     const response = await fastify.inject({ method: 'GET', url: '/cards' });
-    assert.equal(response.statusCode, 401);
+    expect(response.statusCode).toBe(401);
   });
 
   test('POST /cards returns 401 without auth', async () => {
     const response = await fastify.inject({ method: 'POST', url: '/cards', payload: { name: 'Test' } });
-    assert.equal(response.statusCode, 401);
+    expect(response.statusCode).toBe(401);
   });
 
   test('GET /cards/:id returns 401 without auth', async () => {
-    const response = await fastify.inject({ method: 'GET', url: '/cards/some-id' });
-    assert.equal(response.statusCode, 401);
+    const response = await fastify.inject({ method: 'GET', url: '/cards/00000000-0000-0000-0000-000000000099' });
+    expect(response.statusCode).toBe(401);
   });
 });
 
@@ -206,7 +205,7 @@ describe('Cards API — collection routes require authentication', () => {
 describe('Cards API — provider routes', () => {
   let fastify: Awaited<ReturnType<typeof buildAuthApp>>;
 
-  before(async () => {
+  beforeAll(async () => {
     process.env['SESSION_JWT_SECRET'] = TEST_SECRET;
     registry.register('route-test', makeProvider());
     await registry.setActive('route-test');
@@ -214,39 +213,39 @@ describe('Cards API — provider routes', () => {
     await fastify.ready();
   });
 
-  after(async () => {
+  afterAll(async () => {
     await fastify.close();
   });
 
   describe('GET /cards/lookup', () => {
     test('returns 200 with found:true and cards array when card exists', async () => {
       const r = await fastify.inject({ method: 'GET', url: '/cards/lookup?name=Lightning+Bolt' });
-      assert.equal(r.statusCode, 200);
+      expect(r.statusCode).toBe(200);
       const body = r.json<{ found: boolean; cards: CardRecord[] }>();
-      assert.equal(body.found, true);
-      assert.equal(body.cards[0]?.name, 'Lightning Bolt');
+      expect(body.found).toBe(true);
+      expect(body.cards[0]?.name).toBe('Lightning Bolt');
     });
 
     test('returns 200 with found:false when card is not found', async () => {
       registry.register('lookup-miss', makeProvider({ lookup: async (name) => ({ found: false, name }) }));
       await registry.setActive('lookup-miss');
       const r = await fastify.inject({ method: 'GET', url: '/cards/lookup?name=ZZZFake' });
-      assert.equal(r.statusCode, 200);
-      assert.equal(r.json<{ found: boolean }>().found, false);
+      expect(r.statusCode).toBe(200);
+      expect(r.json<{ found: boolean }>().found).toBe(false);
       await registry.setActive('route-test');
     });
 
     test('returns 400 when name is missing', async () => {
       const r = await fastify.inject({ method: 'GET', url: '/cards/lookup' });
-      assert.equal(r.statusCode, 400);
+      expect(r.statusCode).toBe(400);
     });
 
     test('returns 503 when provider is unavailable', async () => {
       registry.register('lookup-down', makeProvider({ lookup: async () => { throw new Error('down'); } }));
       await registry.setActive('lookup-down');
       const r = await fastify.inject({ method: 'GET', url: '/cards/lookup?name=test' });
-      assert.equal(r.statusCode, 503);
-      assert.equal(r.json<{ error: string }>().error, 'PROVIDER_UNAVAILABLE');
+      expect(r.statusCode).toBe(503);
+      expect(r.json<{ error: string }>().error).toBe('PROVIDER_UNAVAILABLE');
       await registry.setActive('route-test');
     });
 
@@ -256,10 +255,10 @@ describe('Cards API — provider routes', () => {
       }));
       await registry.setActive('set-route');
       const r = await fastify.inject({ method: 'GET', url: '/cards/lookup?name=Lightning+Bolt&set=M11' });
-      assert.equal(r.statusCode, 200);
+      expect(r.statusCode).toBe(200);
       const body = r.json<{ found: boolean; cards: CardRecord[] }>();
-      assert.equal(body.found, true);
-      assert.equal(body.cards[0]?.set, 'M11');
+      expect(body.found).toBe(true);
+      expect(body.cards[0]?.set).toBe('M11');
       await registry.setActive('route-test');
     });
 
@@ -270,8 +269,8 @@ describe('Cards API — provider routes', () => {
       }));
       await registry.setActive('number-route');
       const r = await fastify.inject({ method: 'GET', url: '/cards/lookup?name=Lightning+Bolt&set=M11&number=999' });
-      assert.equal(r.statusCode, 200);
-      assert.equal(r.json<{ found: boolean }>().found, false);
+      expect(r.statusCode).toBe(200);
+      expect(r.json<{ found: boolean }>().found).toBe(false);
       await registry.setActive('route-test');
     });
   });
@@ -279,8 +278,8 @@ describe('Cards API — provider routes', () => {
   describe('GET /cards/legality', () => {
     test('returns 200 with legal:true for a legal card', async () => {
       const r = await fastify.inject({ method: 'GET', url: '/cards/legality?name=Sol+Ring' });
-      assert.equal(r.statusCode, 200);
-      assert.equal(r.json<{ legal: boolean }>().legal, true);
+      expect(r.statusCode).toBe(200);
+      expect(r.json<{ legal: boolean }>().legal).toBe(true);
     });
 
     test('returns 200 with legal:false and reason for a banned card', async () => {
@@ -289,10 +288,10 @@ describe('Cards API — provider routes', () => {
       }));
       await registry.setActive('legality-banned');
       const r = await fastify.inject({ method: 'GET', url: '/cards/legality?name=Black+Lotus' });
-      assert.equal(r.statusCode, 200);
+      expect(r.statusCode).toBe(200);
       const body = r.json<{ legal: boolean; reason: string }>();
-      assert.equal(body.legal, false);
-      assert.equal(body.reason, 'Banned in Commander');
+      expect(body.legal).toBe(false);
+      expect(body.reason).toBe('Banned in Commander');
       await registry.setActive('route-test');
     });
 
@@ -304,37 +303,37 @@ describe('Cards API — provider routes', () => {
       }));
       await registry.setActive('legality-notfound');
       const r = await fastify.inject({ method: 'GET', url: '/cards/legality?name=Fake' });
-      assert.equal(r.statusCode, 404);
-      assert.equal(r.json<{ error: string }>().error, 'CARD_NOT_FOUND');
+      expect(r.statusCode).toBe(404);
+      expect(r.json<{ error: string }>().error).toBe('CARD_NOT_FOUND');
       await registry.setActive('route-test');
     });
 
     test('returns 400 when name is missing', async () => {
       const r = await fastify.inject({ method: 'GET', url: '/cards/legality' });
-      assert.equal(r.statusCode, 400);
+      expect(r.statusCode).toBe(400);
     });
   });
 
   describe('GET /cards/search', () => {
     test('returns 200 SearchResult with filters', async () => {
       const r = await fastify.inject({ method: 'GET', url: '/cards/search?colors=R&cmc_max=1' });
-      assert.equal(r.statusCode, 200);
+      expect(r.statusCode).toBe(200);
       const body = r.json<{ cards: unknown[]; total: number; page: number }>();
-      assert.equal(body.page, 1);
-      assert.ok(Array.isArray(body.cards));
+      expect(body.page).toBe(1);
+      expect(Array.isArray(body.cards)).toBe(true);
     });
 
     test('returns 400 when no filter is provided', async () => {
       const r = await fastify.inject({ method: 'GET', url: '/cards/search' });
-      assert.equal(r.statusCode, 400);
-      assert.equal(r.json<{ error: string }>().error, 'MISSING_FILTER');
+      expect(r.statusCode).toBe(400);
+      expect(r.json<{ error: string }>().error).toBe('MISSING_FILTER');
     });
 
     test('returns 503 when provider is unavailable', async () => {
       registry.register('search-down', makeProvider({ search: async () => { throw new Error('down'); } }));
       await registry.setActive('search-down');
       const r = await fastify.inject({ method: 'GET', url: '/cards/search?name=bolt' });
-      assert.equal(r.statusCode, 503);
+      expect(r.statusCode).toBe(503);
       await registry.setActive('route-test');
     });
   });

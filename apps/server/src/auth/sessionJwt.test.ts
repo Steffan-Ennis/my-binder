@@ -1,5 +1,3 @@
-import { test, describe } from 'node:test';
-import assert from 'node:assert/strict';
 import { issueToken, verifyToken } from './sessionJwt';
 
 const TEST_SECRET = 'a-test-secret-that-is-at-least-32-characters-long';
@@ -7,21 +5,21 @@ const TEST_SECRET = 'a-test-secret-that-is-at-least-32-characters-long';
 describe('sessionJwt', () => {
   test('issueToken returns a non-empty string', () => {
     const token = issueToken('user-id-123', TEST_SECRET);
-    assert.ok(typeof token === 'string');
-    assert.ok(token.length > 0);
+    expect(typeof token).toBe('string');
+    expect(token.length).toBeGreaterThan(0);
   });
 
   test('issued token has three parts (header.payload.signature)', () => {
     const token = issueToken('user-id-123', TEST_SECRET);
     const parts = token.split('.');
-    assert.equal(parts.length, 3);
+    expect(parts.length).toBe(3);
   });
 
   test('verifyToken returns the userId (sub) for a valid JWT', () => {
     const userId = 'user-abc-123';
     const token = issueToken(userId, TEST_SECRET);
     const result = verifyToken(token, TEST_SECRET);
-    assert.equal(result, userId);
+    expect(result).toBe(userId);
   });
 
   test('issued token has 7-day exp', () => {
@@ -36,19 +34,19 @@ describe('sessionJwt', () => {
     const exp = payload['exp'] as number;
     const expectedMin = before + 7 * 24 * 60 * 60 - 1;
     const expectedMax = after + 7 * 24 * 60 * 60 + 1;
-    assert.ok(exp >= expectedMin, `exp ${exp} should be >= ${expectedMin}`);
-    assert.ok(exp <= expectedMax, `exp ${exp} should be <= ${expectedMax}`);
+    expect(exp).toBeGreaterThanOrEqual(expectedMin);
+    expect(exp).toBeLessThanOrEqual(expectedMax);
   });
 
   test('verifyToken throws for a tampered token', () => {
     const token = issueToken('user-id', TEST_SECRET);
     const parts = token.split('.');
     const tamperedToken = `${parts[0]}.${parts[1]}.invalidsignature`;
-    assert.throws(() => verifyToken(tamperedToken, TEST_SECRET));
+    expect(() => verifyToken(tamperedToken, TEST_SECRET)).toThrow();
   });
 
   test('verifyToken throws for a token signed with a different secret', () => {
     const token = issueToken('user-id', TEST_SECRET);
-    assert.throws(() => verifyToken(token, 'a-completely-different-secret-value-32+'));
+    expect(() => verifyToken(token, 'a-completely-different-secret-value-32+')).toThrow();
   });
 });

@@ -1,5 +1,3 @@
-import { test, describe, before, mock } from 'node:test';
-import assert from 'node:assert/strict';
 import type { CardProvider } from '@src/providers/interface';
 import { registry } from '@src/providers/registry';
 import {
@@ -65,11 +63,9 @@ const mockCardRepo = {
   },
 };
 
-mock.module('@src/db/repositories', {
-  namedExports: {
-    getRepositories: () => ({ card: mockCardRepo }),
-  },
-});
+jest.mock('@src/db/repositories', () => ({
+  getRepositories: () => ({ card: mockCardRepo }),
+}));
 
 // ─── Provider helpers ─────────────────────────────────────────────────────────
 
@@ -86,7 +82,7 @@ function makeProvider(overrides: Partial<CardProvider> = {}): CardProvider {
 // ─── Collection functions ─────────────────────────────────────────────────────
 
 describe('cardService — collection functions', () => {
-  before(() => {
+  beforeAll(() => {
     mockCardStore = [];
     nextId = 1;
   });
@@ -97,35 +93,33 @@ describe('cardService — collection functions', () => {
       { id: 'c2', name: 'Sol Ring', userId: USER_B, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
     ];
     const result = await getCards(USER_A);
-    assert.equal(result.cards.length, 1);
-    assert.equal(result.cards[0]?.name, 'Lightning Bolt');
-    assert.equal(result.total, 1);
+    expect(result.cards.length).toBe(1);
+    expect(result.cards[0]?.name).toBe('Lightning Bolt');
+    expect(result.total).toBe(1);
   });
 
   test('getCard throws NotFoundError for unknown id', async () => {
     mockCardStore = [];
-    await assert.rejects(() => getCard('unknown-id', USER_A), NotFoundError);
+    await expect(() => getCard('unknown-id', USER_A)).rejects.toThrow(NotFoundError);
   });
 
   test('createCard creates and returns card', async () => {
     mockCardStore = [];
     const card = await createCard({ name: 'Black Lotus' }, USER_A);
-    assert.equal(card.name, 'Black Lotus');
-    assert.ok(card.id);
+    expect(card.name).toBe('Black Lotus');
+    expect(card.id).toBeTruthy();
   });
 
   test('deleteCard throws NotFoundError when card not found', async () => {
     mockCardStore = [];
-    await assert.rejects(() => deleteCard('missing', USER_A), NotFoundError);
+    await expect(() => deleteCard('missing', USER_A)).rejects.toThrow(NotFoundError);
   });
 });
 
 // ─── Provider-backed functions ────────────────────────────────────────────────
-// Collection functions (getCards, getCard, createCard, updateCard, deleteCard)
-// are also tested end-to-end via src/routes/cards.test.ts.
 
 describe('cardService — provider-backed functions', () => {
-  before(async () => {
+  beforeAll(async () => {
     registry.register('test', makeProvider());
     await registry.setActive('test');
   });
@@ -133,23 +127,23 @@ describe('cardService — provider-backed functions', () => {
   describe('lookupCard', () => {
     test('returns CardRecord array when cards are found', async () => {
       const result = await lookupCard('Lightning Bolt');
-      assert.ok(Array.isArray(result));
-      assert.equal((result as CardRecord[])[0]?.name, 'Lightning Bolt');
+      expect(Array.isArray(result)).toBe(true);
+      expect((result as CardRecord[])[0]?.name).toBe('Lightning Bolt');
     });
 
     test('returns CardNotFoundResult when no match', async () => {
       registry.register('notfound', makeProvider({ lookup: async (name) => ({ found: false, name }) }));
       await registry.setActive('notfound');
       const result = await lookupCard('ZZZFake');
-      assert.ok(!Array.isArray(result));
-      assert.equal((result as { found: boolean }).found, false);
+      expect(Array.isArray(result)).toBe(false);
+      expect((result as { found: boolean }).found).toBe(false);
       await registry.setActive('test');
     });
 
     test('throws ProviderUnavailableError when provider errors', async () => {
       registry.register('broken', makeProvider({ lookup: async () => { throw new Error('connection lost'); } }));
       await registry.setActive('broken');
-      await assert.rejects(() => lookupCard('anything'), ProviderUnavailableError);
+      await expect(() => lookupCard('anything')).rejects.toThrow(ProviderUnavailableError);
       await registry.setActive('test');
     });
 
@@ -160,7 +154,7 @@ describe('cardService — provider-backed functions', () => {
       }));
       await registry.setActive('set-test');
       await lookupCard('Lightning Bolt', { set: 'M11' });
-      assert.equal(capturedOpts.set, 'M11');
+      expect(capturedOpts.set).toBe('M11');
       await registry.setActive('test');
     });
 
@@ -171,8 +165,8 @@ describe('cardService — provider-backed functions', () => {
       }));
       await registry.setActive('number-test');
       await lookupCard('Lightning Bolt', { set: 'M11', number: '149' });
-      assert.equal(capturedOpts.set, 'M11');
-      assert.equal(capturedOpts.number, '149');
+      expect(capturedOpts.set).toBe('M11');
+      expect(capturedOpts.number).toBe('149');
       await registry.setActive('test');
     });
   });
@@ -184,8 +178,8 @@ describe('cardService — provider-backed functions', () => {
       }));
       await registry.setActive('legal');
       const result = await checkCommanderLegality('Sol Ring');
-      assert.equal(result.legal, true);
-      assert.equal(result.reason, null);
+      expect(result.legal).toBe(true);
+      expect(result.reason).toBeNull();
     });
 
     test('returns banned result', async () => {
@@ -194,8 +188,8 @@ describe('cardService — provider-backed functions', () => {
       }));
       await registry.setActive('banned-test');
       const result = await checkCommanderLegality('Black Lotus');
-      assert.equal(result.legal, false);
-      assert.equal(result.reason, 'Banned in Commander');
+      expect(result.legal).toBe(false);
+      expect(result.reason).toBe('Banned in Commander');
     });
 
     test('throws CardNotFoundError when provider throws CARD_NOT_FOUND', async () => {
@@ -205,18 +199,18 @@ describe('cardService — provider-backed functions', () => {
         },
       }));
       await registry.setActive('missing-card');
-      await assert.rejects(() => checkCommanderLegality('Nonexistent Card'), CardNotFoundError);
+      await expect(() => checkCommanderLegality('Nonexistent Card')).rejects.toThrow(CardNotFoundError);
     });
 
     test('throws ProviderUnavailableError when provider errors with non-CARD_NOT_FOUND', async () => {
       registry.register('unavailable', makeProvider({ checkLegality: async () => { throw new Error('timeout'); } }));
       await registry.setActive('unavailable');
-      await assert.rejects(() => checkCommanderLegality('Any Card'), ProviderUnavailableError);
+      await expect(() => checkCommanderLegality('Any Card')).rejects.toThrow(ProviderUnavailableError);
     });
   });
 
   describe('searchCards', () => {
-    before(async () => {
+    beforeAll(async () => {
       registry.register('search', makeProvider({
         search: async () => Array.from({ length: 45 }, (_, i) => ({
           ...LIGHTNING_BOLT, name: `Card ${i + 1}`, cardNumber: String(i + 1),
@@ -227,49 +221,49 @@ describe('cardService — provider-backed functions', () => {
 
     test('returns paginated SearchResult', async () => {
       const result = await searchCards({ name: 'Card', page: 1, limit: 20 });
-      assert.equal(result.total, 45);
-      assert.equal(result.page, 1);
-      assert.equal(result.limit, 20);
-      assert.equal(result.totalPages, 3);
-      assert.equal(result.cards.length, 20);
+      expect(result.total).toBe(45);
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(20);
+      expect(result.totalPages).toBe(3);
+      expect(result.cards.length).toBe(20);
     });
 
     test('returns correct slice for page 2', async () => {
       const result = await searchCards({ name: 'Card', page: 2, limit: 20 });
-      assert.equal(result.cards.length, 20);
-      assert.equal(result.cards[0]?.name, 'Card 21');
+      expect(result.cards.length).toBe(20);
+      expect(result.cards[0]?.name).toBe('Card 21');
     });
 
     test('returns correct partial last page', async () => {
       const result = await searchCards({ name: 'Card', page: 3, limit: 20 });
-      assert.equal(result.cards.length, 5);
+      expect(result.cards.length).toBe(5);
     });
 
     test('defaults page=1 and limit=20', async () => {
       const result = await searchCards({ name: 'Card' });
-      assert.equal(result.page, 1);
-      assert.equal(result.limit, 20);
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(20);
     });
 
     test('caps limit at 100', async () => {
       const result = await searchCards({ name: 'Card', limit: 999 });
-      assert.equal(result.limit, 100);
+      expect(result.limit).toBe(100);
     });
 
     test('returns totalPages=0 for empty result set', async () => {
       registry.register('empty', makeProvider({ search: async () => [] }));
       await registry.setActive('empty');
       const result = await searchCards({ name: 'nothing' });
-      assert.equal(result.total, 0);
-      assert.equal(result.totalPages, 0);
-      assert.deepEqual(result.cards, []);
+      expect(result.total).toBe(0);
+      expect(result.totalPages).toBe(0);
+      expect(result.cards).toEqual([]);
       await registry.setActive('search');
     });
 
     test('throws ProviderUnavailableError when provider errors', async () => {
       registry.register('search-broken', makeProvider({ search: async () => { throw new Error('disk error'); } }));
       await registry.setActive('search-broken');
-      await assert.rejects(() => searchCards({ name: 'x' }), ProviderUnavailableError);
+      await expect(() => searchCards({ name: 'x' })).rejects.toThrow(ProviderUnavailableError);
     });
   });
 });

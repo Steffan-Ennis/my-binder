@@ -1,5 +1,3 @@
-import { OAuth2Client } from 'google-auth-library';
-
 export type GoogleTokenPayload = {
   sub: string;
   email: string;
@@ -20,8 +18,10 @@ export type GoogleTokenPayload = {
 export async function verifyGoogleToken(
   idToken: string,
   clientIds: string[],
-  client: OAuth2Client = new OAuth2Client(),
+  injectedClient?: import('google-auth-library').OAuth2Client,
 ): Promise<GoogleTokenPayload> {
+  const client = injectedClient ?? new (await import('google-auth-library')).OAuth2Client()
+
   const ticket = await client.verifyIdToken({
     idToken,
     audience: clientIds,

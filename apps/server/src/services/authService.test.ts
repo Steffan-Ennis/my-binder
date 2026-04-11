@@ -1,5 +1,3 @@
-import { test, describe, before } from 'node:test';
-import assert from 'node:assert/strict';
 import type { OAuth2Client } from 'google-auth-library';
 import type { AuthUser } from '@my-binder/core';
 import { signIn, InvalidGoogleTokenError, AccessDeniedError } from './authService';
@@ -52,7 +50,7 @@ function makeDeps(overrides: {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('authService', () => {
-  before(() => {
+  beforeAll(() => {
     process.env['GOOGLE_CLIENT_IDS'] = 'test-client-id';
     process.env['SESSION_JWT_SECRET'] = 'a-test-secret-that-is-at-least-32-characters-long!!';
   });
@@ -61,8 +59,8 @@ describe('authService', () => {
     test('returns token and user when Google token is valid and email is on allowlist', async () => {
       const client = makeGoogleClient(VALID_GOOGLE_PAYLOAD);
       const result = await signIn('valid-google-id-token', { googleClient: client, ...makeDeps() });
-      assert.ok(result.token, 'should return a token');
-      assert.equal(result.user.email, 'service-test@gmail.com');
+      expect(result.token).toBeTruthy();
+      expect(result.user.email).toBe('service-test@gmail.com');
     });
 
     test('throws AccessDeniedError when email is not on allowlist — upsertUser NOT called', async () => {
@@ -76,16 +74,15 @@ describe('authService', () => {
           upsertUser: async (_input: unknown) => { upsertCalled = true; return {} as AuthUser; },
         } as unknown as UserRepository,
       };
-      await assert.rejects(() => signIn('valid-token', { googleClient: client, ...deps }), AccessDeniedError);
-      assert.equal(upsertCalled, false, 'upsertUser must not be called');
+      await expect(() => signIn('valid-token', { googleClient: client, ...deps })).rejects.toThrow(AccessDeniedError);
+      expect(upsertCalled).toBe(false);
     });
 
     test('throws InvalidGoogleTokenError when googleVerifier rejects', async () => {
       const client = makeGoogleClient(null, new Error('Token expired'));
-      await assert.rejects(
+      await expect(
         () => signIn('bad-token', { googleClient: client, ...makeDeps() }),
-        InvalidGoogleTokenError,
-      );
+      ).rejects.toThrow(InvalidGoogleTokenError);
     });
 
     test('second signIn with same email updates user fields', async () => {
@@ -98,8 +95,8 @@ describe('authService', () => {
       const deps2 = makeDeps({ upsertResult: { displayName: 'Updated Name' } });
       const second = await signIn('token-2', { googleClient: client2, ...deps2 });
 
-      assert.equal(first.user.id, second.user.id, 'same user id on re-sign-in');
-      assert.equal(second.user.displayName, 'Updated Name');
+      expect(first.user.id).toBe(second.user.id);
+      expect(second.user.displayName).toBe('Updated Name');
     });
   });
 });
