@@ -31,4 +31,4 @@ coverage/
 .turbo/
 
 # CDK cache
-cdk.out/
+packages/infrastructure/cdk.out/**
