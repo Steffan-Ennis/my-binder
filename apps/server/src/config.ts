@@ -75,7 +75,7 @@ export async function loadConfig(): Promise<Config> {
     sessionJwtSecret,
     pgHost: process.env['DATABASE_URL'] ?? 'localhost',
     pgPort: parseInt(process.env['DATABASE_PORT'] ?? '5432', 10),
-    pgUser: process.env['DATABASE_USER'] ?? 'postgres',
+    pgUser: process.env['DATABASE_USER'] ?? '',
     pgPassword,
     pgDatabase: process.env['DATABASE_NAME'] ?? 'my_binder',
   };

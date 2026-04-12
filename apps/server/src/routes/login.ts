@@ -45,7 +45,13 @@ export async function loginRoutes(fastify: FastifyInstance): Promise<void> {
 
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          errorEl.textContent = body.message || 'Sign-in failed. Please try again.';
+          if (res.status === 403 && body.error === 'ACCESS_DENIED') {
+            errorEl.textContent =
+              'Access denied: your Google account has not been permitted. ' +
+              'Contact the administrator to request access.';
+          } else {
+            errorEl.textContent = body.message || 'Sign-in failed. Please try again.';
+          }
           errorEl.style.display = 'block';
           return;
         }

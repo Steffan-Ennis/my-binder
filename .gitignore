@@ -32,3 +32,4 @@ coverage/
 
 # CDK cache
 packages/infrastructure/cdk.out/**
+.env

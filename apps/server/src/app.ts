@@ -30,7 +30,13 @@ export async function buildApp(): Promise<AppResult> {
   }
 
   // 2. Initialise PostgreSQL DataSource.
-  await initDataSource(config);
+  await initDataSource({
+    pgPort: config.pgPort,
+    pgPassword: config.pgPassword,
+    pgUser: config.pgUser,
+    pgDatabase: config.pgDatabase,
+    pgHost: config.pgHost
+  });
 
   // 3. Initialise repository singletons — must run after DataSource is ready.
   initRepositories(getDataSource());
