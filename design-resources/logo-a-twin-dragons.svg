@@ -1,0 +1,146 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <radialGradient id="medalBg" cx="50%" cy="48%" r="50%">
+      <stop offset="0%" stop-color="#1c1a20"/>
+      <stop offset="70%" stop-color="#12101a"/>
+      <stop offset="100%" stop-color="#0a0810"/>
+    </radialGradient>
+    <radialGradient id="topLight" cx="45%" cy="35%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rimG" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4a4238"/>
+      <stop offset="50%" stop-color="#2e2820"/>
+      <stop offset="100%" stop-color="#4a4238"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Medallion -->
+  <circle cx="200" cy="200" r="196" fill="#08060a"/>
+  <circle cx="200" cy="200" r="193" fill="url(#medalBg)" stroke="url(#rimG)" stroke-width="3"/>
+  <circle cx="200" cy="200" r="193" fill="url(#topLight)"/>
+  <circle cx="200" cy="200" r="183" fill="none" stroke="#2a2530" stroke-width="1" opacity="0.4"/>
+
+  <!-- Dragon 1 (top-right) — warm maroon silhouette -->
+  <g>
+    <!-- Body: thick comma/tadpole filling top-right of yin-yang -->
+    <path d="
+      M200,88
+      C220,88 248,96 268,118
+      C290,142 298,174 290,200
+      C282,226 260,240 235,240
+      C218,240 208,228 208,214
+      C208,200 220,194 230,200
+      C238,204 234,216 226,216
+      L200,200
+      Z
+    " fill="#3a1825" opacity="0.85"/>
+    <!-- Lighter raised surface -->
+    <path d="
+      M200,92
+      C218,92 244,100 262,120
+      C282,142 290,170 284,196
+      C278,220 258,234 238,234
+      C222,234 214,224 214,212
+      C214,202 224,198 230,202
+      L200,200
+      Z
+    " fill="#4a2232"/>
+
+    <!-- Head profile — facing left at the bulge -->
+    <g transform="translate(276,124) rotate(-30)">
+      <!-- Skull -->
+      <path d="M0,0 C12,-6 22,-2 24,8 C26,16 20,22 10,22 C4,22 -2,18 -4,12 Z"
+        fill="#4a2232"/>
+      <!-- Upper jaw/snout extending forward -->
+      <path d="M24,8 C32,6 38,10 36,16 C34,20 28,22 24,18 Z"
+        fill="#4a2232"/>
+      <!-- Lower jaw -->
+      <path d="M10,22 C16,26 24,26 28,20"
+        fill="none" stroke="#5a3040" stroke-width="1.5"/>
+      <!-- Eye -->
+      <circle cx="14" cy="8" r="3.5" fill="#1a1018"/>
+      <circle cx="14" cy="8" r="1.8" fill="#8a6030" opacity="0.8"/>
+      <!-- Horn -->
+      <path d="M4,-2 L-4,-18 L8,-4" fill="#3a1825"/>
+      <path d="M12,-4 L6,-16 L14,-2" fill="#3a1825"/>
+    </g>
+
+    <!-- Wing silhouette -->
+    <path d="
+      M240,108 C252,88 270,78 285,82
+      C298,86 302,100 292,108
+      C284,114 270,112 258,108
+    " fill="#3a1825" opacity="0.7"/>
+    <!-- Wing bone lines -->
+    <path d="M244,106 L282,84" stroke="#4a2232" stroke-width="0.8" opacity="0.5"/>
+    <path d="M250,108 L290,90" stroke="#4a2232" stroke-width="0.8" opacity="0.5"/>
+
+    <!-- Tail taper -->
+    <path d="M226,216 C220,222 210,220 208,212"
+      fill="none" stroke="#4a2232" stroke-width="3" stroke-linecap="round"/>
+  </g>
+
+  <!-- Dragon 2 (bottom-left) — cool slate silhouette -->
+  <g>
+    <!-- Body: mirrored comma filling bottom-left -->
+    <path d="
+      M200,312
+      C180,312 152,304 132,282
+      C110,258 102,226 110,200
+      C118,174 140,160 165,160
+      C182,160 192,172 192,186
+      C192,200 180,206 170,200
+      C162,196 166,184 174,184
+      L200,200
+      Z
+    " fill="#1a2535" opacity="0.85"/>
+    <!-- Lighter raised surface -->
+    <path d="
+      M200,308
+      C182,308 156,300 138,280
+      C118,258 110,230 116,204
+      C122,180 142,166 162,166
+      C178,166 186,176 186,188
+      C186,198 176,202 170,198
+      L200,200
+      Z
+    " fill="#243548"/>
+
+    <!-- Head profile — facing right -->
+    <g transform="translate(124,276) rotate(150)">
+      <path d="M0,0 C12,-6 22,-2 24,8 C26,16 20,22 10,22 C4,22 -2,18 -4,12 Z"
+        fill="#243548"/>
+      <path d="M24,8 C32,6 38,10 36,16 C34,20 28,22 24,18 Z"
+        fill="#243548"/>
+      <path d="M10,22 C16,26 24,26 28,20"
+        fill="none" stroke="#345060" stroke-width="1.5"/>
+      <circle cx="14" cy="8" r="3.5" fill="#101820"/>
+      <circle cx="14" cy="8" r="1.8" fill="#6a7880" opacity="0.8"/>
+      <path d="M4,-2 L-4,-18 L8,-4" fill="#1a2535"/>
+      <path d="M12,-4 L6,-16 L14,-2" fill="#1a2535"/>
+    </g>
+
+    <!-- Wing silhouette -->
+    <path d="
+      M160,292 C148,312 130,322 115,318
+      C102,314 98,300 108,292
+      C116,286 130,288 142,292
+    " fill="#1a2535" opacity="0.7"/>
+    <path d="M156,294 L118,316" stroke="#243548" stroke-width="0.8" opacity="0.5"/>
+    <path d="M150,292 L110,310" stroke="#243548" stroke-width="0.8" opacity="0.5"/>
+
+    <!-- Tail taper -->
+    <path d="M174,184 C180,178 190,180 192,188"
+      fill="none" stroke="#243548" stroke-width="3" stroke-linecap="round"/>
+  </g>
+
+  <!-- Central yin-yang S-curve divider -->
+  <path d="M200,88 C230,140 240,170 200,200 C160,230 170,260 200,312"
+    fill="none" stroke="#2a2530" stroke-width="1" opacity="0.3"/>
+
+  <!-- Small accent dots at dragon eyes' mirror positions (like the brass rivets in the reference) -->
+  <circle cx="230" cy="200" r="4" fill="#2a2018" stroke="#3a3028" stroke-width="1"/>
+  <circle cx="170" cy="200" r="4" fill="#2a2018" stroke="#3a3028" stroke-width="1"/>
+</svg>

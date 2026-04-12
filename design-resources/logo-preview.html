@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>my-binder — Logo Variations</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: #111; color: #eee; padding: 40px 20px; }
+  h1 { text-align: center; font-size: 32px; margin-bottom: 8px; color: #fcd34d; }
+  .subtitle { text-align: center; color: #888; font-size: 14px; font-family: system-ui; margin-bottom: 48px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 40px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .logo-card {
+    background: #1a1a22;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid #2a2a35;
+  }
+  .logo-card:hover { border-color: #fcd34d55; }
+  .logo-display {
+    padding: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 50% 45%, #1e1e2a, #0a0a12);
+  }
+  .logo-display img, .logo-display object {
+    width: 280px;
+    height: 280px;
+  }
+  .logo-info {
+    padding: 24px;
+    border-top: 1px solid #2a2a35;
+  }
+  .logo-info h2 {
+    font-size: 20px;
+    color: #fcd34d;
+    margin-bottom: 6px;
+  }
+  .logo-info p {
+    font-family: system-ui;
+    font-size: 14px;
+    color: #999;
+    line-height: 1.6;
+  }
+  .logo-info .tags {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .tag {
+    font-family: system-ui;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 100px;
+    background: #2a2a35;
+    color: #ccc;
+  }
+  /* Small size comparison */
+  .size-strip {
+    max-width: 1200px;
+    margin: 48px auto 0;
+    background: #1a1a22;
+    border-radius: 16px;
+    padding: 32px;
+    border: 1px solid #2a2a35;
+  }
+  .size-strip h2 {
+    font-size: 18px;
+    color: #fcd34d;
+    margin-bottom: 24px;
+    text-align: center;
+  }
+  .size-row {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+  .size-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .size-item span {
+    font-family: monospace;
+    font-size: 11px;
+    color: #666;
+  }
+  .ref-image {
+    padding: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 50% 45%, #1e1e2a, #0a0a12);
+  }
+  .ref-image img {
+    width: 280px;
+    height: 280px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+</style>
+</head>
+<body>
+
+<h1>Logo Variations</h1>
+<p class="subtitle">Mythical creature medallion style &mdash; inspired by the dragon life counter</p>
+
+<div class="grid">
+
+  <div class="logo-card">
+    <div class="ref-image">
+      <img src="logo-icon.png" alt="Reference">
+    </div>
+    <div class="logo-info">
+      <h2>Reference</h2>
+      <p>Original inspiration: leather-embossed twin dragon life counter. Dark medallion, coiled dragons in yin-yang arrangement, raised relief texture.</p>
+      <div class="tags">
+        <span class="tag">Original</span>
+        <span class="tag">Leather</span>
+        <span class="tag">Monochrome</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="logo-card">
+    <div class="logo-display">
+      <img src="logo-a-twin-dragons.svg" alt="Twin Dragons">
+    </div>
+    <div class="logo-info">
+      <h2>A. Twin Dragons</h2>
+      <p>Maroon and slate dragon silhouettes in yin-yang arrangement. Bold filled shapes, dark palette with subtle warm/cool split. Two brass-style rivets at centre.</p>
+      <div class="tags">
+        <span class="tag">Maroon + Slate</span>
+        <span class="tag">Yin-Yang</span>
+        <span class="tag">Silhouette</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="logo-card">
+    <div class="logo-display">
+      <img src="logo-b-ouroboros.svg" alt="Ouroboros">
+    </div>
+    <div class="logo-info">
+      <h2>B. Ouroboros</h2>
+      <p>Dark dragon forming a thick crescent ring, biting its own tail. Filled silhouette with spine ridges. "MY BINDER" text in the centre void.</p>
+      <div class="tags">
+        <span class="tag">Dark Plum</span>
+        <span class="tag">Circular</span>
+        <span class="tag">Silhouette</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="logo-card">
+    <div class="logo-display">
+      <img src="logo-c-coiled-single.svg" alt="Coiled Dragon">
+    </div>
+    <div class="logo-info">
+      <h2>C. Coiled Spiral</h2>
+      <p>Single purple dragon coiled in a tight spiral filling the entire medallion. Fire breath at the top, wings spreading wide. Bold and dense &mdash; closest to the reference's filled composition.</p>
+      <div class="tags">
+        <span class="tag">Purple</span>
+        <span class="tag">Spiral</span>
+        <span class="tag">Dense</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="logo-card">
+    <div class="logo-display">
+      <img src="logo-d-dragon-card.svg" alt="Dragon & Card">
+    </div>
+    <div class="logo-info">
+      <h2>D. Dragon & Card</h2>
+      <p>Crimson dragon coiled around a central card, claws gripping the edges. Wings spread wide. Ties the dragon motif directly to the product &mdash; a guardian of the collection.</p>
+      <div class="tags">
+        <span class="tag">Crimson</span>
+        <span class="tag">Card-centric</span>
+        <span class="tag">Guardian</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="size-strip">
+  <h2>Size Comparison</h2>
+  <div class="size-row">
+    <div class="size-item">
+      <img src="logo-a-twin-dragons.svg" width="120" height="120">
+      <span>120px</span>
+    </div>
+    <div class="size-item">
+      <img src="logo-b-ouroboros.svg" width="120" height="120">
+      <span>120px</span>
+    </div>
+    <div class="size-item">
+      <img src="logo-c-coiled-single.svg" width="120" height="120">
+      <span>120px</span>
+    </div>
+    <div class="size-item">
+      <img src="logo-d-dragon-card.svg" width="120" height="120">
+      <span>120px</span>
+    </div>
+  </div>
+  <div class="size-row" style="margin-top: 24px;">
+    <div class="size-item">
+      <img src="logo-a-twin-dragons.svg" width="48" height="48">
+      <span>48px</span>
+    </div>
+    <div class="size-item">
+      <img src="logo-b-ouroboros.svg" width="48" height="48">
+      <span>48px</span>
+    </div>
+    <div class="size-item">
+      <img src="logo-c-coiled-single.svg" width="48" height="48">
+      <span>48px</span>
+    </div>
+    <div class="size-item">
+      <img src="logo-d-dragon-card.svg" width="48" height="48">
+      <span>48px</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
