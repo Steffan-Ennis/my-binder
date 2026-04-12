@@ -57,6 +57,11 @@ my-binder/
 │       │       └── cardService.ts      # Card lookup/search/legality with pagination
 │       ├── docs/                       # Server-specific docs
 │       ├── index.ts                    # Local dev entry point
+│       ├── .env.example                # Env var template (committed)
+│       ├── .env.local                  # Local dev env (gitignored) — loaded by `pnpm dev`/`start`
+│       ├── .env.dev                    # AWS dev/sandbox env (gitignored)
+│       ├── .env.staging                # AWS staging env (gitignored)
+│       ├── .env.prod                   # AWS production env (gitignored)
 │       └── Dockerfile
 ├── packages/
 │   ├── core/                           # @my-binder/core — shared types + schemas
@@ -91,11 +96,34 @@ pnpm install         # Install all workspace dependencies
 ## Scripts
 
 ```bash
-pnpm turbo test      # Run tests across all workspaces
-pnpm turbo build     # Build all workspaces (core first)
-pnpm turbo typecheck # Run tsc --noEmit across all workspaces
-pnpm turbo dev       # Start all dev servers
+turbo test      # Run tests across all workspaces
+turbo build     # Build all workspaces (core first)
+turbo typecheck # Run tsc --noEmit across all workspaces
+turbo dev       # Start all dev servers
+
+# Server-only: TypeORM migrations (Postgres). See apps/server/README.md.
+# Declared in turbo.json with cache: false (stateful DB operations).
+turbo migration:generate --filter=@my-binder/server
+turbo migration:run      --filter=@my-binder/server
+turbo migration:revert   --filter=@my-binder/server
 ```
+
+### Environment files (`apps/server/`)
+
+The server uses Node's `--env-file` flag to load env vars. `pnpm dev` and `pnpm start` both
+read `apps/server/.env.local`. Five files exist, only `.env.example` is committed:
+
+| File | Purpose |
+|---|---|
+| `.env.example` | Template (committed) — documents every var the server reads |
+| `.env.local` | Local development — loaded by `pnpm dev` / `pnpm start` |
+| `.env.dev` | AWS dev/sandbox — secrets resolved via `*_SECRET_NAME` from Secrets Manager |
+| `.env.staging` | AWS staging — `NODE_ENV=production`, Secrets Manager |
+| `.env.prod` | AWS production — Secrets Manager |
+
+Required Postgres vars: `DATABASE_URL` (hostname, despite the name), `DATABASE_PORT`,
+`DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_NAME`. In AWS, `DATABASE_SECRET_NAME` and
+`SESSION_JWT_SECRET_NAME` override the inline secrets — see `apps/server/src/config.ts:resolveSecret`.
 
 ## Notes
 
@@ -129,3 +157,5 @@ pnpm turbo dev       # Start all dev servers
 - **007-google-oauth-auth**: Added Google OAuth + guest mode — `POST /auth/google`, `GET /auth/me`, `POST /auth/signout`; auth plugin decorates `request.identity`; users table in DuckDB; session JWTs (HS256, 7-day TTL)
 - **009-infrastructure**: Added AWS CDK v2 stack (`packages/infrastructure`) — Lambda + API Gateway + EFS + ECR
 - **010-revert-mtgjson-infra**: `MtgjsonProvider` now calls the MTGJSON SDK directly for all card operations; removed DuckDB card replica tables (migrations 003/004), `cardImporter.ts`, and EFS lock-file coordination; SDK instance kept alive between Lambda invocations; EFS used for SDK parquet cache only
+- **Env file convention**: `apps/server` now uses Node's `--env-file` flag to load env vars. Added `.env.local` (local dev, loaded by `pnpm dev`/`pnpm start`), `.env.dev`, `.env.staging`, `.env.prod`. Only `.env.example` is committed — all others are gitignored. `.env.example` documents the new Postgres vars (`DATABASE_URL`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_NAME`, `DATABASE_SECRET_NAME`)
+- **Turbo migration tasks**: added `migration:generate`, `migration:run`, `migration:revert` to `turbo.json` with `cache: false` and `dependsOn: ["^build"]` so TypeORM CLI operations run through Turbo with the right build order and no unsafe caching

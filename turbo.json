@@ -20,6 +20,18 @@
     },
     "lint": {
       "outputs": []
+    },
+    "migration:generate": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
+    "migration:run": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
+    "migration:revert": {
+      "dependsOn": ["^build"],
+      "cache": false
     }
   }
 }
