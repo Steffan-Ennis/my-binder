@@ -138,12 +138,11 @@ Required Postgres vars: `DATABASE_URL` (hostname, despite the name), `DATABASE_P
 - **Fastify v4** — HTTP framework with Ajv JSON schema validation (`apps/server`)
 - **`@duckdb/node-api`** — DuckDB Node.js driver (`apps/server`); app DB only (`binder.duckdb` — user collection)
 - **`mtgjson-sdk@0.1.1`** — MTGJSON card data SDK; long-lived instance created at startup, passed into `MtgjsonProvider`; card queries go directly to the SDK (`apps/server`)
-- **DuckDB** — embedded file-based database for user collection only; card data lives in the SDK's own internal DuckDB instance
 - **`google-auth-library`** — Google ID token verification (`apps/server`); verifies audience, expiry, `email_verified` claim
 - **`jsonwebtoken`** — HS256 session JWT issuance and verification (`apps/server/src/auth/sessionJwt.ts`)
 - **`fastify-plugin`** — used by auth plugin to share `request.identity` decoration across Fastify scopes
 - **`@fastify/aws-lambda`** v6 — Lambda adapter wrapping the Fastify app (`apps/server/src/lambda.ts`)
-- **AWS CDK v2** (`aws-cdk-lib`) — infrastructure as code in `packages/infrastructure`
+- **AWS CDK v2** (`aws-cdk-lib`) — infrastructure as code in `packages/infrastructure`; CDK app entry is `bin/app.ts`, executed via `node --import tsx` (no `ts-node`). Per-environment scripts `pnpm cdk:<env>:{synth,diff,deploy,destroy}` load `packages/infrastructure/.env.<env>` with Node 22's `--env-file` flag — `ENVIRONMENT` is required and suffixes every physical resource name; `REUSE_ORPHANS=true` imports retained secrets instead of creating them
 - **EFS** — persistent storage for DuckDB file (`binder.duckdb`) and MTGJSON SDK parquet cache (`mtgjson-cache/`) on Lambda; `mtgjsonCacheDir` derived from `EFS_PATH` env var when set
 - **NAT instance** (`t4g.nano`, ~$3/month) — replaces Managed NAT Gateway (~$32/month); provisioned via `ec2.NatProvider.instanceV2()` in the CDK stack; provides Lambda internet access for MTGJSON downloads and Google OAuth
 - **Secrets Manager** — all 3 secrets created by CDK (`RemovalPolicy.RETAIN`); `SESSION_JWT_SECRET` is auto-generated; `GOOGLE_CLIENT_IDS` and `GOOGLE_WEB_CLIENT_ID` are created with `REPLACE_ME` placeholder and must be overwritten manually after first deploy via `aws secretsmanager put-secret-value`

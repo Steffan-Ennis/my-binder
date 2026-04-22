@@ -14,6 +14,7 @@ export default new DataSource({
   username: process.env['DATABASE_USER'],
   password: process.env['DATABASE_PASSWORD'],
   database: process.env['DATABASE_NAME'] ?? 'my_binder',
+  ssl: { rejectUnauthorized: false },
   entities: [UserEntity, CardEntity, AllowedUserEntity],
   migrations: ['src/db/migrations/*.ts'],
   migrationsRun: false,

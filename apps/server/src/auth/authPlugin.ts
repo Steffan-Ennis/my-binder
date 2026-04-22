@@ -1,8 +1,8 @@
-import type { FastifyInstance, FastifyPluginCallback, FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import fp from 'fastify-plugin';
 import type { AuthState } from '@my-binder/core';
 import { verifyToken } from './sessionJwt';
-import { getConfig } from '@src/config';
+import { getAuthConfig } from './authConfig';
 import { getRepositories } from '@src/db/repositories';
 
 declare module 'fastify' {
@@ -23,8 +23,8 @@ declare module 'fastify' {
  *
  * Route handlers read `request.identity` to decide whether to return 401.
  */
-const authPlugin: FastifyPluginCallback = (fastify: FastifyInstance, _options, done) => {
-  const { sessionJwtSecret } = getConfig();
+const authPlugin: FastifyPluginAsync = async (fastify: FastifyInstance) => {
+  const { sessionJwtSecret } = await getAuthConfig();
 
   fastify.decorateRequest('identity', null);
 
@@ -66,7 +66,6 @@ const authPlugin: FastifyPluginCallback = (fastify: FastifyInstance, _options, d
     }
   });
 
-  done();
 };
 
 export default fp(authPlugin, { name: 'auth-plugin' });

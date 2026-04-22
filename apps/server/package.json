@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "build": "tsc && tsc-alias",
-    "migration:generate": "tsx ./node_modules/typeorm/cli.js migration:generate src/db/migrations/migration -d src/db/datasource-cli.ts",
-    "migration:run": "tsx ./node_modules/typeorm/cli.js migration:run -d src/db/datasource-cli.ts",
-    "migration:revert": "tsx ./node_modules/typeorm/cli.js migration:revert -d src/db/datasource-cli.ts",
+    "migration:generate": "node --env-file=.env.local --import tsx ./node_modules/typeorm/cli.js migration:generate src/db/migrations/migration -d src/db/datasource-cli.ts",
+    "migration:run": "node --env-file=.env.local --import tsx ./node_modules/typeorm/cli.js migration:run -d src/db/datasource-cli.ts",
+    "migration:revert": "node --env-file=.env.local --import tsx ./node_modules/typeorm/cli.js migration:revert -d src/db/datasource-cli.ts",
     "dev": "node --env-file=.env.local --import tsx --watch index.ts",
     "start": "node --env-file=.env.local dist/index.js",
     "test": "jest",

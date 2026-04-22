@@ -5,7 +5,7 @@ import { issueToken } from '@src/auth/sessionJwt';
 import { getRepositories } from '@src/db/repositories';
 import type { AllowedUserRepository } from '@src/repositories/allowedUserRepository';
 import type { UserRepository } from '@src/repositories/userRepository';
-import { getConfig } from '@src/config';
+import { getAuthConfig } from '@src/auth/authConfig';
 
 export class InvalidGoogleTokenError extends Error {
   constructor(cause?: unknown) {
@@ -44,7 +44,7 @@ export async function signIn(
   idToken: string,
   deps: SignInDeps = {},
 ): Promise<GoogleSignInResponse> {
-  const { googleClientIds, sessionJwtSecret } = getConfig();
+  const { googleClientIds, sessionJwtSecret } = await getAuthConfig();
   const _allowedUserRepo = deps.allowedUserRepo ?? getRepositories().allowedUser;
   const _userRepo = deps.userRepo ?? getRepositories().user;
   let user: AuthUser;

@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
-import { getConfig } from '@src/config';
+import { getAuthConfig } from '@src/auth/authConfig';
 
 export async function loginRoutes(fastify: FastifyInstance): Promise<void> {
-  const { googleWebClientId } = getConfig();
+  const { googleWebClientId } = await getAuthConfig();
 
   fastify.get('/auth/login', async (_request, reply) => {
     const html = `<!DOCTYPE html>

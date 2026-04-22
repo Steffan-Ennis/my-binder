@@ -1,8 +1,9 @@
-import { DataSource, } from 'typeorm';
+import {DataSource} from 'typeorm';
 import type { Config } from '@src/config';
 import { UserEntity } from '@src/entities/UserEntity';
 import { CardEntity } from '@src/entities/CardEntity';
 import { AllowedUserEntity } from '@src/entities/AllowedUserEntity';
+
 
 const dataSource = new DataSource({
   type: 'postgres',
@@ -17,11 +18,19 @@ const dataSource = new DataSource({
   },
 });
 
-export async function initDataSource(config: Pick<Config, 'pgHost' | 'pgPort' | 'pgUser' | 'pgPassword' | 'pgDatabase'>): Promise<void> {
+type DataInitialiseOptions = Pick<Config, 'pgHost' | 'pgPort' | 'pgUser' | 'pgPassword' | 'pgDatabase'> & {
+  ssl?:  {
+    rejectUnauthorized: boolean
+  }
+}
+
+
+export async function initDataSource(config: DataInitialiseOptions): Promise<void> {
   if (dataSource.isInitialized) return;
   dataSource.setOptions({
     host: config.pgHost,
     port: config.pgPort,
+    ssl : config.ssl,
     username: config.pgUser,
     password: config.pgPassword,
     database: config.pgDatabase,
