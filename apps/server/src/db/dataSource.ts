@@ -18,7 +18,7 @@ const dataSource = new DataSource({
   },
 });
 
-type DataInitialiseOptions = Pick<Config, 'pgHost' | 'pgPort' | 'pgUser' | 'pgPassword' | 'pgDatabase'> & {
+export type DataInitialiseOptions = Pick<Config, 'pgHost' | 'pgPort' | 'pgUser' | 'pgPassword' | 'pgDatabase'> & {
   ssl?:  {
     rejectUnauthorized: boolean
   }

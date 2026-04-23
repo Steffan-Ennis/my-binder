@@ -1,4 +1,5 @@
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
+import { type DataInitialiseOptions } from './dataSource'
 
 export type DbConfig = {
   host: string;
@@ -6,6 +7,7 @@ export type DbConfig = {
   username: string;
   password: string;
   database: string;
+  ssl?: DataInitialiseOptions['ssl']
 };
 
 /**
@@ -26,6 +28,9 @@ const DEFAULTS: DbConfig = {
   username: 'postgres',
   password: '',
   database: 'my_binder',
+  ssl: {
+    rejectUnauthorized: true
+  }
 };
 
 /**
@@ -43,12 +48,21 @@ const DEFAULTS: DbConfig = {
 export async function resolveDbConfig(env: NodeJS.ProcessEnv = process.env): Promise<DbConfig> {
   const secret = await fetchRdsSecret(env);
 
+  console.log(
+    'Secret',
+    secret?.dbname,
+    secret?.host,
+    secret?.port,
+  )
   return {
     host: secret?.host ?? env['DATABASE_URL'] ?? DEFAULTS.host,
     port: secret?.port ?? parseInt(env['DATABASE_PORT'] ?? String(DEFAULTS.port), 10),
     username: secret?.username ?? env['DATABASE_USER'] ?? DEFAULTS.username,
     password: secret?.password ?? env['DATABASE_PASSWORD'] ?? DEFAULTS.password,
     database: secret?.dbname ?? env['DATABASE_NAME'] ?? DEFAULTS.database,
+    ssl: {
+      rejectUnauthorized: env['DATABASE_SSL'] === 'true'
+    }
   };
 }
 
@@ -63,6 +77,9 @@ export function resolveDbConfigSync(env: NodeJS.ProcessEnv = process.env): DbCon
     username: env['DATABASE_USER'] ?? DEFAULTS.username,
     password: env['DATABASE_PASSWORD'] ?? DEFAULTS.password,
     database: env['DATABASE_NAME'] ?? DEFAULTS.database,
+    ssl: {
+      rejectUnauthorized: env['DATABASE_SSL'] === 'true'
+    }
   };
 }
 

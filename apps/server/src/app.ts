@@ -35,7 +35,8 @@ export async function buildApp(): Promise<AppResult> {
     pgPassword: config.pgPassword,
     pgUser: config.pgUser,
     pgDatabase: config.pgDatabase,
-    pgHost: config.pgHost
+    pgHost: config.pgHost,
+    ssl: config.pgSsl
   });
 
   // 3. Initialise repository singletons — must run after DataSource is ready.

@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { DataSourceOptions } from "typeorm";
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
 import { resolveDbConfig, resolveDbConfigSync } from '@src/db/dbConfig';
+import type {DataInitialiseOptions} from "@src/db/dataSource";
 
 export type Config = {
   port: number;
@@ -14,6 +15,7 @@ export type Config = {
   pgUser: string;
   pgPassword: string;
   pgDatabase: string;
+  pgSsl?: DataInitialiseOptions['ssl'];
 
   // DatabaseType
   dbType?: DataSourceOptions['type'],
@@ -65,6 +67,7 @@ export async function loadConfig(): Promise<Config> {
     pgUser: dbConfig.username,
     pgPassword: dbConfig.password,
     pgDatabase: dbConfig.database,
+    pgSsl: dbConfig.ssl,
   };
 
   return _config;
@@ -91,6 +94,7 @@ function buildConfigFromEnv(): Config {
     pgUser: dbConfig.username,
     pgPassword: dbConfig.password,
     pgDatabase: dbConfig.database,
+    pgSsl: dbConfig.ssl,
   };
 }
 
