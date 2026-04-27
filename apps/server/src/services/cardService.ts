@@ -1,9 +1,11 @@
 import type {
   Card, CardList, CreateCardBody, UpdateCardBody,
-  CardRecord, CardNotFoundResult, LegalityResult, SearchQuery, SearchResult,
+  CardRecord, CardNotFoundResult, LegalityResult,
+  SearchQuery, SearchResult,
 } from '@my-binder/core';
 import { getRepositories } from '@src/db/repositories';
 import { registry } from '@src/providers/registry';
+import { CardProvider } from "@src/providers/interface";
 
 export class NotFoundError extends Error {
   constructor(id: string) {
@@ -60,11 +62,12 @@ export async function lookupCard(
 ): Promise<CardRecord[] | CardNotFoundResult> {
   try {
     return await registry.getActive().lookup(name, opts);
-  } catch (err) {
-    if (err instanceof Error && (err as NodeJS.ErrnoException).code !== 'CARD_NOT_FOUND') {
+  } catch (error) {
+    console.error(error)
+    if (error instanceof Error && (error as NodeJS.ErrnoException).code !== 'CARD_NOT_FOUND') {
       throw new ProviderUnavailableError();
     }
-    throw err;
+    throw error;
   }
 }
 
@@ -74,9 +77,10 @@ export async function checkCommanderLegality(
 ): Promise<LegalityResult> {
   try {
     return await registry.getActive().checkLegality(name, commanderColors);
-  } catch (err) {
-    if (err instanceof Error) {
-      const typed = err as NodeJS.ErrnoException;
+  } catch (error) {
+    console.error(error)
+    if (error instanceof Error) {
+      const typed = error as NodeJS.ErrnoException;
       if (typed.code === 'CARD_NOT_FOUND') throw new CardNotFoundError(name);
     }
     throw new ProviderUnavailableError();
@@ -86,14 +90,15 @@ export async function checkCommanderLegality(
 export async function searchCards(query: SearchQuery): Promise<SearchResult> {
   const page = Math.max(1, query.page ?? 1);
   const limit = Math.min(100, Math.max(1, query.limit ?? 20));
-
-  let allCards: CardRecord[];
+  let activeProvider: CardProvider
   try {
-    allCards = await registry.getActive().search(query);
-  } catch {
+    activeProvider = registry.getActive()
+  } catch (error) {
+    console.error(error)
     throw new ProviderUnavailableError();
   }
 
+  const allCards = await activeProvider.search(query)
   const total = allCards.length;
   const offset = (page - 1) * limit;
   const cards = allCards.slice(offset, offset + limit);

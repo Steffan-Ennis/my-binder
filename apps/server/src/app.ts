@@ -17,6 +17,7 @@ import authPlugin from '@src/auth/authPlugin';
 import { MtgjsonProvider } from '@src/providers/mtgjson/index';
 import { registry } from '@src/providers/registry';
 import { initEfs } from '@src/services/efsService';
+import { readdir, cp } from 'node:fs/promises';
 
 export type AppResult = { fastify: FastifyInstance; config: Config };
 
@@ -27,6 +28,7 @@ export async function buildApp(): Promise<AppResult> {
   // 1. Ensure EFS subdirectories exist (Lambda only — no-op locally).
   if (process.env['EFS_PATH']) {
     await initEfs(process.env['EFS_PATH']);
+    console.log('EFS mtgjson-cache:', await readdir('/mnt/data/mtgjson-cache/parquet'));
   }
 
   // 2. Initialise PostgreSQL DataSource.
@@ -42,9 +44,27 @@ export async function buildApp(): Promise<AppResult> {
   // 3. Initialise repository singletons — must run after DataSource is ready.
   initRepositories(getDataSource());
 
-  // 4. Initialise MTGJSON SDK — downloads parquet files on first cold start,
-  //    reads from EFS cache on subsequent starts.
-  const sdk = await MtgjsonSDK.create({ cacheDir: config.mtgjsonCacheDir });
+  // 4. Initialise MTGJSON SDK.
+  //    EFS holds the persistent parquet cache (survives cold starts).
+  //    DuckDB can't reliably read parquets from NFS (EFS), so on Lambda we:
+  //      a) Let the SDK download to EFS (config.mtgjsonCacheDir)
+  //      b) Copy the parquets to /tmp (local ephemeral storage)
+  //      c) Point the SDK at /tmp for queries
+  let sdkCacheDir = config.mtgjsonCacheDir;
+  if (process.env['EFS_PATH']) {
+    // Ensure parquets exist on EFS (downloads on very first deploy only).
+    const efsSdk = await MtgjsonSDK.create({ cacheDir: config.mtgjsonCacheDir });
+    // Warm up to trigger lazy parquet downloads (identifiers, legalities).
+    await efsSdk.identifiers.getIdentifiers('00000000-0000-0000-0000-000000000000').catch(() => {});
+    await efsSdk.legalities.isLegal('00000000-0000-0000-0000-000000000000', 'commander').catch(() => {});
+    await efsSdk.close();
+
+    // Copy from EFS to /tmp for DuckDB compatibility.
+    sdkCacheDir = '/tmp/mtgjson-cache';
+    await cp(config.mtgjsonCacheDir, sdkCacheDir, { recursive: true });
+    console.log('Copied parquets to /tmp:', await readdir(sdkCacheDir + '/parquet'));
+  }
+  const sdk = await MtgjsonSDK.create({ cacheDir: sdkCacheDir });
 
   // 5. Register the card provider backed by the SDK.
   const mtgjsonProvider = new MtgjsonProvider(sdk);

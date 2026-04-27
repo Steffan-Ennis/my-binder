@@ -1,4 +1,4 @@
-import type {CardSet, MtgjsonSDK} from 'mtgjson-sdk';
+import type {MtgjsonSDK, CardSet} from 'mtgjson-sdk';
 import type { CardRecord, CardNotFoundResult, LegalityResult, SearchQuery } from '@my-binder/core';
 import type { CardProvider, LookupOptions } from '@src/providers/interface';
 import { mapCardSetToCardRecord } from '@src/providers/mtgjson/mapper';
@@ -105,7 +105,9 @@ export class MtgjsonProvider implements CardProvider {
       availability: 'paper',
     });
 
+    // TODO: re-enable enrichment after debugging
     return await Promise.all(cards.map(card => this.enrichCard(card)));
+    // return enrichedCards.map(card => mapCardSetToCardRecord(card, { scryfallId: null, commanderLegal: false }));
   }
 
   async isReachable(): Promise<boolean> {
@@ -120,11 +122,11 @@ export class MtgjsonProvider implements CardProvider {
   // Fetch the enrichment data for a single card that cannot be obtained from the
   // cards Parquet alone — legalities and identifiers live in separate Parquet files.
   private async enrichCard(card: CardSet): Promise<CardRecord> {
-    const [ids, commanderLegal] = await Promise.all([
+    const [ids, commanderLegal = false] = await Promise.all([
       this.sdk.identifiers.getIdentifiers(card.uuid),
-      this.sdk.legalities.isLegal(card.uuid, 'commander'),
+      // this.sdk.legalities.isLegal(card.uuid, 'commander'),
     ]);
-    const scryfallId = typeof ids?.scryfallId === 'string' ? ids.scryfallId : null;
+  const scryfallId = typeof ids?.scryfallId === 'string' ? ids.scryfallId : null;
     return mapCardSetToCardRecord(card, { commanderLegal, scryfallId });
   }
 }

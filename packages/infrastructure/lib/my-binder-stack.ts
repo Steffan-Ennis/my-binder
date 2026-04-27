@@ -216,7 +216,7 @@ export class MyBinderStack extends cdk.Stack {
       ),
       memorySize: 1024,
       ephemeralStorageSize: cdk.Size.gibibytes(1),
-      timeout: cdk.Duration.seconds(60),
+      timeout: cdk.Duration.seconds(300),
       vpc,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       filesystem: lambda.FileSystem.fromEfsAccessPoint(accessPoint, '/mnt/data'),
