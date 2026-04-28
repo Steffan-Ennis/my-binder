@@ -39,6 +39,8 @@ type SearchQuerystring = {
 
 export async function cardRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.setErrorHandler((error, _request, reply) => {
+    console.error(error)
+
     if (error.validation) {
       return reply.code(HTTP_STATUS.BAD_REQUEST).send({
         error: ERROR_CODES.VALIDATION_ERROR,
