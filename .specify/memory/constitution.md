@@ -1,38 +1,59 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.9.0 → 1.9.1
-Bump type: PATCH — TypeScript naming conventions added to Principle VII.
-  Every task MUST include a documentation step as part of its verification criteria.
-  Package documentation lives in <package>/docs/*.md.
-Last amended: 2026-03-21
+Version change: 1.10.0 → 1.11.0
+Bump type: MINOR — new principle added (IX. Public API Discipline).
+  Combines two related rules: (a) services and providers MUST publish JSDoc with
+  examples on every public function, and (b) index files MUST be barrel re-exports
+  only — they MUST NOT declare their own behaviour.
+Last amended: 2026-04-28
 
 Modified principles:
-  VII. Strong Typing & Schema Validation — enforcement mechanism updated from JSDoc @ts-check
-    to TypeScript strict mode (noImplicitAny, strictNullChecks). Runtime boundary validation
-    via Fastify Ajv unchanged.
+  (none)
 
 Added sections / material expansions:
-  - Principle VI: Layered Architecture (1.1.0)
-  - Technology Stack: multi-component inventory (1.1.0)
-  - DATABASE_TYPE resolved to DuckDB (1.2.0)
-  - Principle VII: Strong Typing & Schema Validation (1.3.0)
-  - Monorepo: Turborepo + pnpm workspaces; apps/server, apps/mobile, packages/core (1.4.0)
-  - TypeScript: project-wide language; tsc compilation; strict mode (1.5.0)
+  - Principle IX: Public API Discipline (1.11.0) — JSDoc with examples on every public
+    method of services/providers; index files reserved for re-exports.
 
 Removed sections:
   (none)
 
 Templates reviewed:
-  ✅ .specify/templates/plan-template.md  — Language-agnostic; no structural change needed.
-     Plans must gate against all seven principles at plan-time.
+  ✅ .specify/templates/plan-template.md  — Constitution Check is principle-list
+     agnostic; no structural change. Plans must now gate against nine principles.
   ✅ .specify/templates/spec-template.md  — No structural changes required.
-  ✅ .specify/templates/tasks-template.md — No structural changes required.
-  ⚠  specs/001-server-architecture/plan.md — Language field and file extensions require
-     updating from JavaScript/JSDoc to TypeScript. jsconfig.json → tsconfig.json.
-  ⚠  specs/004-card-data-provider/plan.md — Language field and type definitions require
-     updating from JSDoc @typedef to TypeScript interfaces.
-  ✅ CLAUDE.md — Setup section updated to reflect pnpm + Turborepo monorepo.
+  ✅ .specify/templates/tasks-template.md — No structural changes required; the new
+     principle is enforced at task-verification time alongside the existing
+     "documentation step" rule under Development Workflow.
+  ✅ CLAUDE.md — No update required; principle is enforced at code-review time.
+
+Known violations to remediate (⚠ pending):
+  ⚠ apps/server/src/providers/mtgjson/index.ts — declares `MtgjsonProvider` class
+    inline. Required remediation: extract to `apps/server/src/providers/mtgjson/MtgjsonProvider.ts`
+    and reduce `index.ts` to `export { MtgjsonProvider } from './MtgjsonProvider';`.
+  ⚠ packages/core/src/types/index.ts — declares `Card`, `CardList`, `CreateCardBody`,
+    `UpdateCardBody` inline alongside `export *` re-exports. Required remediation:
+    move inline declarations to a peer file (e.g., `card.ts` if not already present)
+    and reduce `index.ts` to re-exports.
+  ⚠ packages/core/src/constants/index.ts — declares `AUTH_ERROR_CODES`, `ERROR_CODES`,
+    `SESSION_JWT_TTL_DAYS`, `AUTH_IDENTITY_KIND` inline. Required remediation: extract
+    to peer files (e.g., `errorCodes.ts`, `authIdentity.ts`) and reduce `index.ts` to
+    re-exports.
+  ⚠ Service/provider JSDoc backfill — audit `apps/server/src/services/*.ts` and
+    `apps/server/src/providers/**/*.ts` (excluding type-only files) and backfill JSDoc
+    with `@example` blocks on every public function/method. Reference implementation:
+    `apps/server/src/providers/mtgjson/index.ts`.
+
+Compliant index files (no action required):
+  ✅ packages/core/src/index.ts — pure re-export barrel.
+
+Carve-outs:
+  ✅ apps/server/index.ts — application entry-point referenced by package.json `main`;
+     exempt from the index-file purity rule under the explicit carve-out in Principle IX.
+
+Carry-over from 1.10.0:
+  ⚠  specs/001-server-architecture/plan.md — JSDoc → TypeScript migration. Unchanged.
+  ⚠  specs/004-card-data-provider/plan.md — JSDoc → TypeScript migration. Unchanged.
 
 Deferred TODOs:
   - TODO(MOBILE_PLATFORM): Mobile app framework not yet chosen (spec 002 confirms iOS +
@@ -189,6 +210,109 @@ Rationale: upward-traversing relative paths (`../../db/client`) obscure the stru
 of the importing file and break silently when files are moved. Named aliases make every import
 self-documenting and refactoring-safe.
 
+### VIII. Error Transparency
+
+Errors MUST never be silently swallowed. Every caught error MUST result in at least one
+observable side effect — a log entry, a re-thrown error, a returned error value, or a
+recorded metric. Empty catch blocks and `catch { /* ignore */ }` patterns are prohibited.
+
+When a catch block raises a new error to replace the caught one, the original error MUST
+be logged before the new error is thrown. This guarantees the original message and stack
+trace are preserved in observability tooling even when the wrapper error is what reaches
+the caller. Attaching the cause via `Error`'s `cause` option is encouraged but does not
+substitute for logging — `cause` survives in memory but is not always serialised by every
+logger or transport.
+
+The acceptable patterns are:
+
+- **Re-throw unchanged**: `catch (err) { throw err; }` — original preserved verbatim.
+- **Log and continue**: `catch (err) { console.error(err); /* skip and proceed */ }` —
+  permitted when failure of one unit must not abort a batch (the rationale MUST be
+  documented in a comment or JSDoc).
+- **Log and throw a new error**: `catch (err) { console.error(err); throw new MyError('...', { cause: err }); }`
+  — the preferred pattern when wrapping is necessary.
+- **Catch and return a sentinel**: `catch { return false; }` — permitted only when the
+  absence of error is the intended signal (e.g., a liveness probe). The function MUST
+  carry a JSDoc note explaining why the error is intentionally discarded.
+
+The prohibited patterns are:
+
+- `catch (err) { /* nothing */ }` — silent swallow.
+- `catch (err) { throw new MyError('...'); }` — original error discarded; the wrapper
+  reaches the caller stripped of its cause.
+- `catch (err) { return null; }` without a JSDoc note explaining the intentional discard.
+
+Rationale: silent failures produce incidents that cannot be diagnosed from logs alone.
+Once an error is discarded, the only signal of its existence is downstream symptoms —
+usually hours after the cause occurred. Logging the original before any wrapping or
+sentinel-return makes post-incident analysis tractable and keeps stack traces intact.
+
+### IX. Public API Discipline
+
+Two rules govern how the public surface of a workspace is documented and where it lives.
+
+**JSDoc rule for services and providers**: Every public function or method of a class
+that lives under `apps/*/src/services/` or `apps/*/src/providers/` MUST carry a JSDoc
+block. The block MUST include:
+
+- A short description of the function's intent (the *why*, not a restatement of the
+  signature).
+- An `@param` entry for every parameter. When a parameter is an options object, each
+  recognised sub-field MUST also be described (`@param opts.foo - ...`).
+- A `@returns` entry describing the return shape and any sentinels (e.g.,
+  `CardNotFoundResult`, `false` from a liveness probe).
+- A `@throws` entry for every error the function may throw, including the error code
+  if one is attached.
+- An `@example` block wrapped in triple-backtick fenced TypeScript showing at least
+  one realistic call. Multiple `@example` blocks are encouraged when behaviour varies
+  across input shapes (e.g., success vs. not-found, with vs. without optional args).
+
+`apps/server/src/providers/mtgjson/index.ts` is the canonical reference for compliant
+JSDoc on a provider class. New services and providers MUST adopt this style; existing
+ones MUST be backfilled.
+
+Private methods, internal helpers, and type-only files (interfaces, mappers without
+behaviour) are exempt unless their behaviour is non-obvious from a one-line comment.
+
+Rationale: services and providers are the contract that the rest of the application
+consumes. Examples-in-source make the contract discoverable from an IDE without a
+separate reading pass through call sites, and they remain accurate because they sit
+next to the implementation they describe.
+
+**Index file purity rule**: Files named `index.ts` (or `index.js`) MUST be reserved
+for re-exporting behaviour declared in *other* files within the same directory. They
+MUST NOT declare their own classes, functions, types, constants, or runtime values
+beyond the re-exports themselves.
+
+- **Permitted in `index.ts`**: `export { Foo } from './foo';`, `export type { Bar } from './bar';`, `export * from './baz';`.
+- **Prohibited in `index.ts`**: class/function/type/const declarations, top-level
+  computation, side effects, or local helper definitions.
+
+The compliant pattern is `<Symbol>.ts` containing the declaration, with a sibling
+`index.ts` containing only the re-exports. For example:
+
+```ts
+// apps/server/src/providers/mtgjson/MtgjsonProvider.ts
+export class MtgjsonProvider implements CardProvider { /* ... */ }
+
+// apps/server/src/providers/mtgjson/index.ts
+export { MtgjsonProvider } from './MtgjsonProvider';
+export { mapCardSetToCardRecord } from './mapper';
+```
+
+**Carve-out**: an `index.ts` file referenced by `package.json` `main` or `bin` (i.e.,
+the application entry-point) is exempt from this rule. Such a file's purpose is to
+bootstrap the runtime, not to aggregate exports — `apps/server/index.ts` is the
+canonical example. The carve-out applies only to the package-root entry-point; nested
+`src/**/index.ts` files MUST follow the purity rule regardless.
+
+Rationale: index files exist to give a directory a single import path. When they also
+declare behaviour, the directory has two competing entry points (the index file and
+the file the index would otherwise have re-exported), and refactoring becomes
+ambiguous — *"where does `MtgjsonProvider` actually live?"* becomes a question with no
+single right answer. Keeping declarations in named files and using `index.ts` strictly
+as a barrel preserves a single source of truth per symbol.
+
 ## Technology Stack
 
 The system is a **monorepo** managed with **pnpm workspaces** and **Turborepo**. Each
@@ -310,7 +434,7 @@ a version bump per semantic versioning:
 - **PATCH**: clarification, wording improvement, or non-semantic refinement.
 
 Each feature plan MUST include a Constitution Check (as defined in
-`.specify/templates/plan-template.md`) verifying compliance with all seven principles before
+`.specify/templates/plan-template.md`) verifying compliance with all nine principles before
 implementation begins. Violations MUST be justified in the plan's Complexity Tracking table.
 
-**Version**: 1.9.1 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-03-21
+**Version**: 1.11.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-04-28
