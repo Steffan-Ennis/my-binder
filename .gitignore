@@ -33,3 +33,7 @@ coverage/
 # CDK cache
 packages/infrastructure/cdk.out/**
 .env
+
+# duckdb
+apps/server/binder.duckdb
+apps/server/binder.duckdb.wal
