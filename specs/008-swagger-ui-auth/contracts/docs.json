@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "API Documentation Endpoints",
+  "description": "Contracts for the Swagger UI documentation routes and the browser-based login page.",
+  "version": "2.0.0",
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/auth/login",
+      "summary": "Browser-based Google Sign-In page",
+      "auth": "none",
+      "description": "Serves a self-contained HTML page with the Google Identity Services 'Sign in with Google' button. Not behind any auth gate — accessible to unauthenticated users. On successful sign-in, the JS callback POSTs the Google ID token to POST /auth/google, then redirects the browser to /docs.",
+      "responses": {
+        "200": {
+          "description": "HTML login page",
+          "contentType": "text/html",
+          "notes": "Contains Google Identity Services <script> tag with data-client_id set from GOOGLE_WEB_CLIENT_ID env var."
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/docs",
+      "summary": "Redirect to the Swagger UI index page",
+      "auth": "required — session cookie (browser) or Authorization: Bearer header (API client)",
+      "responses": {
+        "302": {
+          "description": "Redirects to /docs/static/index.html (authenticated browser navigation)"
+        },
+        "302-login": {
+          "description": "Redirects to /auth/login when Accept: text/html and no valid session cookie is present"
+        },
+        "401": {
+          "description": "Unauthenticated API client request (no Accept: text/html, no valid Bearer token or cookie)",
+          "schema": {
+            "type": "object",
+            "required": ["code", "message"],
+            "properties": {
+              "code": { "type": "string", "enum": ["UNAUTHORIZED"] },
+              "message": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/docs/json",
+      "summary": "OpenAPI 3.0 schema document for the entire API",
+      "auth": "required — Authorization: Bearer header or session cookie",
+      "responses": {
+        "200": {
+          "description": "OpenAPI 3.0 JSON document",
+          "contentType": "application/json",
+          "schema": {
+            "description": "Standard OpenAPI 3.0 object — see https://spec.openapis.org/oas/v3.0.3"
+          }
+        },
+        "401": {
+          "description": "Unauthenticated request",
+          "schema": {
+            "type": "object",
+            "required": ["code", "message"],
+            "properties": {
+              "code": { "type": "string", "enum": ["UNAUTHORIZED"] },
+              "message": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/docs/yaml",
+      "summary": "OpenAPI 3.0 schema document in YAML format",
+      "auth": "required — Authorization: Bearer header or session cookie",
+      "responses": {
+        "200": {
+          "description": "OpenAPI 3.0 YAML document",
+          "contentType": "application/x-yaml"
+        },
+        "401": {
+          "description": "Unauthenticated request"
+        }
+      }
+    }
+  ],
+  "security": {
+    "browserAccess": {
+      "mechanism": "HttpOnly session cookie named 'session'",
+      "description": "Set by POST /auth/google after successful sign-in. Used for browser navigation to /docs. Cookie properties: HttpOnly, Secure, SameSite=Strict, path=/, maxAge=7 days (matching JWT TTL)."
+    },
+    "apiClientAccess": {
+      "mechanism": "Authorization: Bearer <jwt>",
+      "description": "Session JWT obtained from POST /auth/google. Used for API client access and Swagger UI 'Try it out' requests via the Authorize dialog."
+    },
+    "swaggerUiScheme": {
+      "scheme": "bearerAuth",
+      "type": "http",
+      "httpScheme": "bearer",
+      "bearerFormat": "JWT",
+      "description": "OpenAPI 3.0 security scheme pre-configured in @fastify/swagger. Swagger UI renders an Authorize button; the developer pastes their session JWT to enable Try-it-out calls to protected endpoints."
+    }
+  },
+  "notes": [
+    "The auth gate uses a preHandler hook (not onRequest) — request.identity is populated by authPlugin in preHandler; onRequest fires before that and identity would be null.",
+    "Browser GET requests to /docs/* without a valid session cookie receive a 302 redirect to /auth/login.",
+    "API client requests to /docs/* without a valid Bearer token or cookie receive 401.",
+    "All /docs/* static asset routes (CSS, JS, fonts) are protected — the scoped plugin's preHandler applies to all sub-paths.",
+    "The OpenAPI document at /docs/json is auto-generated from Fastify route schema definitions; it is always in sync with the live server.",
+    "PORT must be fixed at 3000 — http://localhost:3000 must be registered as an authorized JavaScript origin in Google Cloud Console.",
+    "GOOGLE_WEB_CLIENT_ID must be included in GOOGLE_CLIENT_IDS so the server's verifyIdToken() accepts tokens issued to the web client.",
+    "No server-side state is introduced beyond the session cookie — the schema document is computed on each request from the in-memory route registry."
+  ]
+}

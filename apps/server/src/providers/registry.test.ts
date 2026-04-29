@@ -1,5 +1,3 @@
-import { test, describe } from 'node:test';
-import assert from 'node:assert/strict';
 import type { CardProvider } from './interface';
 import {
   ProviderRegistry,
@@ -20,7 +18,7 @@ function makeProvider(overrides: Partial<CardProvider> = {}): CardProvider {
 describe('ProviderRegistry', () => {
   test('getActive throws when no provider is active', () => {
     const r = new ProviderRegistry();
-    assert.throws(() => r.getActive(), /No active provider set/);
+    expect(() => r.getActive()).toThrow(/No active provider set/);
   });
 
   test('register + setActive + getActive returns the registered provider', async () => {
@@ -28,24 +26,22 @@ describe('ProviderRegistry', () => {
     const provider = makeProvider();
     r.register('test', provider);
     await r.setActive('test');
-    assert.equal(r.getActive(), provider);
+    expect(r.getActive()).toBe(provider);
   });
 
   test('setActive throws ProviderRegistryNotFoundError for unknown name', async () => {
     const r = new ProviderRegistry();
-    await assert.rejects(
+    await expect(
       () => r.setActive('unknown'),
-      ProviderRegistryNotFoundError,
-    );
+    ).rejects.toThrow(ProviderRegistryNotFoundError);
   });
 
   test('setActive throws ProviderRegistryUnreachableError when isReachable returns false', async () => {
     const r = new ProviderRegistry();
     r.register('dead', makeProvider({ isReachable: async () => false }));
-    await assert.rejects(
+    await expect(
       () => r.setActive('dead'),
-      ProviderRegistryUnreachableError,
-    );
+    ).rejects.toThrow(ProviderRegistryUnreachableError);
   });
 
   test('setActive keeps previous active provider when new one is unreachable', async () => {
@@ -55,10 +51,10 @@ describe('ProviderRegistry', () => {
     await r.setActive('good');
 
     r.register('dead', makeProvider({ isReachable: async () => false }));
-    await assert.rejects(() => r.setActive('dead'), ProviderRegistryUnreachableError);
+    await expect(() => r.setActive('dead')).rejects.toThrow(ProviderRegistryUnreachableError);
 
     // Previous active should still be in place.
-    assert.equal(r.getActive(), good);
+    expect(r.getActive()).toBe(good);
   });
 
   test('getProviderInfo returns active provider name and reachability', async () => {
@@ -66,9 +62,9 @@ describe('ProviderRegistry', () => {
     r.register('mtgjson', makeProvider());
     await r.setActive('mtgjson');
     const info = await r.getProviderInfo();
-    assert.equal(info.name, 'mtgjson');
-    assert.equal(info.active, true);
-    assert.equal(info.reachable, true);
+    expect(info.name).toBe('mtgjson');
+    expect(info.active).toBe(true);
+    expect(info.reachable).toBe(true);
   });
 
   test('getProviderInfo returns reachable: false when provider is down', async () => {
@@ -81,13 +77,13 @@ describe('ProviderRegistry', () => {
 
     reachable = false;
     const info = await r.getProviderInfo();
-    assert.equal(info.reachable, false);
+    expect(info.reachable).toBe(false);
   });
 
   test('getProviderInfo when no active provider', async () => {
     const r = new ProviderRegistry();
     const info = await r.getProviderInfo();
-    assert.equal(info.active, false);
-    assert.equal(info.reachable, false);
+    expect(info.active).toBe(false);
+    expect(info.reachable).toBe(false);
   });
 });

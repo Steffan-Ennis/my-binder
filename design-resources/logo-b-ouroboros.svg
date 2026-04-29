@@ -1,0 +1,163 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="48%" r="50%">
+      <stop offset="0%" stop-color="#1c1a20"/>
+      <stop offset="70%" stop-color="#12101a"/>
+      <stop offset="100%" stop-color="#0a0810"/>
+    </radialGradient>
+    <radialGradient id="hl" cx="45%" cy="35%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rimB" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4a4238"/>
+      <stop offset="50%" stop-color="#2e2820"/>
+      <stop offset="100%" stop-color="#4a4238"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Medallion -->
+  <circle cx="200" cy="200" r="196" fill="#08060a"/>
+  <circle cx="200" cy="200" r="193" fill="url(#bg)" stroke="url(#rimB)" stroke-width="3"/>
+  <circle cx="200" cy="200" r="193" fill="url(#hl)"/>
+  <circle cx="200" cy="200" r="183" fill="none" stroke="#2a2530" stroke-width="1" opacity="0.4"/>
+
+  <!-- Dragon body — thick crescent/ring silhouette -->
+  <!-- Outer body edge (shadow) -->
+  <path d="
+    M310,145
+    C340,185 350,235 330,280
+    C310,325 270,355 220,360
+    C170,365 120,345 85,310
+    C50,275 40,225 55,180
+    C70,135 105,100 150,85
+    C195,70 240,75 275,100
+    C295,115 308,132 310,145
+    Z
+  " fill="#1a1220" opacity="0.5"/>
+
+  <!-- Main body silhouette — broad C-shaped dragon -->
+  <path d="
+    M300,150
+    C328,190 335,240 318,280
+    C300,320 265,348 222,354
+    C178,360 135,340 105,308
+    C75,276 62,232 75,190
+    C88,148 118,115 158,98
+    C198,80 238,88 268,108
+    C285,120 296,136 300,150
+    Z
+  " fill="#2a1e30"/>
+
+  <!-- Inner cutout to form the ring body shape -->
+  <!-- This is the belly/inner edge — slightly lighter -->
+  <path d="
+    M270,165
+    C290,195 295,235 282,268
+    C268,300 240,322 208,328
+    C175,334 148,318 128,296
+    C108,274 100,242 108,212
+    C116,182 138,158 168,148
+    C198,138 228,145 250,158
+    C260,162 266,164 270,165
+    Z
+  " fill="#12101a"/>
+
+  <!-- Belly ridge highlight -->
+  <path d="
+    M265,170
+    C284,198 288,232 276,262
+    C262,292 238,314 208,320
+    C178,326 152,312 134,292
+    C116,272 108,244 116,216
+    C124,188 144,165 172,155
+    C200,146 232,150 254,164
+  " fill="none" stroke="#362840" stroke-width="2" opacity="0.5"/>
+
+  <!-- Spine ridges along outer edge -->
+  <g fill="#342440" opacity="0.6">
+    <path d="M170,88 L166,72 L176,86"/>
+    <path d="M198,82 L198,66 L204,80"/>
+    <path d="M226,84 L230,68 L232,82"/>
+    <path d="M252,96 L260,82 L258,96"/>
+    <path d="M276,112 L286,100 L282,114"/>
+    <path d="M294,134 L306,124 L300,138"/>
+    <path d="M308,160 L322,154 L314,164"/>
+    <path d="M318,190 L332,188 L322,196"/>
+    <path d="M322,220 L336,222 L326,226"/>
+    <path d="M318,250 L332,256 L322,256"/>
+    <path d="M308,278 L320,286 L312,284"/>
+    <path d="M290,302 L300,314 L294,308"/>
+    <path d="M268,322 L274,336 L272,326"/>
+    <path d="M242,338 L244,352 L248,340"/>
+    <path d="M214,348 L214,362 L220,350"/>
+    <path d="M186,352 L182,366 L192,354"/>
+    <path d="M158,348 L152,360 L164,350"/>
+    <path d="M132,336 L124,348 L138,338"/>
+    <path d="M110,318 L100,328 L116,320"/>
+    <path d="M92,296 L80,304 L98,298"/>
+    <path d="M78,270 L66,274 L84,274"/>
+    <path d="M68,242 L56,242 L74,246"/>
+    <path d="M64,212 L52,208 L70,216"/>
+    <path d="M66,182 L54,176 L72,186"/>
+    <path d="M76,155 L66,146 L82,158"/>
+    <path d="M94,132 L86,120 L100,134"/>
+    <path d="M116,112 L110,100 L122,114"/>
+    <path d="M142,98 L140,82 L148,96"/>
+  </g>
+
+  <!-- Head at top-right — facing right, about to bite tail -->
+  <g transform="translate(298,142)">
+    <!-- Skull/head -->
+    <path d="M0,0 C8,-12 22,-14 30,-6 C36,0 34,12 24,16 C18,18 10,16 6,10 Z"
+      fill="#3a2840"/>
+    <!-- Snout/upper jaw -->
+    <path d="M30,-6 C38,-10 44,-4 42,4 C40,10 34,14 30,10 Z"
+      fill="#3a2840"/>
+    <!-- Lower jaw (open, reaching for tail) -->
+    <path d="M24,16 C30,22 38,20 40,14"
+      fill="none" stroke="#4a3850" stroke-width="1.5"/>
+    <!-- Eye -->
+    <circle cx="18" cy="2" r="3.5" fill="#1a1220"/>
+    <circle cx="18" cy="2" r="1.8" fill="#6a5040" opacity="0.8"/>
+    <!-- Horns -->
+    <path d="M10,-10 L2,-28 L14,-12" fill="#2a1e30"/>
+    <path d="M20,-12 L16,-26 L22,-10" fill="#2a1e30"/>
+  </g>
+
+  <!-- Tail tip approaching mouth from below -->
+  <path d="M296,158 C304,162 310,158 312,150 C314,144 310,140 306,142"
+    fill="#2a1e30" stroke="#342440" stroke-width="1"/>
+  <!-- Tail point -->
+  <path d="M312,150 L320,146 L316,152 L322,150"
+    fill="none" stroke="#2a1e30" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Wing pair at top -->
+  <g opacity="0.6">
+    <!-- Left wing -->
+    <path d="M162,92 C140,60 105,48 88,62 C74,74 80,96 98,102 C112,106 132,100 152,90"
+      fill="#1e1428" opacity="0.6"/>
+    <path d="M158,90 L96,52" stroke="#2a1e30" stroke-width="0.6" opacity="0.4"/>
+    <path d="M152,92 L88,60" stroke="#2a1e30" stroke-width="0.6" opacity="0.4"/>
+    <path d="M146,96 L82,70" stroke="#2a1e30" stroke-width="0.6" opacity="0.4"/>
+    <!-- Right wing -->
+    <path d="M240,92 C255,62 278,48 296,58 C310,68 308,90 292,98 C280,104 262,100 248,92"
+      fill="#1e1428" opacity="0.6"/>
+    <path d="M244,90 L290,54" stroke="#2a1e30" stroke-width="0.6" opacity="0.4"/>
+    <path d="M250,92 L296,62" stroke="#2a1e30" stroke-width="0.6" opacity="0.4"/>
+    <path d="M256,96 L302,72" stroke="#2a1e30" stroke-width="0.6" opacity="0.4"/>
+  </g>
+
+  <!-- Claws at bottom -->
+  <g stroke="#342440" stroke-width="1.2" fill="none" opacity="0.5" stroke-linecap="round">
+    <path d="M115,310 C108,318 106,328 112,332"/>
+    <path d="M112,332 L106,338 M112,332 L110,340 M112,332 L116,338"/>
+    <path d="M285,310 C292,318 294,328 288,332"/>
+    <path d="M288,332 L294,338 M288,332 L290,340 M288,332 L284,338"/>
+  </g>
+
+  <!-- Centre text -->
+  <circle cx="200" cy="210" r="30" fill="#0a0810" stroke="#2a2530" stroke-width="1.2" opacity="0.5"/>
+  <text x="200" y="205" text-anchor="middle" font-family="Georgia, serif" font-size="11" font-weight="bold" fill="#3a3530" opacity="0.6" letter-spacing="1">MY</text>
+  <text x="200" y="222" text-anchor="middle" font-family="Georgia, serif" font-size="13" font-weight="bold" fill="#3a3530" opacity="0.6" letter-spacing="2">BINDER</text>
+</svg>

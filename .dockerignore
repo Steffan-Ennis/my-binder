@@ -1,0 +1,21 @@
+# Dependencies — installed fresh inside the Docker build
+**/node_modules
+
+# CDK synthesis output — must be excluded to prevent recursive path explosion
+**/cdk.out
+
+# Git history
+.git
+
+# Local dev artifacts
+**/.env
+**/*.duckdb
+**/dist
+**/build
+
+# Mobile app — not needed for server build
+apps/mobile
+
+# Test + spec files not needed at runtime
+**/specs
+**/*.test.ts

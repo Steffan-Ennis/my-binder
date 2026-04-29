@@ -1,0 +1,200 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <radialGradient id="bgC" cx="50%" cy="48%" r="50%">
+      <stop offset="0%" stop-color="#1c1a20"/>
+      <stop offset="70%" stop-color="#12101a"/>
+      <stop offset="100%" stop-color="#0a0810"/>
+    </radialGradient>
+    <radialGradient id="hlC" cx="45%" cy="35%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rimC" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4a4238"/>
+      <stop offset="50%" stop-color="#2e2820"/>
+      <stop offset="100%" stop-color="#4a4238"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Medallion -->
+  <circle cx="200" cy="200" r="196" fill="#08060a"/>
+  <circle cx="200" cy="200" r="193" fill="url(#bgC)" stroke="url(#rimC)" stroke-width="3"/>
+  <circle cx="200" cy="200" r="193" fill="url(#hlC)"/>
+  <circle cx="200" cy="200" r="183" fill="none" stroke="#2a2530" stroke-width="1" opacity="0.4"/>
+
+  <!-- Dragon — single coiled serpent filling the medallion -->
+  <!-- Built as concentric filled crescents (body sections) with head at top -->
+
+  <!-- Outer coil: full ring body -->
+  <!-- Shadow layer -->
+  <path d="
+    M200,48
+    C270,48 340,92 358,162
+    C376,232 345,305 278,342
+    C211,379 132,368 78,312
+    C24,256 12,172 52,108
+    C92,44 155,38 200,48
+    Z
+  " fill="#1a1222" opacity="0.4"/>
+  <!-- Body fill -->
+  <path d="
+    M200,54
+    C265,54 328,94 346,158
+    C364,222 336,296 274,332
+    C212,368 138,358 88,306
+    C38,254 26,176 62,116
+    C98,56 158,46 200,54
+    Z
+  " fill="#281e2e"/>
+  <!-- Inner cutout for outer ring -->
+  <path d="
+    M200,92
+    C248,92 298,120 316,168
+    C334,216 318,272 274,302
+    C230,332 174,328 138,296
+    C102,264 90,210 106,164
+    C122,118 162,92 200,92
+    Z
+  " fill="#12101a"/>
+
+  <!-- Inner coil: second ring -->
+  <!-- Body fill -->
+  <path d="
+    M200,108
+    C240,108 284,130 300,170
+    C316,210 304,260 268,286
+    C232,312 186,310 156,284
+    C126,258 116,214 130,176
+    C144,138 172,114 200,108
+    Z
+  " fill="#241a2a"/>
+  <!-- Inner cutout -->
+  <path d="
+    M200,148
+    C226,148 258,162 270,188
+    C282,214 276,246 258,264
+    C240,282 214,286 194,274
+    C174,262 162,238 168,214
+    C174,190 188,170 200,148
+    Z
+  " fill="#12101a"/>
+
+  <!-- Innermost coil: tail spiral -->
+  <path d="
+    M200,162
+    C220,162 244,174 252,196
+    C260,218 252,244 236,258
+    C220,272 200,274 186,264
+    C172,254 164,236 170,218
+    C176,200 190,186 200,162
+    Z
+  " fill="#201828"/>
+  <!-- Final inner cutout -->
+  <path d="
+    M200,192
+    C212,192 226,200 232,214
+    C238,228 232,244 222,252
+    C212,260 200,260 192,252
+    C184,244 180,230 186,218
+    C190,208 196,200 200,192
+    Z
+  " fill="#12101a"/>
+
+  <!-- Tail tip at centre -->
+  <path d="
+    M200,206
+    C206,206 214,212 216,220
+    C218,228 214,236 208,238
+    C202,240 198,236 198,230
+    C198,224 202,218 200,206
+    Z
+  " fill="#201828"/>
+
+  <!-- Belly ridges — lighter arcs along inner body edges -->
+  <!-- Outer ring belly -->
+  <path d="
+    M200,92 C248,92 298,120 316,168 C334,216 318,272 274,302
+    C230,332 174,328 138,296 C102,264 90,210 106,164 C122,118 162,92 200,92
+  " fill="none" stroke="#342840" stroke-width="2" opacity="0.4"/>
+  <!-- Inner ring belly -->
+  <path d="
+    M200,148 C226,148 258,162 270,188 C282,214 276,246 258,264
+    C240,282 214,286 194,274 C174,262 162,238 168,214 C174,190 188,170 200,148
+  " fill="none" stroke="#342840" stroke-width="1.5" opacity="0.35"/>
+
+  <!-- Spine ridges along outer edge -->
+  <g fill="#322440" opacity="0.55">
+    <path d="M165,52 L160,36 L172,50"/>
+    <path d="M195,48 L194,32 L202,46"/>
+    <path d="M225,52 L228,36 L232,50"/>
+    <path d="M255,64 L262,50 L260,64"/>
+    <path d="M280,82 L290,70 L286,84"/>
+    <path d="M302,106 L314,96 L308,110"/>
+    <path d="M320,134 L334,128 L326,140"/>
+    <path d="M334,166 L348,164 L338,172"/>
+    <path d="M340,198 L354,200 L344,206"/>
+    <path d="M338,232 L352,238 L342,238"/>
+    <path d="M328,262 L340,272 L332,268"/>
+    <path d="M312,290 L322,302 L316,296"/>
+    <path d="M288,312 L296,326 L292,318"/>
+    <path d="M262,330 L266,344 L268,334"/>
+    <path d="M232,342 L232,356 L238,344"/>
+    <path d="M202,348 L200,362 L208,350"/>
+    <path d="M172,346 L168,360 L178,348"/>
+    <path d="M142,338 L136,350 L148,340"/>
+    <path d="M116,322 L108,334 L122,326"/>
+    <path d="M94,300 L84,310 L100,304"/>
+    <path d="M76,274 L64,280 L82,278"/>
+    <path d="M64,244 L52,248 L70,248"/>
+    <path d="M58,214 L46,212 L64,218"/>
+    <path d="M58,182 L46,178 L64,186"/>
+    <path d="M64,152 L54,144 L70,154"/>
+    <path d="M78,126 L70,114 L84,128"/>
+    <path d="M98,104 L92,90 L104,106"/>
+    <path d="M122,86 L118,72 L128,84"/>
+    <path d="M148,66 L148,50 L154,64"/>
+  </g>
+
+  <!-- Head at top center -->
+  <g transform="translate(200, 46)">
+    <!-- Skull — broad, angular -->
+    <path d="M-22,4 C-26,-12 -16,-28 0,-32 C16,-28 26,-12 22,4 C18,12 -18,12 -22,4Z"
+      fill="#302640"/>
+    <!-- Snout -->
+    <path d="M-14,0 C-16,-10 -8,-20 0,-24 C8,-20 16,-10 14,0"
+      fill="#28203a"/>
+    <!-- Nostrils -->
+    <ellipse cx="-4" cy="-17" rx="1.8" ry="1.2" fill="#12101a"/>
+    <ellipse cx="4" cy="-17" rx="1.8" ry="1.2" fill="#12101a"/>
+    <!-- Eyes -->
+    <circle cx="-10" cy="-8" r="4" fill="#1a1220"/>
+    <circle cx="-10" cy="-8" r="2" fill="#6a5040" opacity="0.7"/>
+    <circle cx="10" cy="-8" r="4" fill="#1a1220"/>
+    <circle cx="10" cy="-8" r="2" fill="#6a5040" opacity="0.7"/>
+    <!-- Horns — tall, swept back -->
+    <path d="M-16,-20 L-26,-48 L-12,-24" fill="#241c30"/>
+    <path d="M16,-20 L26,-48 L12,-24" fill="#241c30"/>
+    <path d="M-8,-24 L-14,-44 L-6,-26" fill="#241c30"/>
+    <path d="M8,-24 L14,-44 L6,-26" fill="#241c30"/>
+    <!-- Jaw line -->
+    <path d="M-14,0 C-10,6 10,6 14,0" fill="none" stroke="#3a3040" stroke-width="0.8" opacity="0.4"/>
+  </g>
+
+  <!-- Wings — broad, swept -->
+  <g opacity="0.55">
+    <!-- Left wing -->
+    <path d="M145,68 C118,38 78,28 58,44 C42,58 48,82 68,90 C84,96 110,88 136,76"
+      fill="#1a1226" opacity="0.6"/>
+    <path d="M140,66 L72,32" stroke="#241c30" stroke-width="0.6" opacity="0.4"/>
+    <path d="M134,70 L62,40" stroke="#241c30" stroke-width="0.6" opacity="0.4"/>
+    <path d="M128,74 L54,52" stroke="#241c30" stroke-width="0.6" opacity="0.4"/>
+    <path d="M120,80 L50,64" stroke="#241c30" stroke-width="0.6" opacity="0.4"/>
+    <!-- Right wing -->
+    <path d="M255,68 C282,38 322,28 342,44 C358,58 352,82 332,90 C316,96 290,88 264,76"
+      fill="#1a1226" opacity="0.6"/>
+    <path d="M260,66 L328,32" stroke="#241c30" stroke-width="0.6" opacity="0.4"/>
+    <path d="M266,70 L338,40" stroke="#241c30" stroke-width="0.6" opacity="0.4"/>
+    <path d="M272,74 L346,52" stroke="#241c30" stroke-width="0.6" opacity="0.4"/>
+    <path d="M280,80 L350,64" stroke="#241c30" stroke-width="0.6" opacity="0.4"/>
+  </g>
+</svg>

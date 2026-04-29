@@ -1,0 +1,28 @@
+{
+  "name": "@my-binder/infrastructure",
+  "version": "0.1.0",
+  "bin": {
+    "infrastructure": "bin/infrastructure.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk:dev:deploy": "cdk deploy --app 'node --env-file=.env.dev --import tsx bin/app.ts'",
+    "cdk:dev:synth": "cdk synth --app 'node --env-file=.env.dev --import tsx bin/app.ts'",
+    "cdk:dev:diff": "cdk diff --app 'node --env-file=.env.dev --import tsx bin/app.ts'",
+    "cdk:dev:destroy": "cdk destroy --app 'node --env-file=.env.dev --import tsx bin/app.ts'"
+  },
+  "devDependencies": {
+    "@types/jest": "^30",
+    "@types/node": "^24.10.1",
+    "jest": "^30",
+    "ts-jest": "^29",
+    "aws-cdk": "2.1114.1",
+    "tsx": "^4.19.0",
+    "typescript": "~5.9.3"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.244.0",
+    "constructs": "^10.5.0"
+  }
+}

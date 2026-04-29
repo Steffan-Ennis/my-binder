@@ -1,5 +1,3 @@
-import { test, describe, before, after } from 'node:test';
-import assert from 'node:assert/strict';
 import Fastify from 'fastify';
 import { providerRoutes } from './provider';
 import { registry } from '@src/providers/registry';
@@ -18,14 +16,14 @@ function makeProvider(overrides: Partial<CardProvider> = {}): CardProvider {
 describe('Provider routes', () => {
   const fastify = Fastify();
 
-  before(async () => {
+  beforeAll(async () => {
     registry.register('provider-route-test', makeProvider());
     await registry.setActive('provider-route-test');
     await fastify.register(providerRoutes);
     await fastify.ready();
   });
 
-  after(async () => {
+  afterAll(async () => {
     await fastify.close();
   });
 
@@ -33,11 +31,11 @@ describe('Provider routes', () => {
   describe('GET /provider', () => {
     test('returns 200 with active provider info', async () => {
       const r = await fastify.inject({ method: 'GET', url: '/provider' });
-      assert.equal(r.statusCode, 200);
+      expect(r.statusCode).toBe(200);
       const body = r.json<{ name: string; active: boolean; reachable: boolean }>();
-      assert.equal(body.name, 'provider-route-test');
-      assert.equal(body.active, true);
-      assert.equal(body.reachable, true);
+      expect(body.name).toBe('provider-route-test');
+      expect(body.active).toBe(true);
+      expect(body.reachable).toBe(true);
     });
   });
 
@@ -50,10 +48,10 @@ describe('Provider routes', () => {
         url: '/provider',
         payload: { name: 'provider-alt' },
       });
-      assert.equal(r.statusCode, 200);
+      expect(r.statusCode).toBe(200);
       const body = r.json<{ name: string; active: boolean }>();
-      assert.equal(body.name, 'provider-alt');
-      assert.equal(body.active, true);
+      expect(body.name).toBe('provider-alt');
+      expect(body.active).toBe(true);
 
       // Restore
       await registry.setActive('provider-route-test');
@@ -65,8 +63,8 @@ describe('Provider routes', () => {
         url: '/provider',
         payload: { name: 'unknown-provider' },
       });
-      assert.equal(r.statusCode, 404);
-      assert.equal(r.json<{ error: string }>().error, 'PROVIDER_NOT_FOUND');
+      expect(r.statusCode).toBe(404);
+      expect(r.json<{ error: string }>().error).toBe('PROVIDER_NOT_FOUND');
     });
 
     test('returns 422 when provider is registered but unreachable', async () => {
@@ -76,8 +74,8 @@ describe('Provider routes', () => {
         url: '/provider',
         payload: { name: 'provider-dead' },
       });
-      assert.equal(r.statusCode, 422);
-      assert.equal(r.json<{ error: string }>().error, 'PROVIDER_UNAVAILABLE');
+      expect(r.statusCode).toBe(422);
+      expect(r.json<{ error: string }>().error).toBe('PROVIDER_UNAVAILABLE');
     });
 
     test('keeps current active provider after a 422 rejection', async () => {
@@ -86,12 +84,12 @@ describe('Provider routes', () => {
 
       // Active provider should still be 'provider-route-test'.
       const r = await fastify.inject({ method: 'GET', url: '/provider' });
-      assert.equal(r.json<{ name: string }>().name, 'provider-route-test');
+      expect(r.json<{ name: string }>().name).toBe('provider-route-test');
     });
 
     test('returns 400 when body is missing name', async () => {
       const r = await fastify.inject({ method: 'PUT', url: '/provider', payload: {} });
-      assert.equal(r.statusCode, 400);
+      expect(r.statusCode).toBe(400);
     });
   });
 });

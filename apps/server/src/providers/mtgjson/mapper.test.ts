@@ -1,5 +1,3 @@
-import { test, describe } from 'node:test';
-import assert from 'node:assert/strict';
 import type { CardSet } from 'mtgjson-sdk';
 import { mapCardSetToCardRecord } from './mapper';
 
@@ -41,41 +39,41 @@ describe('mapCardSetToCardRecord', () => {
       commanderLegal: true,
       scryfallId: 'e3285fd6-0000-0000-0000-example00001',
     });
-    assert.equal(record.name, 'Lightning Bolt');
-    assert.equal(record.set, 'M11');
-    assert.equal(record.cardNumber, '149');
-    assert.equal(record.manaCost, '{R}');
-    assert.deepEqual(record.colorIdentity, ['R']);
-    assert.equal(record.commanderLegal, true);
-    assert.equal(record.imageRef, 'e3285fd6-0000-0000-0000-example00001');
+    expect(record.name).toBe('Lightning Bolt');
+    expect(record.set).toBe('M11');
+    expect(record.cardNumber).toBe('149');
+    expect(record.manaCost).toBe('{R}');
+    expect(record.colorIdentity).toEqual(['R']);
+    expect(record.commanderLegal).toBe(true);
+    expect(record.imageRef).toBe('e3285fd6-0000-0000-0000-example00001');
   });
 
   test('commanderLegal and imageRef are undefined when no enrichment is passed', () => {
     const card = makeCard();
     const record = mapCardSetToCardRecord(card);
-    assert.equal(record.commanderLegal, undefined);
-    assert.equal(record.imageRef, null);
+    expect(record.commanderLegal).toBeUndefined();
+    expect(record.imageRef).toBeNull();
   });
 
   test('manaCost is null when card has no mana cost (land)', () => {
     const card = makeCard({ manaCost: undefined });
     const record = mapCardSetToCardRecord(card);
-    assert.equal(record.manaCost, null);
+    expect(record.manaCost).toBeNull();
   });
 
   test('imageRef is null when scryfallId is absent in enrichment', () => {
     const record = mapCardSetToCardRecord(makeCard(), { scryfallId: null });
-    assert.equal(record.imageRef, null);
+    expect(record.imageRef).toBeNull();
   });
 
   test('commanderLegal is false when enrichment says banned', () => {
     const record = mapCardSetToCardRecord(makeCard(), { commanderLegal: false });
-    assert.equal(record.commanderLegal, false);
+    expect(record.commanderLegal).toBe(false);
   });
 
   test('colorIdentity is empty array for colourless cards', () => {
     const card = makeCard({ colorIdentity: [] });
     const record = mapCardSetToCardRecord(card);
-    assert.deepEqual(record.colorIdentity, []);
+    expect(record.colorIdentity).toEqual([]);
   });
 });
