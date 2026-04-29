@@ -7,6 +7,26 @@ import type { AllowedUserRepository } from '@src/repositories/allowedUserReposit
 import type { UserRepository } from '@src/repositories/userRepository';
 import { getAuthConfig } from '@src/auth/authConfig';
 
+/**
+ * Thrown when the Google ID token cannot be verified — bad signature, wrong
+ * audience, expired, unverified email, or any non-`AccessDeniedError` failure
+ * during the sign-in pipeline. Always surfaces as HTTP 401 to the caller.
+ *
+ * The original cause is preserved as the `Error.message` when one is
+ * available, so server logs see the underlying reason; the HTTP layer must
+ * not echo the message verbatim to clients (auth-error opacity).
+ *
+ * @example
+ * ```ts
+ * try {
+ *   await signIn(idToken);
+ * } catch (err) {
+ *   if (err instanceof InvalidGoogleTokenError) {
+ *     reply.code(401).send({ error: 'INVALID_GOOGLE_TOKEN', message: 'Sign-in failed.' });
+ *   }
+ * }
+ * ```
+ */
 export class InvalidGoogleTokenError extends Error {
   constructor(cause?: unknown) {
     const msg = cause instanceof Error ? cause.message : 'Google ID token verification failed.';
@@ -15,6 +35,22 @@ export class InvalidGoogleTokenError extends Error {
   }
 }
 
+/**
+ * Thrown when Google verifies the user successfully but their email is not on
+ * the allowlist. Distinct from `InvalidGoogleTokenError` so the HTTP layer can
+ * map this to 403 (forbidden) rather than 401 (unauthenticated).
+ *
+ * @example
+ * ```ts
+ * try {
+ *   await signIn(idToken);
+ * } catch (err) {
+ *   if (err instanceof AccessDeniedError) {
+ *     reply.code(403).send({ error: 'ACCESS_DENIED', message: err.message });
+ *   }
+ * }
+ * ```
+ */
 export class AccessDeniedError extends Error {
   constructor() {
     super('This email address is not permitted to sign in.');
@@ -31,14 +67,41 @@ type SignInDeps = {
 };
 
 /**
- * Orchestrate Google sign-in:
- *   1. Verify the Google ID token (rejects expired, wrong audience, unverified email)
- *   2. Check email against the allowlist — throws AccessDeniedError if not found
- *   3. Upsert the user in PostgreSQL (idempotent on email)
- *   4. Issue a server-side session JWT
+ * Orchestrate a Google sign-in end-to-end:
  *
- * Throws InvalidGoogleTokenError if the Google token is invalid for any reason.
- * Throws AccessDeniedError if the email is not on the allowlist.
+ *   1. Verify the Google ID token (rejects expired tokens, wrong audience,
+ *      unverified email).
+ *   2. Look up the verified email in the allowlist; reject if absent.
+ *   3. Upsert the user in PostgreSQL — idempotent on email so the same caller
+ *      across logins yields the same `AuthUser.id`.
+ *   4. Issue a server-side session JWT (HS256, 7-day TTL by default).
+ *
+ * Any non-allowlist failure inside the verify-and-upsert block is wrapped in
+ * `InvalidGoogleTokenError` so the HTTP layer can return a single 401 shape
+ * regardless of the underlying cause. The `AccessDeniedError` is intentionally
+ * re-raised unwrapped because it must map to 403, not 401.
+ *
+ * @param idToken - The Google-issued ID token from the browser sign-in flow.
+ * @param deps - Optional test injection points.
+ * @param deps.googleClient - Substitute Google OAuth2 client (used by tests to bypass network).
+ * @param deps.allowedUserRepo - Substitute allowlist repository.
+ * @param deps.userRepo - Substitute user repository.
+ * @returns `{ token, user }` — a session JWT plus the upserted `AuthUser` row.
+ * @throws InvalidGoogleTokenError when the token fails verification or any underlying repository call throws.
+ * @throws AccessDeniedError when verification succeeds but the email is not on the allowlist.
+ *
+ * @example
+ * ```ts
+ * // Production path — uses live repositories and Google client.
+ * const { token, user } = await signIn(idTokenFromBrowser);
+ *
+ * // Test path — inject mocks.
+ * const { token, user } = await signIn(idTokenFromBrowser, {
+ *   googleClient: mockGoogleClient,
+ *   allowedUserRepo: { findByEmail: async () => ({ email: 'me@example.com' }) },
+ *   userRepo: { upsertUser: async (u) => ({ id: 'u_1', ...u }) },
+ * });
+ * ```
  */
 export async function signIn(
   idToken: string,

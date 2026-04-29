@@ -40,8 +40,9 @@ my-binder/
 │       │   │   ├── interface.ts        # CardProvider type + LookupOptions
 │       │   │   ├── registry.ts         # Provider registry (register/setActive/getActive)
 │       │   │   └── mtgjson/
-│       │   │       ├── index.ts        # MtgjsonProvider — SDK-backed CardProvider impl
-│       │   │       └── mapper.ts       # mapCardSetToCardRecord (CardSet → CardRecord)
+│       │   │       ├── index.ts            # Barrel re-export only (Principle IX)
+│       │   │       ├── MtgjsonProvider.ts  # SDK-backed CardProvider impl
+│       │   │       └── mapper.ts           # mapCardSetToCardRecord (CardSet → CardRecord)
 │       │   ├── repositories/
 │       │   │   ├── cardRepository.ts   # User collection CRUD (binder.duckdb)
 │       │   │   └── userRepository.ts   # User upsert/lookup (binder.duckdb)
@@ -54,7 +55,8 @@ my-binder/
 │       │   │   └── provider.ts         # GET|PUT /provider
 │       │   └── services/
 │       │       ├── authService.ts      # Sign-in orchestration (verify → upsert → JWT)
-│       │       └── cardService.ts      # Card lookup/search/legality with pagination
+│       │       ├── cardService.ts      # Card lookup/search/legality with pagination
+│       │       └── efsService.ts       # EFS mount preparation (Lambda startup)
 │       ├── docs/                       # Server-specific docs
 │       ├── index.ts                    # Local dev entry point
 │       ├── .env.example                # Env var template (committed)
@@ -66,9 +68,20 @@ my-binder/
 ├── packages/
 │   ├── core/                           # @my-binder/core — shared types + schemas
 │   │   └── src/
-│   │       ├── constants/              # Shared constants
+│   │       ├── constants/              # Shared constants — barrel `index.ts` + peer files
+│   │       │   ├── index.ts            # Re-export only (Principle IX)
+│   │       │   ├── authIdentity.ts     # AUTH_ERROR_CODES, AuthErrorCode, AUTH_IDENTITY_KIND
+│   │       │   ├── sessionJwt.ts       # SESSION_JWT_TTL_DAYS
+│   │       │   ├── errorCodes.ts       # ERROR_CODES, ErrorCode
+│   │       │   └── httpStatus.ts       # HTTP_STATUS
 │   │       ├── schemas/                # Ajv/JSON schemas (card, auth)
-│   │       └── types/                  # TypeScript types (CardRecord, SearchQuery, etc.)
+│   │       └── types/                  # TypeScript types — barrel `index.ts` + peer files
+│   │           ├── index.ts            # Re-export only (Principle IX)
+│   │           ├── card.ts             # CardRecord, Printing, LegalityResult, SearchQuery, etc.
+│   │           ├── auth.ts             # AuthUser, GoogleSignInResponse, etc.
+│   │           ├── crud.ts             # Card, CardList, CreateCardBody, UpdateCardBody, CardIdParams
+│   │           ├── health.ts           # HealthResponse
+│   │           └── errorBody.ts        # ErrorBody
 │   └── infrastructure/                 # @my-binder/infrastructure — AWS CDK v2
 │       ├── bin/app.ts                  # CDK app entry point
 │       └── lib/my-binder-stack.ts      # Lambda + API Gateway + EFS + ECR stack
@@ -158,3 +171,4 @@ Required Postgres vars: `DATABASE_URL` (hostname, despite the name), `DATABASE_P
 - **010-revert-mtgjson-infra**: `MtgjsonProvider` now calls the MTGJSON SDK directly for all card operations; removed DuckDB card replica tables (migrations 003/004), `cardImporter.ts`, and EFS lock-file coordination; SDK instance kept alive between Lambda invocations; EFS used for SDK parquet cache only
 - **Env file convention**: `apps/server` now uses Node's `--env-file` flag to load env vars. Added `.env.local` (local dev, loaded by `pnpm dev`/`pnpm start`), `.env.dev`, `.env.staging`, `.env.prod`. Only `.env.example` is committed — all others are gitignored. `.env.example` documents the new Postgres vars (`DATABASE_URL`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_NAME`, `DATABASE_SECRET_NAME`)
 - **Turbo migration tasks**: added `migration:generate`, `migration:run`, `migration:revert` to `turbo.json` with `cache: false` and `dependsOn: ["^build"]` so TypeORM CLI operations run through Turbo with the right build order and no unsafe caching
+- **015-fix-public-api-discipline**: Brought the codebase into compliance with constitution Principle IX. Extracted `MtgjsonProvider` from `apps/server/src/providers/mtgjson/index.ts` into a sibling `MtgjsonProvider.ts`; both `packages/core/src/types/index.ts` and `packages/core/src/constants/index.ts` are now pure barrel re-exports with declarations moved into named peer files (`types/{crud,health,errorBody}.ts`, `constants/{authIdentity,sessionJwt,errorCodes,httpStatus}.ts`); JSDoc with `@example` blocks backfilled across `providers/registry.ts`, `services/authService.ts`, `services/cardService.ts`, `services/efsService.ts`. No caller-side import edits; no behavioural changes.

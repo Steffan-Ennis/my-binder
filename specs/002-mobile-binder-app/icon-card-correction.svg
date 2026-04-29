@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>my-binder icon — spine right, cards emerging from binder</title>
+
+  <defs>
+    <!-- Anything below the binder's top edge (y=70) is clipped, so the cards
+         appear to be tucked inside the binder with only their tops sticking out. -->
+    <clipPath id="aboveBinder">
+      <rect x="0" y="0" width="256" height="70"/>
+    </clipPath>
+  </defs>
+
+  <!-- Cards: pivot inside binder near top-left corner at (35, 115) — bottom halves clipped -->
+  <g clip-path="url(#aboveBinder)">
+    <!-- Card 3: 65° tilt — green border (back) -->
+    <g transform="rotate(-65, 35, 115)">
+      <rect x="35" y="35" width="50" height="80" rx="3.5" ry="3.5" fill="#1e8449" stroke="#0e5631" stroke-width="1.5"/>
+      <rect x="38.5" y="38.5" width="43" height="73" rx="2" ry="2" fill="#fdfdfd"/>
+    </g>
+
+    <!-- Card 2: 50° tilt — red border (middle) -->
+    <g transform="rotate(-50, 35, 115)">
+      <rect x="35" y="35" width="50" height="80" rx="3.5" ry="3.5" fill="#c0392b" stroke="#7b241c" stroke-width="1.5"/>
+      <rect x="38.5" y="38.5" width="43" height="73" rx="2" ry="2" fill="#fdfdfd"/>
+    </g>
+
+    <!-- Card 1: 35° tilt — blue border (front) -->
+    <g transform="rotate(-35, 35, 115)">
+      <rect x="35" y="35" width="50" height="80" rx="3.5" ry="3.5" fill="#2471a3" stroke="#1a5276" stroke-width="1.5"/>
+      <rect x="38.5" y="38.5" width="43" height="73" rx="2" ry="2" fill="#fdfdfd"/>
+    </g>
+  </g>
+
+  <!-- Binder body — spine on RIGHT -->
+  <g id="binder">
+    <rect x="20" y="70" width="140" height="160" rx="6" ry="6" fill="#3d5a80" stroke="#1f3a5f" stroke-width="2"/>
+    <!-- Spine -->
+    <rect x="146" y="70" width="14" height="160" fill="#2c3e50"/>
+    <!-- Rings -->
+    <circle cx="153" cy="105" r="2.5" fill="#ecf0f1"/>
+    <circle cx="153" cy="150" r="2.5" fill="#ecf0f1"/>
+    <circle cx="153" cy="195" r="2.5" fill="#ecf0f1"/>
+    <!-- Label -->
+    <rect x="35" y="180" width="100" height="35" rx="2" fill="#ecf0f1" stroke="#95a5a6" stroke-width="0.8"/>
+  </g>
+</svg>
