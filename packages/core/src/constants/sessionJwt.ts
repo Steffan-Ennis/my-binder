@@ -1,0 +1,1 @@
+export const SESSION_JWT_TTL_DAYS = 7 as const;
