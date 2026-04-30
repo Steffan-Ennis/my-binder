@@ -143,25 +143,27 @@ Required Postgres vars: `DATABASE_URL` (hostname, despite the name), `DATABASE_P
 - Use `pnpm` — not `npm` or `yarn`. `pnpm-lock.yaml` is the canonical lock file.
 - Workspaces are built separately and deployed independently.
 - `packages/core` must be built before `apps/*` (Turborepo handles this automatically).
-- Each `apps/*` workspace has its own `Dockerfile` and deploy pipeline.
+- `apps/server` is deployed to AWS Lambda via the CDK stack in `packages/infrastructure` (spec 009).
 
 ## Active Technologies
 - **TypeScript 5** (`strict: true`) — project-wide language for all workspaces
 - **Node 22** — server runtime (`apps/server`)
 - **Fastify v4** — HTTP framework with Ajv JSON schema validation (`apps/server`)
-- **`@duckdb/node-api`** — DuckDB Node.js driver (`apps/server`); app DB only (`binder.duckdb` — user collection)
 - **`mtgjson-sdk@0.1.1`** — MTGJSON card data SDK; long-lived instance created at startup, passed into `MtgjsonProvider`; card queries go directly to the SDK (`apps/server`)
 - **`google-auth-library`** — Google ID token verification (`apps/server`); verifies audience, expiry, `email_verified` claim
 - **`jsonwebtoken`** — HS256 session JWT issuance and verification (`apps/server/src/auth/sessionJwt.ts`)
 - **`fastify-plugin`** — used by auth plugin to share `request.identity` decoration across Fastify scopes
 - **`@fastify/aws-lambda`** v6 — Lambda adapter wrapping the Fastify app (`apps/server/src/lambda.ts`)
 - **AWS CDK v2** (`aws-cdk-lib`) — infrastructure as code in `packages/infrastructure`; CDK app entry is `bin/app.ts`, executed via `node --import tsx` (no `ts-node`). Per-environment scripts `pnpm cdk:<env>:{synth,diff,deploy,destroy}` load `packages/infrastructure/.env.<env>` with Node 22's `--env-file` flag — `ENVIRONMENT` is required and suffixes every physical resource name; `REUSE_ORPHANS=true` imports retained secrets instead of creating them
-- **EFS** — persistent storage for DuckDB file (`binder.duckdb`) and MTGJSON SDK parquet cache (`mtgjson-cache/`) on Lambda; `mtgjsonCacheDir` derived from `EFS_PATH` env var when set
+- **AWS EFS** — persistent storage for DuckDB file (`binder.duckdb`) and MTGJSON SDK parquet cache (`mtgjson-cache/`) on Lambda; `mtgjsonCacheDir` derived from `EFS_PATH` env var when set
 - **NAT instance** (`t4g.nano`, ~$3/month) — replaces Managed NAT Gateway (~$32/month); provisioned via `ec2.NatProvider.instanceV2()` in the CDK stack; provides Lambda internet access for MTGJSON downloads and Google OAuth
 - **Secrets Manager** — all 3 secrets created by CDK (`RemovalPolicy.RETAIN`); `SESSION_JWT_SECRET` is auto-generated; `GOOGLE_CLIENT_IDS` and `GOOGLE_WEB_CLIENT_ID` are created with `REPLACE_ME` placeholder and must be overwritten manually after first deploy via `aws secretsmanager put-secret-value`
 - TypeScript 5, Node 22 + Fastify v4, TypeORM 0.3.x, `pg` (PostgreSQL driver), `reflect-metadata` (011-postgres-migration)
-- AWS Aurora Serverless V2 PostgreSQL 17 — public subnet, developer-accessible (011-postgres-migration)
+- **AWS Aurora Serverless V2 PostgreSQL 17** — public subnet, developer-accessible (011-postgres-migration)
 - Jest 29 + ts-jest 29 + @types/jest — test framework for `apps/server` (013-migrate-jest-tests)
+- **`@duckdb/node-api`** — retained only as the MTGJSON SDK's parquet cache backend (spec 011 FR-006)
+- **Google OAuth (`google-auth-library`)** — sign-in with allowlist gate stored in the `allowed_users` table (spec 011)
+- **AWS Lambda + API Gateway HTTP API** — production runtime, defined via CDK (spec 009)
 
 ## Recent Changes
 - Adopted TypeScript 5 (strict) project-wide — replaces JavaScript + JSDoc approach
