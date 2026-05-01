@@ -1,61 +1,58 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.12.0 → 1.13.0
-Bump type: MINOR — new principle added (X. Component Architecture).
-  Codifies the Screen → Container → Hook → View pattern as the non-negotiable
-  structure for every UI feature in `apps/mobile`. Includes:
-    (a) The four-layer file structure (`<Feature>Container.tsx`, `use<Feature>.ts`,
-        `<Feature>View.tsx`) and the screen-as-thin-shell rule.
-    (b) A layer-rules table fixing each layer's responsibility and forbidden imports.
-    (c) The "no spread on hook results" container prop-passing rule.
-    (d) `useEffect` usage discipline — escape-hatch only; the five forbidden anti-
-        patterns from React's "You Might Not Need an Effect" guidance are listed
-        explicitly, plus exhaustive-deps and cleanup mandates.
+Version change: 1.13.1 → 1.13.2
+Bump type: PATCH — accommodates Expo Router's standard `app/` directory at the
+  workspace root. Refines the literal location of the Screen layer in Principle X
+  and the `apps/mobile` workspace src-layout declaration; the four-layer Screen →
+  Container → Hook → View *intent* is unchanged.
+
+  Locked-in decisions (changes from v1.13.1):
+    - Mobile routing: Expo Router 4 (file-based, built on @react-navigation/
+      native-stack 7). Routes live in `apps/mobile/app/` at the workspace root.
+    - Principle X "Screen" row: location updated from `src/screens/` to `app/`.
+    - apps/mobile workspace src layout: now `apps/mobile/{app,src/{components,
+      hooks,services,stores,utils}}/`. The `src/screens/` directory is removed;
+      `src/navigation/` is also unnecessary (Expo Router's `_layout.tsx` files
+      replace any imperative navigator).
+    - Switching away from Expo Router (e.g., back to imperative React Navigation
+      or to a different routing library) henceforth requires a fresh constitution
+      amendment.
+
 Last amended: 2026-05-01
 
 Modified principles:
-  (none redefined)
+  - X. Component Architecture (Mobile) — Screen-row location and example file paths
+    updated for Expo Router. The four-layer rule, container prop-passing rule, and
+    `useEffect` discipline are unchanged.
 
 Added sections / material expansions:
-  - Principle X: Component Architecture (Mobile) — full four-layer mandate plus
-    `useEffect` rules.
-  - Governance: principle count updated from "nine" to "ten".
+  (none — Principle X's wording is refined, not expanded; the Technology Stack
+   `apps/mobile` workspace declaration is updated; no new principles or sections.)
 
 Removed sections:
-  (none)
+  - Reference to `src/screens/` and `src/navigation/` in `apps/mobile`'s pinned
+    layout — replaced by `app/` (Expo Router convention).
 
 Templates reviewed:
-  ✅ .specify/templates/plan-template.md  — Constitution Check is principle-list
-     agnostic; no structural change. Plans now gate against ten principles.
-  ✅ .specify/templates/spec-template.md  — No structural changes required.
-  ✅ .specify/templates/tasks-template.md — No structural change required; the new
-     principle is enforced at task-verification time. Mobile feature tasks SHOULD
-     produce three files (container, hook, view) — `/speckit.tasks` will surface
-     this automatically once mobile features are decomposed.
-  ✅ CLAUDE.md — No update required at this time. When the mobile framework is
-     chosen (TODO(MOBILE_PLATFORM)), CLAUDE.md MUST document the four-layer folder
-     layout under `apps/mobile/src/components/<feature>/` and the `src/screens/`
-     and `src/hooks/` and `src/utils/` siblings.
+  ✅ .specify/templates/plan-template.md  — No change required.
+  ✅ .specify/templates/spec-template.md  — No change required.
+  ✅ .specify/templates/tasks-template.md — No change required.
+  ✅ CLAUDE.md — Already updated as part of spec 002's plan: Active Technologies
+     entry replaced "React Navigation 7 (native stack)" with "Expo Router 4
+     (file-based routing built on @react-navigation/native-stack 7)". Recent
+     Changes entry for spec 002 updated to reflect the routing pivot. No
+     further edits required.
 
 Known violations to remediate (⚠ pending):
-  (none — `apps/mobile` has not yet been scaffolded, so there are no existing
-  components to retrofit. The principle applies to all components from first
-  scaffolding onward.)
+  (none — `apps/mobile` has not yet been scaffolded.)
 
-Carry-over from 1.12.0 (unchanged):
+Carry-over from 1.13.1 (unchanged):
   ⚠ specs/001-server-architecture/plan.md — JSDoc → TypeScript migration. Unchanged.
   ⚠ specs/004-card-data-provider/plan.md — JSDoc → TypeScript migration. Unchanged.
 
 Deferred TODOs:
-  - TODO(MOBILE_PLATFORM): Mobile app framework not yet chosen (spec 002 confirms iOS +
-    Android targets; platform choice requires a constitution amendment when made).
-    TypeScript is confirmed as the language regardless of framework. Both the Jest
-    mandate (Principle III) and the four-layer Component Architecture (Principle X)
-    apply to mobile from day one — when the framework is chosen, its Jest preset
-    (e.g., `jest-expo`, `@testing-library/react-native`) MUST be declared, and
-    `apps/mobile/src/{screens,components,hooks,utils}/` MUST be the scaffolded
-    directory layout.
+  (none — TODO(MOBILE_PLATFORM) was fully resolved in v1.13.1.)
 -->
 
 # my-binder Constitution
@@ -89,9 +86,17 @@ the monorepo. New unit and integration tests MUST be written with Jest. TypeScri
 MUST be compiled with `ts-jest`. Alternative Jest-compatible runners (Vitest, Mocha, AVA,
 node:test) are NOT permitted — alignment on a single tool eliminates configuration drift
 between workspaces and keeps coverage tooling, mocking conventions, and CI invocation
-identical everywhere. When the mobile workspace selects its framework, the corresponding
-Jest preset (e.g., `jest-expo`, `@testing-library/react-native`) MUST be declared as part
-of that decision; switching to a non-Jest runner requires a constitution amendment.
+identical everywhere.
+
+The per-workspace Jest presets are pinned as follows:
+
+- **`apps/server`**: `ts-jest` (Node test environment).
+- **`apps/mobile`**: **`jest-expo`** preset, with **`@testing-library/react-native` 12.x**
+  for view rendering and `renderHook` for hook tests.
+- **`packages/core`**: `ts-jest` (Node test environment); pure TypeScript module under test.
+
+Switching any of the above to a different preset or test library requires a fresh
+constitution amendment.
 
 **Plan requirement**: Every feature plan (`specs/<feature>/plan.md`) MUST include an
 explicit **Unit Testing Phase** section that identifies:
@@ -352,15 +357,25 @@ apps/mobile/src/components/<feature-name>/
 └── <Feature>View.tsx        ← pure JSX: props-only, no store/service imports
 ```
 
-Screens in `src/screens/` are navigation entry points only. A screen file MUST render
-exactly one container and contain no other logic:
+Screens (Expo Router route files) live under `apps/mobile/app/` at the workspace root.
+Each route file is a navigation entry point only — it MUST render exactly one container
+and contain no other logic. The default export MUST be a function component with no
+local state:
 
 ```tsx
-// apps/mobile/src/screens/ModelManagerScreen.tsx
-export function ModelManagerScreen() {
-  return <ModelManagerContainer />;
+// apps/mobile/app/login.tsx
+import { LoginContainer } from '@src/components/login/LoginContainer';
+export default function Login() {
+  return <LoginContainer />;
 }
 ```
+
+Layout files (`apps/mobile/app/**/_layout.tsx`) are permitted to declare the route
+hierarchy (e.g., `<Stack />`) and to enforce auth gates with `<Redirect />`, but they
+MUST NOT host feature business logic. An auth-gate layout like
+`app/(authenticated)/_layout.tsx` may consume `useSession()` and render
+`<Redirect href="/login" />` when the session is inactive — this is the canonical
+Expo Router pattern and counts as Screen-layer behaviour.
 
 **Layer rules.** Each layer has a fixed responsibility and a fixed list of forbidden
 imports. Any import that violates the "Forbidden" column is a constitution breach
@@ -368,7 +383,8 @@ requiring justification in the relevant plan's Complexity Tracking table.
 
 | Layer | Location | Responsibility | Forbidden |
 |---|---|---|---|
-| Screen | `src/screens/` | Navigation entry point | State, `useState`, `useEffect`, store imports, JSX beyond a single container element |
+| Screen (route file) | `apps/mobile/app/**/*.tsx` (Expo Router) | Navigation entry point — renders a single container | State, `useState`, `useEffect`, store imports, JSX beyond a single container element |
+| Layout (route layout) | `apps/mobile/app/**/_layout.tsx` (Expo Router) | Declare route hierarchy (`<Stack />`, `<Tabs />`) and auth gates (`<Redirect />`) | Feature business logic, view JSX beyond router primitives, direct service calls |
 | Container | `src/components/<feature>/<Feature>Container.tsx` | Call hook, destructure result, pass individual named props to the view | Business logic, store imports, service calls, `useState`, `useEffect` |
 | Hook | `src/components/<feature>/use<Feature>.ts` | All state, effects, store calls, side-effecting handlers; returns a typed result object | JSX, direct DOM/native API access (use a sub-hook or service) |
 | View | `src/components/<feature>/<Feature>View.tsx` | Pure JSX rendering of received props; presentational only | Store imports, service imports, navigation imports, `Alert`, `useState`, `useEffect`, `useReducer` |
@@ -475,10 +491,16 @@ my-binder/                     # Repo root (private — not published)
 - **`apps/server`**: TypeScript (Node 22) Fastify API server. Compiled with `tsc`; output
   runs on Node 22. Depends on `packages/core`. Node built-ins are preferred over third-party
   packages. Deployed as a Docker container. `tsconfig.json` MUST enable `strict: true`.
-- **`apps/mobile`**: TypeScript mobile application targeting iOS and Android. Depends on
-  `packages/core`. `tsconfig.json` MUST enable `strict: true`.
-  TODO(MOBILE_PLATFORM): Framework not yet chosen; requires a constitution amendment when
-  decided. TypeScript is confirmed as the language regardless of framework.
+- **`apps/mobile`**: TypeScript mobile application targeting iOS 15.1+ and Android API 24+.
+  Depends on `packages/core`. `tsconfig.json` MUST enable `strict: true`. Framework:
+  **React Native 0.76 + Expo SDK 52** (managed workflow). Routing: **Expo Router 4**
+  (file-based, built on `@react-navigation/native-stack` 7) — routes live in
+  `apps/mobile/app/` at the workspace root. Store artifacts are produced via EAS Build.
+  Test stack: Jest 30 + `jest-expo` preset + `@testing-library/react-native` 12.x (per
+  Principle III). The workspace layout MUST follow Principle X:
+  `apps/mobile/{app,src/{components,hooks,services,stores,utils}}/`. Switching the
+  framework, routing library, Jest preset, or view-test library requires a constitution
+  amendment.
 - **`packages/core`**: Shared TypeScript code consumed by both apps. Contains: TypeScript
   interfaces and types, JSON Schema constants (Principle VII), and named constants (error
   codes, status values). MUST NOT contain application-specific business logic. MUST NOT
@@ -575,4 +597,4 @@ Each feature plan MUST include a Constitution Check (as defined in
 `.specify/templates/plan-template.md`) verifying compliance with all ten principles before
 implementation begins. Violations MUST be justified in the plan's Complexity Tracking table.
 
-**Version**: 1.13.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-01
+**Version**: 1.13.2 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-01
