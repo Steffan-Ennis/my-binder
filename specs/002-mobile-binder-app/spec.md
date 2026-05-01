@@ -7,66 +7,59 @@
 see the images in design-resources, it should have a login screen, with user-name, password,
 support multi factor authentication from a provider. We'll start with google."
 
+## Clarifications
+
+### Session 2026-05-01
+
+- Q: With password removed, is Google the only sign-in path, or should the app also expose guest mode? → A: Google only — no guest mode, no other entry path
+- Q: What should the app do when Google sign-in is unavailable (no internet, Google service outage, user cancels)? → A: Show a clear error with retry; user remains on the login screen until Google is reachable
+- Q: What should the mobile app show when a Google-authenticated user is rejected by the server allowlist (`allowed_users` table, spec 011)? → A: Dedicated "access not yet granted" screen explaining the binder is invite-only, with contact instructions (future enhancement: redirect to a signup route — out of scope for this feature)
+- Q: What is the mobile session duration before requiring fresh Google sign-in? → A: 7 days, matching server `SESSION_JWT_TTL_DAYS`
+- Q: What does sign-out do? → A: Clear local session JWT AND revoke the Google grant so the user must re-consent (full Google flow) on next sign-in
+
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Sign In with Username and Password (Priority: P1)
+### User Story 1 - Sign In with Google (Priority: P1)
 
-A returning user opens the app and is greeted by a login screen. They enter their username
-and password and are authenticated into their personal binder. The login screen visually
-reflects the binder aesthetic — it feels like the cover of their physical collectors album.
+A user opens the app and is greeted by a login screen reflecting the binder aesthetic. The
+only sign-in option is "Sign in with Google". They tap it, complete Google's authentication
+flow (including any MFA steps Google enforces on their account), and land on their binder
+home screen.
 
-**Why this priority**: Authentication is the front door to all other functionality. Without
-it, no personalised binder content can be shown. It is the smallest independently deliverable
-slice that proves the app exists and can protect personal data.
+**Why this priority**: Authentication is the front door to all other functionality. Google
+sign-in delegates credential management and MFA to a trusted provider and is the sole
+authentication path for this feature (password authentication is postponed). Without it, no
+personalised binder content can be shown.
 
-**Independent Test**: Can be fully tested by launching the app, entering valid credentials,
-and confirming the user lands on their binder home screen — and by confirming that invalid
-credentials are rejected with a clear message.
-
-**Acceptance Scenarios**:
-
-1. **Given** the app is launched, **When** the login screen appears, **Then** fields for
-   username and password are visible and the screen reflects the binder visual theme.
-2. **Given** the login screen is shown, **When** the user enters a valid username and password
-   and submits, **Then** the user is authenticated and lands on their binder home screen.
-3. **Given** the login screen is shown, **When** the user enters an incorrect password,
-   **Then** a clear error message is displayed and the user remains on the login screen.
-4. **Given** the login screen is shown, **When** the user submits with empty fields, **Then**
-   each empty field is highlighted and a message indicates what is required.
-5. **Given** the user is authenticated, **When** they close and reopen the app within the
-   session window, **Then** they are not required to log in again.
-
----
-
-### User Story 2 - Sign In with Google (Multi-Factor Authentication) (Priority: P2)
-
-A user who prefers not to manage a separate password can tap "Sign in with Google" on the
-login screen. They are taken through Google's own authentication flow — which may include
-Google's built-in MFA — and land on their binder home screen upon success.
-
-**Why this priority**: Google sign-in delegates credential management and MFA to a trusted
-provider, significantly raising account security. It is independently deliverable alongside
-or after basic login.
-
-**Independent Test**: Can be fully tested by tapping the Google sign-in option, completing
-Google's auth flow in a test account, and confirming the user lands on their binder home
-screen with their account identity displayed.
+**Independent Test**: Can be fully tested by launching the app, tapping "Sign in with Google",
+completing Google's auth flow in a test account that is on the server allowlist, and
+confirming the user lands on their binder home screen with their account identity displayed.
 
 **Acceptance Scenarios**:
 
-1. **Given** the login screen is shown, **When** the user taps "Sign in with Google", **Then**
+1. **Given** the app is launched, **When** the login screen appears, **Then** "Sign in with
+   Google" is the only authentication option presented and the screen reflects the binder
+   visual theme.
+2. **Given** the login screen is shown, **When** the user taps "Sign in with Google", **Then**
    Google's authentication flow is presented without leaving the app context.
-2. **Given** the Google auth flow is in progress, **When** the user successfully authenticates
-   with Google (including any MFA steps Google requires), **Then** the user is signed in and
-   lands on their binder home screen.
-3. **Given** the Google auth flow is in progress, **When** the user cancels or Google auth
-   fails, **Then** the user is returned to the login screen with an appropriate message.
-4. **Given** a user has previously signed in with Google, **When** they open the app again
-   within the session window, **Then** they are not required to go through Google auth again.
+3. **Given** the Google auth flow is in progress, **When** the user successfully authenticates
+   (including any MFA steps Google requires) AND their account is on the server allowlist,
+   **Then** the user is signed in and lands on their binder home screen.
+4. **Given** the Google auth flow is in progress, **When** the user cancels or Google auth
+   fails, **Then** the user is returned to the login screen with a clear error and a retry
+   action.
+5. **Given** Google authentication succeeds, **When** the server rejects the user because
+   their Google account is not on the allowlist, **Then** the app displays a dedicated
+   "access not yet granted" screen explaining the binder is invite-only and how to request
+   access.
+6. **Given** a user signed in with Google within the last 7 days, **When** they open the app
+   again, **Then** they are not required to go through Google auth again.
+7. **Given** the user signs out, **When** they next tap "Sign in with Google", **Then** the
+   full Google consent flow is presented again (the prior grant has been revoked).
 
 ---
 
-### User Story 3 - Browse the Binder Home Screen (Priority: P3)
+### User Story 2 - Browse the Binder Home Screen (Priority: P2)
 
 After signing in, the user sees their binder represented as a digital collectors album. The
 home screen visually mirrors a physical 9-pocket binder page (3 columns × 3 rows of card
@@ -98,19 +91,23 @@ their slots, and the user can navigate between pages.
 
 ### Edge Cases
 
-- What happens when the user's session expires while the app is backgrounded?
+- What happens when the user's 7-day session expires while the app is backgrounded?
   The user is returned to the login screen when they next bring the app to the foreground,
   without losing their place in the binder.
-- What happens when Google authentication is unavailable (no internet, Google service down)?
-  A clear message informs the user that Google sign-in is temporarily unavailable and
-  prompts them to try the username/password option instead.
+- What happens when Google authentication is unavailable (no internet, Google service down,
+  or the user cancels)?
+  The user remains on the login screen with a clear, retryable error. There is no fallback
+  authentication path — the user must wait until Google is reachable and retry.
+- What happens when the user is rejected by the server allowlist after a successful Google
+  sign-in?
+  The app shows a dedicated "access not yet granted" screen explaining the binder is
+  invite-only and how to request access. (A future enhancement may redirect to a self-serve
+  signup route — out of scope for this feature.)
 - What happens when the user's collection is empty?
   The binder home screen shows an empty first page with all 9 slots visible but unfilled,
   and a prompt inviting the user to add their first card.
 - What happens when the user has a partial last page (e.g., 11 cards = 1 full page + 2)?
   The second page shows 2 filled slots and 7 empty slots; no phantom cards are displayed.
-- What happens when login is attempted with no network connection?
-  A clear offline message is shown; the user is not left on a spinner indefinitely.
 
 ## Requirements *(mandatory)*
 
@@ -120,18 +117,23 @@ their slots, and the user can navigate between pages.
 
 - **FR-001**: The app MUST present a login screen as the first screen on launch for
   unauthenticated users.
-- **FR-002**: The login screen MUST include a username field, a password field, and a submit
-  action.
-- **FR-003**: The app MUST authenticate users with valid username and password credentials.
-- **FR-004**: The app MUST reject invalid credentials and display a clear, user-friendly error
-  message without revealing which field is incorrect.
-- **FR-005**: The app MUST offer a "Sign in with Google" option on the login screen.
-- **FR-006**: The app MUST complete Google authentication without requiring the user to leave
-  the app to a browser (in-app auth flow).
-- **FR-007**: The app MUST maintain an authenticated session so the user is not required to
-  log in again on subsequent opens within the session period.
-- **FR-008**: The app MUST allow the user to sign out, returning them to the login screen and
-  clearing the active session.
+- **FR-002**: The login screen MUST present "Sign in with Google" as the only authentication
+  option. No username/password fields are shown (password authentication is postponed).
+- **FR-003**: The app MUST complete Google authentication without requiring the user to leave
+  the app to an external browser (in-app auth flow).
+- **FR-004**: When Google authentication is unavailable (no network, Google service outage,
+  or user cancellation), the app MUST keep the user on the login screen and display a clear,
+  retryable error. The app MUST NOT offer any non-Google authentication path.
+- **FR-005**: When Google authentication succeeds but the server rejects the user because
+  their account is not on the allowlist, the app MUST display a dedicated "access not yet
+  granted" screen explaining the binder is invite-only and how to request access.
+- **FR-006**: The app MUST maintain an authenticated session for 7 days (matching the server
+  `SESSION_JWT_TTL_DAYS`) so the user is not required to sign in again on subsequent opens
+  within that window.
+- **FR-007**: When the 7-day session expires, the app MUST return the user to the login
+  screen on next foreground without losing the binder page they were last viewing.
+- **FR-008**: The app MUST allow the user to sign out. Sign-out MUST clear the local session
+  and revoke the Google grant so that the next sign-in presents the full Google consent flow.
 
 **Binder Experience**
 
@@ -149,8 +151,9 @@ their slots, and the user can navigate between pages.
 
 ### Key Entities
 
-- **User**: The account holder. Has a unique identifier, username, and one or more
-  authentication methods (password, Google).
+- **User**: The account holder. Identified by their Google account (the only authentication
+  method in scope) and a server-side unique identifier. Must be present on the server's
+  allowlist to access the binder.
 - **Binder**: A personal collection belonging to a user, composed of ordered pages.
 - **Page**: A single binder page holding up to 9 card slots in a 3×3 arrangement.
 - **Card Slot**: A position within a page — either occupied by a card or empty.
@@ -161,30 +164,38 @@ their slots, and the user can navigate between pages.
 
 ### Measurable Outcomes
 
-- **SC-001**: A new user can complete login (username/password) in under 60 seconds from
-  first launching the app.
-- **SC-002**: Google sign-in is completable in under 90 seconds including Google's own auth
-  steps.
+- **SC-001**: Google sign-in is completable in under 90 seconds including Google's own auth
+  steps, measured from tapping "Sign in with Google" to landing on the binder home screen.
+- **SC-002**: A returning user with an unexpired (≤7 day) session reaches the binder home
+  screen within 2 seconds of launching the app.
 - **SC-003**: The binder home screen renders and is interactive within 2 seconds of
   successful authentication on a standard mobile device.
-- **SC-004**: Invalid login attempts are rejected and an error is displayed within 3 seconds.
+- **SC-004**: Google sign-in failures (outage, cancellation, allowlist rejection) surface a
+  clear message within 3 seconds and never leave the user on a spinner indefinitely.
 - **SC-005**: Page navigation between binder pages is visually smooth with no perceptible
   stutter on a standard mobile device.
 - **SC-006**: 100% of unauthenticated app launches are intercepted by the login screen — no
   binder content is accessible without a valid session.
 - **SC-007**: The binder layout correctly renders for collections ranging from 0 to at least
   1,000 cards without layout errors.
+- **SC-008**: After sign-out, 100% of next sign-in attempts present the full Google consent
+  flow (the prior grant is revoked).
 
 ## Assumptions
 
 - The app targets both iOS and Android.
-- Google is the first supported MFA/SSO provider; additional providers (Apple, Facebook, etc.)
-  are out of scope for this feature.
-- Username is a text identifier chosen at registration; email address may serve as username
-  (to be confirmed at registration feature spec time).
-- Session persistence duration follows a standard "stay logged in" pattern — users are not
-  forced to re-authenticate on every app open unless they explicitly sign out or the session
-  expires.
+- Google is the only supported authentication provider in this feature. Username/password
+  authentication is explicitly **postponed** and not in scope here. Additional federated
+  providers (Apple, Facebook, etc.) are also out of scope.
+- Guest mode (unauthenticated browsing) is not exposed in this feature, even though the
+  server supports it (spec 007).
+- A self-serve signup or invite-request flow may be added in a future feature; for now,
+  allowlist additions are handled out-of-band.
+- Session duration is fixed at 7 days to match the server `SESSION_JWT_TTL_DAYS` constant.
+  Users are not forced to re-authenticate on every app open within that window unless they
+  explicitly sign out.
+- Sign-out revokes the Google grant in addition to clearing the local session, so the next
+  sign-in presents the full Google consent flow.
 - Card images are sourced from the server (feature spec 001); this spec does not define how
   images are fetched, only that they are displayed in slots.
 - The binder visual theme is inspired by the physical Ultra Pro Collectors Album shown in

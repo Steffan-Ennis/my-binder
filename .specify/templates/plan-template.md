@@ -94,6 +94,48 @@ ios/ or android/
 **Structure Decision**: [Document the selected structure and reference the real
 directories captured above]
 
+## Unit Testing Phase
+
+*GATE: This section is REQUIRED in every plan per Constitution Principle III. A plan
+without a completed Unit Testing Phase MUST NOT proceed to task generation
+(`/speckit.tasks`).*
+
+**Test framework**: Jest (with `ts-jest` for TypeScript sources). Alternative runners
+are not permitted (see Principle III).
+
+### Test files to create or update
+
+List every Jest test file that will be created or updated by this feature, with the full
+co-located path (`<filename>.test.ts` next to the file under test, per Principle III's
+co-location rule). E2E tests, if any, live under `tests/e2e/`.
+
+| Test file | Status | Behaviours covered (mapped to FR-### where applicable) |
+|---|---|---|
+| `apps/<workspace>/src/<path>/<file>.test.ts` | new \| update | <bullet list of behaviours> |
+| `apps/<workspace>/src/<path>/<file>.test.ts` | new \| update | <bullet list of behaviours> |
+
+### Coverage target
+
+Declare the coverage target for the new code this feature introduces. Express as Jest
+`coverageThreshold` values (line %, branch %, function %, statement %). The default
+project floor is 80% line / 80% function unless an explicit reason justifies otherwise
+in the Complexity Tracking table.
+
+```jsonc
+// jest.config.* — coverageThreshold for this feature's new code
+{
+  "coverageThreshold": {
+    "global": { "branches": 80, "functions": 80, "lines": 80, "statements": 80 }
+  }
+}
+```
+
+### Test execution
+
+State how the unit tests will be run locally and in CI (e.g., `pnpm --filter @my-binder/server test`,
+`turbo test`). Tests MUST run as part of the standard `turbo test` pipeline so the `main`
+branch stays green per Principle III.
+
 ## Complexity Tracking
 
 > **Fill ONLY if Constitution Check has violations that must be justified**

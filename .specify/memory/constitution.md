@@ -1,64 +1,61 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.10.0 → 1.11.0
-Bump type: MINOR — new principle added (IX. Public API Discipline).
-  Combines two related rules: (a) services and providers MUST publish JSDoc with
-  examples on every public function, and (b) index files MUST be barrel re-exports
-  only — they MUST NOT declare their own behaviour.
-Last amended: 2026-04-28
+Version change: 1.12.0 → 1.13.0
+Bump type: MINOR — new principle added (X. Component Architecture).
+  Codifies the Screen → Container → Hook → View pattern as the non-negotiable
+  structure for every UI feature in `apps/mobile`. Includes:
+    (a) The four-layer file structure (`<Feature>Container.tsx`, `use<Feature>.ts`,
+        `<Feature>View.tsx`) and the screen-as-thin-shell rule.
+    (b) A layer-rules table fixing each layer's responsibility and forbidden imports.
+    (c) The "no spread on hook results" container prop-passing rule.
+    (d) `useEffect` usage discipline — escape-hatch only; the five forbidden anti-
+        patterns from React's "You Might Not Need an Effect" guidance are listed
+        explicitly, plus exhaustive-deps and cleanup mandates.
+Last amended: 2026-05-01
 
 Modified principles:
-  (none)
+  (none redefined)
 
 Added sections / material expansions:
-  - Principle IX: Public API Discipline (1.11.0) — JSDoc with examples on every public
-    method of services/providers; index files reserved for re-exports.
+  - Principle X: Component Architecture (Mobile) — full four-layer mandate plus
+    `useEffect` rules.
+  - Governance: principle count updated from "nine" to "ten".
 
 Removed sections:
   (none)
 
 Templates reviewed:
   ✅ .specify/templates/plan-template.md  — Constitution Check is principle-list
-     agnostic; no structural change. Plans must now gate against nine principles.
+     agnostic; no structural change. Plans now gate against ten principles.
   ✅ .specify/templates/spec-template.md  — No structural changes required.
-  ✅ .specify/templates/tasks-template.md — No structural changes required; the new
-     principle is enforced at task-verification time alongside the existing
-     "documentation step" rule under Development Workflow.
-  ✅ CLAUDE.md — No update required; principle is enforced at code-review time.
+  ✅ .specify/templates/tasks-template.md — No structural change required; the new
+     principle is enforced at task-verification time. Mobile feature tasks SHOULD
+     produce three files (container, hook, view) — `/speckit.tasks` will surface
+     this automatically once mobile features are decomposed.
+  ✅ CLAUDE.md — No update required at this time. When the mobile framework is
+     chosen (TODO(MOBILE_PLATFORM)), CLAUDE.md MUST document the four-layer folder
+     layout under `apps/mobile/src/components/<feature>/` and the `src/screens/`
+     and `src/hooks/` and `src/utils/` siblings.
 
 Known violations to remediate (⚠ pending):
-  ⚠ apps/server/src/providers/mtgjson/index.ts — declares `MtgjsonProvider` class
-    inline. Required remediation: extract to `apps/server/src/providers/mtgjson/MtgjsonProvider.ts`
-    and reduce `index.ts` to `export { MtgjsonProvider } from './MtgjsonProvider';`.
-  ⚠ packages/core/src/types/index.ts — declares `Card`, `CardList`, `CreateCardBody`,
-    `UpdateCardBody` inline alongside `export *` re-exports. Required remediation:
-    move inline declarations to a peer file (e.g., `card.ts` if not already present)
-    and reduce `index.ts` to re-exports.
-  ⚠ packages/core/src/constants/index.ts — declares `AUTH_ERROR_CODES`, `ERROR_CODES`,
-    `SESSION_JWT_TTL_DAYS`, `AUTH_IDENTITY_KIND` inline. Required remediation: extract
-    to peer files (e.g., `errorCodes.ts`, `authIdentity.ts`) and reduce `index.ts` to
-    re-exports.
-  ⚠ Service/provider JSDoc backfill — audit `apps/server/src/services/*.ts` and
-    `apps/server/src/providers/**/*.ts` (excluding type-only files) and backfill JSDoc
-    with `@example` blocks on every public function/method. Reference implementation:
-    `apps/server/src/providers/mtgjson/index.ts`.
+  (none — `apps/mobile` has not yet been scaffolded, so there are no existing
+  components to retrofit. The principle applies to all components from first
+  scaffolding onward.)
 
-Compliant index files (no action required):
-  ✅ packages/core/src/index.ts — pure re-export barrel.
-
-Carve-outs:
-  ✅ apps/server/index.ts — application entry-point referenced by package.json `main`;
-     exempt from the index-file purity rule under the explicit carve-out in Principle IX.
-
-Carry-over from 1.10.0:
-  ⚠  specs/001-server-architecture/plan.md — JSDoc → TypeScript migration. Unchanged.
-  ⚠  specs/004-card-data-provider/plan.md — JSDoc → TypeScript migration. Unchanged.
+Carry-over from 1.12.0 (unchanged):
+  ⚠ specs/001-server-architecture/plan.md — JSDoc → TypeScript migration. Unchanged.
+  ⚠ specs/004-card-data-provider/plan.md — JSDoc → TypeScript migration. Unchanged.
 
 Deferred TODOs:
   - TODO(MOBILE_PLATFORM): Mobile app framework not yet chosen (spec 002 confirms iOS +
-    Android targets; platform choice requires a constitution amendment when made). TypeScript
-    is confirmed as the language regardless of framework.
+    Android targets; platform choice requires a constitution amendment when made).
+    TypeScript is confirmed as the language regardless of framework. Both the Jest
+    mandate (Principle III) and the four-layer Component Architecture (Principle X)
+    apply to mobile from day one — when the framework is chosen, its Jest preset
+    (e.g., `jest-expo`, `@testing-library/react-native`) MUST be declared, and
+    `apps/mobile/src/{screens,components,hooks,utils}/` MUST be the scaffolded
+    directory layout.
 -->
 
 # my-binder Constitution
@@ -87,6 +84,28 @@ considered complete until its automated tests pass. The `main` branch MUST remai
 all times. No code reaches `main` without a corresponding test exercising its primary
 behaviour.
 
+**Test framework**: **Jest** is the chosen unit testing library across every workspace in
+the monorepo. New unit and integration tests MUST be written with Jest. TypeScript sources
+MUST be compiled with `ts-jest`. Alternative Jest-compatible runners (Vitest, Mocha, AVA,
+node:test) are NOT permitted — alignment on a single tool eliminates configuration drift
+between workspaces and keeps coverage tooling, mocking conventions, and CI invocation
+identical everywhere. When the mobile workspace selects its framework, the corresponding
+Jest preset (e.g., `jest-expo`, `@testing-library/react-native`) MUST be declared as part
+of that decision; switching to a non-Jest runner requires a constitution amendment.
+
+**Plan requirement**: Every feature plan (`specs/<feature>/plan.md`) MUST include an
+explicit **Unit Testing Phase** section that identifies:
+
+- Which Jest test files will be created or updated, with full paths.
+- The behaviours each test file will cover (one bullet per behaviour, mapped back to the
+  feature's functional requirements where applicable).
+- A coverage target for the new code introduced by the feature (line and branch
+  percentages, expressed as a Jest `coverageThreshold` or equivalent).
+
+A plan that omits the Unit Testing Phase MUST NOT proceed to task generation
+(`/speckit.tasks`). The Unit Testing Phase complements — but does not replace — Phase 0
+research or Phase 1 design artifacts.
+
 **Test co-location rule**: Unit and integration tests MUST live in the same directory as
 the file they test, named `<filename>.test.ts`. For example, `src/services/cardService.ts`
 MUST be tested by `src/services/cardService.test.ts`. The only exception is **E2E tests**,
@@ -95,7 +114,11 @@ exercise the full system, not a single file). No other `tests/` directories are 
 
 Rationale: co-located tests are discovered immediately alongside the code they cover, making
 it obvious when a file has no test and preventing tests from becoming detached from the module
-they exercise when files are moved or renamed.
+they exercise when files are moved or renamed. Pinning Jest as the single test runner avoids
+the per-workspace tooling drift (separate matchers, separate mocks, separate coverage
+formats) that accumulates when each package picks its own framework. Requiring an explicit
+Unit Testing Phase in every plan makes the test surface visible at design time rather than
+at implementation time, when scope creep has already happened.
 
 ### IV. Single Responsibility
 
@@ -313,6 +336,121 @@ ambiguous — *"where does `MtgjsonProvider` actually live?"* becomes a question
 single right answer. Keeping declarations in named files and using `index.ts` strictly
 as a barrel preserves a single source of truth per symbol.
 
+### X. Component Architecture (Mobile)
+
+**Every UI feature in `apps/mobile` MUST follow the Screen → Container → Hook → View
+pattern. This is non-negotiable.** The pattern applies to every component from first
+scaffolding onward — there is no "small component" carve-out.
+
+Each feature lives in its own directory under `src/components/<feature-name>/` and
+consists of exactly three files:
+
+```
+apps/mobile/src/components/<feature-name>/
+├── <Feature>Container.tsx   ← orchestration: calls hook, passes named props to view
+├── use<Feature>.ts          ← business logic: state, effects, store calls, handlers
+└── <Feature>View.tsx        ← pure JSX: props-only, no store/service imports
+```
+
+Screens in `src/screens/` are navigation entry points only. A screen file MUST render
+exactly one container and contain no other logic:
+
+```tsx
+// apps/mobile/src/screens/ModelManagerScreen.tsx
+export function ModelManagerScreen() {
+  return <ModelManagerContainer />;
+}
+```
+
+**Layer rules.** Each layer has a fixed responsibility and a fixed list of forbidden
+imports. Any import that violates the "Forbidden" column is a constitution breach
+requiring justification in the relevant plan's Complexity Tracking table.
+
+| Layer | Location | Responsibility | Forbidden |
+|---|---|---|---|
+| Screen | `src/screens/` | Navigation entry point | State, `useState`, `useEffect`, store imports, JSX beyond a single container element |
+| Container | `src/components/<feature>/<Feature>Container.tsx` | Call hook, destructure result, pass individual named props to the view | Business logic, store imports, service calls, `useState`, `useEffect` |
+| Hook | `src/components/<feature>/use<Feature>.ts` | All state, effects, store calls, side-effecting handlers; returns a typed result object | JSX, direct DOM/native API access (use a sub-hook or service) |
+| View | `src/components/<feature>/<Feature>View.tsx` | Pure JSX rendering of received props; presentational only | Store imports, service imports, navigation imports, `Alert`, `useState`, `useEffect`, `useReducer` |
+| Shared hook | `src/hooks/` | Cross-feature hooks (e.g. `useInference`) | JSX |
+| Utility | `src/utils/` | Pure functions (format, parse, math) | React, hooks, JSX, side effects |
+
+**Container prop-passing rule.** Containers MUST explicitly destructure the hook
+result and pass individual named props to the view. Spread operators applied to a
+hook's return value are prohibited:
+
+```tsx
+// REQUIRED
+const { storageInfo, downloadedModels, handleDownload } = useModelManager();
+return (
+  <ModelManagerView
+    storageInfo={storageInfo}
+    downloadedModels={downloadedModels}
+    onDownload={handleDownload}
+  />
+);
+
+// PROHIBITED — hides dependencies, breaks static analysis, masks unused fields
+return <ModelManagerView {...useModelManager()} />;
+```
+
+Spreading hides the contract between the hook and the view. When the hook adds a
+field, a spread silently passes it through; when the hook removes a field, the view
+breaks at runtime instead of at `tsc` time. Named props make the data flow visible
+at the call site and let TypeScript catch every drift.
+
+**`useEffect` usage discipline.** `useEffect` is an escape hatch for synchronising
+React state with **external systems** (browser/native APIs, subscriptions, network
+resources, third-party widgets). It MUST NOT be used for any of the following
+React-internal concerns:
+
+1. **Computing state from props or other state.** Derive the value in the render
+   path or with `useMemo`. An effect that watches `propA` and writes
+   `setStateDerivedFromA(transform(propA))` is always wrong — it forces an extra
+   render and creates a window where state and props disagree.
+2. **Handling user events.** Put the logic in the event handler that triggered it.
+   Effects that watch a "clicked" or "submitted" flag and react to it are anti-
+   patterns; the navigation, mutation, or notification belongs in the handler
+   itself.
+3. **Resetting state when props change.** Pass a `key` prop to the component so
+   React unmounts and remounts it with fresh state. Effects that compare prop
+   values to old values via refs and call `setState` to "reset" duplicate React's
+   own machinery.
+4. **Notifying parent components of state changes.** Call the parent callback from
+   the same handler that mutated the state, not from an effect that watches the
+   state. Effect-based notification creates ordering bugs and double-fires when
+   the parent re-renders.
+5. **Chaining effects to drive other effects.** If effect A's only purpose is to
+   trigger effect B, derive the result directly or call both updates from one
+   event handler. Each link in the chain adds a render cycle.
+
+`useEffect` IS appropriate for: subscribing to a store outside the React tree,
+attaching listeners to a native API, fetching when no framework-provided data hook
+is available, and starting/stopping animations bound to mount/unmount.
+
+Two technical rules govern every `useEffect` that does ship:
+
+- **Cleanup is mandatory** for every effect that subscribes, opens a connection,
+  schedules a timer, or starts an async operation whose result the component will
+  consume. The cleanup function MUST cancel the subscription/timer/operation so a
+  fast unmount does not leak handles or call `setState` on an unmounted component.
+- **Exhaustive dependencies are mandatory.** The `react-hooks/exhaustive-deps` rule
+  MUST be enabled at the lint level. Suppression
+  (`// eslint-disable-next-line react-hooks/exhaustive-deps`) is permitted only with
+  an adjacent comment naming the invariant that makes the missing dependency safe
+  (e.g., "ref is stable across renders", "callback intentionally captures the
+  initial value"). Suppression without justification is a constitution breach.
+
+Rationale: the four-layer split makes every component testable in three independent
+slices — the hook can be unit-tested with renderHook-style tools (Principle III's
+Jest mandate), the view can be snapshot-tested with no providers or store mocks,
+and the container is a one-line glue file requiring no test of its own. Spreading
+hook results hides the hook→view contract; named props make the data flow visible
+and let `tsc` enforce it. The `useEffect` rules cut off the most common React bug
+class — effects that fight the render loop and produce stale UI — before it enters
+the codebase. These rules align with React's official "You Might Not Need an
+Effect" guidance and the canonical React `eslint-plugin-react-hooks` ruleset.
+
 ## Technology Stack
 
 The system is a **monorepo** managed with **pnpm workspaces** and **Turborepo**. Each
@@ -434,7 +572,7 @@ a version bump per semantic versioning:
 - **PATCH**: clarification, wording improvement, or non-semantic refinement.
 
 Each feature plan MUST include a Constitution Check (as defined in
-`.specify/templates/plan-template.md`) verifying compliance with all nine principles before
+`.specify/templates/plan-template.md`) verifying compliance with all ten principles before
 implementation begins. Violations MUST be justified in the plan's Complexity Tracking table.
 
-**Version**: 1.11.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-04-28
+**Version**: 1.13.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-01
