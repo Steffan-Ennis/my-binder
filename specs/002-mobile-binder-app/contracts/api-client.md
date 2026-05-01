@@ -10,6 +10,13 @@ sends, and the response shape it expects. The server is the source of truth; if 
 schema changes, the entry below MUST be updated and the matching `@my-binder/core` schema
 re-imported.
 
+**Layering**: `apiClient.ts` exposes a small set of typed methods (`getCards`, `getMe`,
+`signInWithGoogle`, `signOut`) that perform `fetch` + auth-header attachment + Ajv
+validation. These methods are the **`queryFn` / `mutationFn` bodies** for TanStack Query 5;
+all caching, request deduplication, and retry-with-back-off are handled by TanStack Query
+on top of them (see [research.md §11](../research.md#11-server-state-management-tanstack-query)).
+The hook consumer column below names the TanStack hook for each operation.
+
 All endpoints share the following:
 
 - **Base URL**: read from `expo-constants` `extra.apiBaseUrl` at app start. Local dev points
@@ -17,12 +24,23 @@ All endpoints share the following:
   stack (`packages/infrastructure`).
 - **Content-Type**: `application/json` on requests with bodies; responses are always JSON.
 - **Authorization**: `Authorization: Bearer <jwt>` for every endpoint except `POST
-  /auth/google`. The JWT comes from `useSession()`; if absent or expired, `apiClient` does
+  /auth/google`. The JWT comes from `sessionStore`; if absent or expired, `apiClient` does
   not attach the header and the server replies with 401 (mapped to `AUTH_INVALID_TOKEN`,
-  see Error Mapping below).
+  see Error Mapping below). TanStack hooks additionally gate execution via
+  `enabled: useSession().status === "active"` so a query never fires for an unauthenticated
+  user.
 - **Schema validation**: every response body is validated against the corresponding Ajv
-  schema from `@my-binder/core/schemas/` before returning to the caller (Principle VII).
-  Validation failure is a `SchemaValidationError`, logged per Principle VIII.
+  schema from `@my-binder/core/schemas/` **inside** the `queryFn` before resolving (Principle
+  VII). A schema mismatch throws `SchemaValidationError`, which TanStack treats as a query
+  error; the cache therefore only ever stores schema-validated payloads. Errors are logged
+  per Principle VIII.
+- **Retry & caching defaults** (set on the QueryClient in
+  `apps/mobile/src/services/api/queryClient.ts`):
+  - Queries: `retry: 3` with exponential back-off (`1s → 2s → 4s`, ceiling 30s),
+    **predicate skips 4xx** so auth errors fail fast.
+  - Mutations: `retry: 0` — never auto-retry sign-in or sign-out.
+  - `refetchOnWindowFocus: false`, `retryOnMount: false`.
+  - Per-endpoint `staleTime` / `gcTime` listed below.
 
 ---
 
@@ -30,7 +48,9 @@ All endpoints share the following:
 
 ### POST /auth/google — Sign in with Google
 
-**Used by**: `useLogin` (FR-002 → FR-005).
+**Used by**: `useGoogleSignInMutation` (TanStack `useMutation`), composed by `useLogin`
+(FR-002 → FR-005).
+**TanStack config**: `mutationFn: apiClient.signInWithGoogle`; `retry: 0`.
 
 **Request**:
 
@@ -84,8 +104,12 @@ Content-Type: application/json
 
 ### GET /auth/me — Hydrate current user
 
-**Used by**: `useSession` on app start, after a session is rehydrated from secure storage,
-to verify the JWT is still valid server-side before navigating away from `Login`.
+**Used by**: `useMeQuery` (TanStack `useQuery`), composed by `useSession` on app start
+after a session is rehydrated from secure storage, to verify the JWT is still valid
+server-side before navigating away from `Login`.
+**TanStack config**: `queryKey: ["auth", "me"]`; `queryFn: apiClient.getMe`;
+`staleTime: 60_000` (1 min); `gcTime: 5 * 60_000` (5 min);
+`enabled: useSession().status === "active"`.
 
 **Request**:
 
@@ -120,7 +144,9 @@ Authorization: Bearer <jwt>
 
 ### POST /auth/signout — Sign out
 
-**Used by**: `useLogin.handleSignOut` (FR-008).
+**Used by**: `useSignOutMutation` (TanStack `useMutation`), composed by
+`useLogin.handleSignOut` (FR-008).
+**TanStack config**: `mutationFn: apiClient.signOut`; `retry: 0`.
 
 **Request**:
 
@@ -138,9 +164,11 @@ Authorization: Bearer <jwt>
 3. POST `https://oauth2.googleapis.com/revoke?token=<google-access-token>` to revoke the
    Google grant per FR-008 (Q5: full re-consent on next sign-in).
 4. Reset `sessionStore` and `binderStore`.
-5. Navigate to `Login`.
+5. **Call `queryClient.clear()`** so `["cards"]`, `["auth", "me"]`, and any future
+   per-user query keys are wiped from the cache before another user can sign in.
+6. Navigate to `Login`.
 
-Steps 2–4 MUST execute even if step 1 returns an error — local cleanup must be best-effort
+Steps 2–5 MUST execute even if step 1 returns an error — local cleanup must be best-effort
 to satisfy "user wants to sign out" intent. The error from step 1 is logged per Principle
 VIII but not surfaced to the user.
 
@@ -148,8 +176,12 @@ VIII but not surfaced to the user.
 
 ### GET /cards — List the user's cards
 
-**Used by**: `useBinderHome` after sign-in to populate `binderStore.cards` (FR-009 →
-FR-014).
+**Used by**: `useCardsInfiniteQuery` (TanStack `useInfiniteQuery`), composed by
+`useBinderHome` after sign-in to populate the cache (FR-009 → FR-014).
+**TanStack config**: `queryKey: ["cards"]`; `queryFn: apiClient.getCards`;
+`getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined`;
+`staleTime: 5 * 60_000` (5 min); `gcTime: 30 * 60_000` (30 min);
+`enabled: useSession().status === "active"`.
 
 **Request**:
 
@@ -158,8 +190,10 @@ GET /cards?limit=200&cursor=<opaque>
 Authorization: Bearer <jwt>
 ```
 
-The mobile client uses page size 200 (server max). Repeats with the returned cursor until
-`nextCursor` is null. All fetched pages are concatenated into `binderStore.cards`.
+The mobile client uses page size 200 (server max). `useCardsInfiniteQuery` calls
+`fetchNextPage()` until `nextCursor` is null; pages live in TanStack's cache as a single
+infinite-query result and are flattened in `useBinderHome` via
+`pages.flatMap(p => p.cards)` for the `Card[]` consumed by the view.
 
 **200 OK response**:
 
@@ -176,11 +210,16 @@ The mobile client uses page size 200 (server max). Repeats with the returned cur
 
 **Mobile handling**:
 
-- Each batch is validated; on validation failure, `binderStore.loadState` becomes
-  `"error"` and the binder view shows an error banner.
-- Pagination loop continues until `nextCursor === null`. The user sees a loading state on
-  page 1 of the binder until at least the first batch lands; subsequent batches stream into
-  the store and pages 2+ become navigable as their cards arrive.
+- Each batch is validated inside the queryFn; on validation failure, the `useInfiniteQuery`
+  resolves to `isError`, `useBinderHome` maps that to `loadState === "error"`, and the
+  binder view shows an error banner.
+- The infinite-query loop continues until `nextCursor === null`. The user sees a loading
+  state on page 1 of the binder until at least the first batch lands; subsequent batches
+  stream into the cache and pages 2+ become navigable via `isFetchingNextPage` once their
+  cards arrive.
+- Manual refresh (pull-to-refresh on a future iteration) calls
+  `queryClient.invalidateQueries({ queryKey: ["cards"] })`, which restarts the infinite
+  query from the first cursor without unmounting the view.
 
 **Error responses**:
 

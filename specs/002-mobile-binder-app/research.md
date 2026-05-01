@@ -58,10 +58,16 @@ amendment text is in `plan.md` Constitution Check.
 
 ## 2. State management
 
-**Decision**: **Zustand 5** with `subscribeWithSelector` middleware. Two top-level stores —
-`sessionStore` (auth state, JWT, expiry) and `binderStore` (current page, cached cards,
-total count). Hooks subscribe to slices via selectors; views never touch stores (Principle X
-Forbidden column).
+**Decision**: Split server state and UI state across two libraries.
+
+- **UI / auth state** → **Zustand 5** with `subscribeWithSelector` middleware. Two
+  top-level stores — `sessionStore` (auth state, JWT, expiry) and `binderStore`
+  (`currentPage` only; was previously also `cards`/`totalPages`/`loadState` but those
+  responsibilities moved to TanStack Query — see §11). Hooks subscribe to slices via
+  selectors; views never touch stores (Principle X Forbidden column).
+- **Server state** (cards from `GET /cards`, profile from `GET /auth/me`, mutation
+  results from `POST /auth/google` and `POST /auth/signout`) → **TanStack Query 5**, see
+  §11 for the full decision and configuration.
 
 **Rationale**:
 
@@ -255,9 +261,15 @@ known and equal), and `removeClippedSubviews` for off-screen pages. Page navigat
 ## 7. API response validation
 
 **Decision**: **Ajv 8** at the mobile boundary, re-using JSON Schemas from `@my-binder/core`
-(already used by the server's Fastify route validation). Wrap `fetch` in `apiClient.ts`; on
-every response, parse JSON and run the schema validator before returning to the caller.
-Reject with a typed `SchemaValidationError` on mismatch (logged per Principle VIII).
+(already used by the server's Fastify route validation). The typed methods on `apiClient.ts`
+(`getCards`, `getMe`, `signInWithGoogle`, `signOut`) each wrap `fetch`; on every response,
+parse JSON and run the schema validator before returning to the caller. Reject with a typed
+`SchemaValidationError` on mismatch (logged per Principle VIII).
+
+Since these typed methods serve as the **`queryFn`** bodies for TanStack Query (see §11),
+validation runs **inside** the queryFn and throws **before** TanStack writes the result to
+its cache. The cache therefore holds only schema-validated payloads — an invalid cache
+entry is structurally impossible.
 
 **Rationale**:
 
@@ -288,9 +300,33 @@ Reject with a typed `SchemaValidationError` on mismatch (logged per Principle VI
   retryable error banner per FR-004.
 - All others → log full original error per Principle VIII, render generic banner.
 
-**Rationale**: Centralising the mapping in one place keeps every UI feature's error handling
-consistent and avoids the "where do we render this error?" sprawl that ad-hoc `try/catch`
-in views would produce.
+**Routing of the mapping** is split between two layers (see §11 for context):
+
+1. **Centralised auth handling** — `queryClient.ts` registers `queryCache.onError` and
+   `mutationCache.onError` callbacks that match on `AUTH_INVALID_TOKEN` and
+   `AUTH_NOT_ALLOWLISTED` and dispatch the session-clear / navigate side effects. This
+   single registration point covers every query and mutation in the app.
+2. **Per-feature handling** — feature hooks (`useLogin`, `useBinderHome`) consume
+   `error` / `isError` flags from their TanStack hook results and surface
+   feature-specific messages to their views (e.g., the Login retry banner).
+
+**TanStack retry policy** (configured on the QueryClient default options):
+
+- `retry: 3` for queries, **gated by a predicate** that returns `false` for any
+  `ApiError` whose status is in the 4xx range. Auth errors fail fast.
+- `retryDelay: attempt => Math.min(1000 * 2 ** attempt, 30000)` — exponential back-off
+  with a 30-second ceiling.
+- `retry: 0` for mutations — never auto-retry a sign-in or sign-out (would risk
+  duplicate side effects).
+- `refetchOnWindowFocus: false` (mobile: no `window` semantic, but the equivalent
+  AppState-driven refetch is also disabled to keep behaviour predictable on a flaky
+  cellular network).
+
+**Rationale**: Centralising the mapping in one place keeps every UI feature's error
+handling consistent and avoids the "where do we render this error?" sprawl that ad-hoc
+`try/catch` in views would produce. Gating retry by HTTP status range prevents the
+retry-storm that would otherwise happen if a 401 (e.g., from an expired session) bounced
+through three back-off attempts before TanStack surfaced it to the global handler.
 
 ---
 
@@ -348,7 +384,96 @@ wireframe's iOS-style icon language: `book-outline` (Binder), `search-outline` (
 
 ---
 
-## 11. Open follow-ups (none block /speckit.tasks)
+## 11. Server-state management (TanStack Query)
+
+**Decision**: **TanStack Query 5** (`@tanstack/react-query@5`) as the data-fetching,
+caching, and retry layer. The previously-planned `useApi` hook (a hand-rolled `fetch`
+wrapper) is **removed**; `apiClient.ts` shrinks to a small set of typed methods that act
+as `queryFn`/`mutationFn` bodies, and TanStack Query owns everything that surrounds them.
+Dev-only: `@tanstack/react-query-devtools` for cache inspection in development.
+
+**Per-endpoint configuration** (single source of truth lives in
+`apps/mobile/src/services/api/queryClient.ts` defaults plus per-hook overrides):
+
+| Operation | Hook | Type | `staleTime` | `gcTime` | Retry | Notes |
+|---|---|---|---|---|---|---|
+| `GET /cards` | `useCardsInfiniteQuery` | `useInfiniteQuery` | 5 min | 30 min | 3 attempts on 5xx/network, 0 on 4xx | Cursor pagination per `contracts/api-client.md`; `enabled: useSession().status === "active"` |
+| `GET /auth/me` | `useMeQuery` | `useQuery` | 1 min | 5 min | same | Validates a hydrated session at app start |
+| `POST /auth/google` | `useGoogleSignInMutation` | `useMutation` | n/a | n/a | 0 (no auto-retry on sign-in) | On success: persist JWT, update `sessionStore`, navigate Binder |
+| `POST /auth/signout` | `useSignOutMutation` | `useMutation` | n/a | n/a | 0 | Always runs the local cleanup chain (delete secure-store, revoke Google, reset stores, **`queryClient.clear()`**, navigate Login) — even when the server call fails |
+
+**QueryClient defaults** (set once in `queryClient.ts`):
+
+```ts
+new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error) => {
+        if (error instanceof ApiError && error.status >= 400 && error.status < 500) return false;
+        return failureCount < 3;
+      },
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 30_000),
+      refetchOnWindowFocus: false,
+      retryOnMount: false,
+    },
+    mutations: { retry: 0 },
+  },
+});
+```
+
+**Provider placement**: `<QueryClientProvider client={queryClient}>` is mounted at the
+Root Stack in `app/_layout.tsx`, above the `(authenticated)` auth gate, so the same
+QueryClient instance serves both pre-auth and authenticated routes. Auth-error routing is
+attached via `queryCache.onError` and `mutationCache.onError` registered on the same
+QueryClient (see §8).
+
+**Rationale**:
+
+- The user explicitly chose TanStack Query for **caching, back-off, and retry** —
+  TanStack ships all three out of the box and handles edge cases (request deduplication,
+  in-flight cancellation, refetch-on-reconnect) that the hand-rolled fetch wrapper would
+  have re-implemented one bug at a time.
+- `useInfiniteQuery` cleanly maps the server's cursor pagination from
+  `contracts/api-client.md` GET /cards. The 1000-card / 112-page scale (SC-007) means
+  the user might re-enter the Binder tab repeatedly — TanStack's `staleTime` keeps that
+  navigation snappy without staleness drift, exactly the property a hand-rolled wrapper
+  would fight to provide.
+- TanStack Query fits Principle X without modification: hooks own state, views receive
+  named props, no `useEffect` is required for data fetching. The pre-existing
+  `useEffect` discipline rule is therefore strengthened, not weakened.
+- Schema validation (Principle VII) keeps its boundary because Ajv runs inside the
+  `queryFn` (see §7) — TanStack treats validation failures as query errors and never
+  caches malformed payloads.
+- Bundle cost (~13KB gzipped for `@tanstack/react-query` v5) is well within mobile
+  constraints; cold-start budget is dominated by JS engine init, not this dependency.
+
+**Alternatives considered**:
+
+- **Hand-rolled fetch wrapper (the previous plan)** — would require writing and testing
+  retry-with-back-off, request deduplication, in-flight cancellation, and a per-screen
+  cache layer from scratch. The user's explicit reason for switching ("caching,
+  back-off, retry") is precisely the surface TanStack codifies. Rejected.
+- **SWR** — comparable feature set, but no first-party React Native infinite-query
+  ergonomics match `useInfiniteQuery`'s API; smaller community footprint for the
+  caching-tunable scenarios we anticipate post-spec-002. Rejected.
+- **Apollo Client** — REST mode exists but the project's API is plain JSON, not GraphQL;
+  Apollo's normalised cache would be heavyweight overkill. Rejected.
+- **Persisting the cache to disk** (`@tanstack/react-query-persist-client` +
+  `expo-async-storage`) — deferred. Cold-start always re-fetches in this spec; offline
+  card browsing is not a US1/US2 requirement. Logged as a future consideration so the
+  cache surface is intentional, not accidental.
+
+**Testing notes**:
+
+- Wrap hook tests with a `<QueryClientProvider>` whose QueryClient is a per-test
+  instance configured with `retry: false` to keep tests deterministic.
+- Mock `apiClient` methods (not `fetch`) so query/mutation tests assert hook behaviour,
+  not transport details. `apiClient.test.ts` covers transport + Ajv validation
+  separately.
+
+---
+
+## 12. Open follow-ups (none block /speckit.tasks)
 
 - **Server `GOOGLE_CLIENT_IDS` and `GOOGLE_WEB_CLIENT_ID` secrets** are already defined per
   CLAUDE.md but ship with `REPLACE_ME` placeholders. The mobile app needs its **own**
@@ -360,3 +485,7 @@ wireframe's iOS-style icon language: `book-outline` (Binder), `search-outline` (
   spec is intentionally minimal (title + message + icon). The Search / Scan / Profile
   specs (003+) will replace each stub with a feature-specific view that implements the
   wireframe's full visual language for that tab.
+- **Persisting the TanStack cache to disk** — see §11. Adding
+  `@tanstack/react-query-persist-client` would let an offline cold start show the last
+  known cards before the network resolves. Out of scope for spec 002 (no offline
+  requirement) but a low-friction add when the offline story lands.

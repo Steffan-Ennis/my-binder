@@ -45,7 +45,9 @@ start by `useSession`.
 
 - `iat` is never modified after creation; refresh = a new sign-in flow, not a token rotation.
 - An expired session MUST NOT be sent on outbound requests; `useSession` returns
-  `status: "expired"` and `useApi` refuses to attach the bearer.
+  `status: "expired"` and `apiClient` refuses to attach the bearer (TanStack hooks gate
+  query execution on `useSession().status === "active"` via the `enabled` flag, so an
+  expired session also prevents queries from firing in the first place).
 - On sign-out, both `expo-secure-store` keys MUST be deleted **before** the Google revoke
   call so a process kill mid-revocation still leaves the local session cleared.
 
@@ -55,24 +57,29 @@ start by `useSession`.
 
 ### Binder
 
-The user's logical collection, paginated for display. Held in `binderStore`. Refetched on
-sign-in; not persisted to disk.
+The user's logical collection, paginated for display. **Storage is split** between the
+TanStack Query cache (server data) and Zustand (UI navigation state) — see
+[research.md §11](./research.md#11-server-state-management-tanstack-query). Refetched on
+sign-in / when stale; not persisted to disk in this spec.
 
-| Field | Type | Constraints | Notes |
-|---|---|---|---|
-| `cards` | `Card[]` | server-ordered list; mobile preserves order | Source: `GET /cards` (paginated server-side; mobile concatenates pages until done) |
-| `currentPage` | `number` | `1 ≤ currentPage ≤ totalPages`; default 1 | UI state; resets to 1 when `cards` is replaced |
-| `totalPages` | `number` (derived) | `Math.max(1, ceil(cards.length / 9))` | Derived; never persisted |
-| `loadState` | `"idle" \| "loading" \| "ready" \| "error"` | finite state | Drives the empty-state vs. cards-rendered branching |
+| Field | Type | Where it lives | Constraints | Notes |
+|---|---|---|---|---|
+| `cards` | `Card[]` | **TanStack Query cache** under key `["cards"]` (an `useInfiniteQuery` result) | server-ordered list; mobile preserves order | Source: `GET /cards` (paginated server-side; `useCardsInfiniteQuery` concatenates pages until `nextCursor === null`). `staleTime: 5 min`, `gcTime: 30 min`. |
+| `currentPage` | `number` | **Zustand `binderStore`** | `1 ≤ currentPage ≤ totalPages`; default 1 | UI state; resets to 1 on sign-out and when the cache key changes (e.g., a different user signs in after a sign-out cycle). |
+| `totalPages` | `number` (derived) | **Computed** in `useBinderHome` from `cards.length` | `Math.max(1, ceil(cards.length / 9))` | Derived; never persisted, never stored. |
+| `loadState` | `"idle" \| "loading" \| "ready" \| "error"` | **Computed** in `useBinderHome` from TanStack flags | finite state | Mapped from `isPending` / `isError` / `isSuccess` / `isFetching` returned by `useCardsInfiniteQuery`. Drives the empty-state vs. cards-rendered branching. |
 
 **Invariants**:
 
-- `totalPages` is derived from `cards.length` per FR-013. The store does NOT expose a setter
-  for it — it's a computed selector.
+- `totalPages` is derived from `cards.length` per FR-013. Neither the store nor the cache
+  exposes a setter for it — it's a computed selector.
 - An empty collection (`cards.length === 0`) yields `totalPages === 1` so the empty-binder
   view always has a page to render (Edge Case in spec).
 - `currentPage > totalPages` after a card removal MUST clamp to `totalPages` rather than
   produce a phantom page (Edge Case).
+- On sign-out the side-effect chain MUST call `queryClient.clear()` so the previous user's
+  cards do not survive in the cache for any subsequent sign-in (see
+  `contracts/api-client.md` POST /auth/signout).
 
 ### Page (logical, not stored)
 

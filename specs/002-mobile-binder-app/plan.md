@@ -24,15 +24,27 @@ Screen → Container → Hook → View component architecture (Principle X) from
 **Language/Version**: TypeScript 5.7 (`strict: true`), Node 22 (build/test toolchain only)
 **Primary Dependencies**: React Native 0.76 + Expo SDK 52, **Expo Router 4** (file-based
 routing built on React Navigation 7 — picked for its forward-scaling story as the screen
-count grows beyond the initial three), Zustand 5 (state), `expo-auth-session` (Google
-OAuth), `expo-secure-store` (session JWT), `expo-image` (caching + lazy loading),
-`@expo/vector-icons` (tab-bar glyphs for Binder/Search/Scan/Profile per the v3 wireframe),
-`ajv` (response validation per Principle VII), `@my-binder/core` (shared types and schemas)
+count grows beyond the initial three), **TanStack Query 5** (`@tanstack/react-query@5`,
+the **server-state layer** — caching, request deduplication, and the exponential-back-off
+retry policy that motivated this dependency choice; see [research.md §11](./research.md#11-server-state-management-tanstack-query)),
+Zustand 5 (UI/auth state — sessions and `currentPage` only; server data lives in the
+TanStack cache), `expo-auth-session` (Google OAuth), `expo-secure-store` (session JWT),
+`expo-image` (caching + lazy loading), `@expo/vector-icons` (tab-bar glyphs for
+Binder/Search/Scan/Profile per the v3 wireframe), `ajv` (response validation per Principle
+VII — runs inside every TanStack `queryFn` before results enter the cache), `@my-binder/core`
+(shared types and schemas). Dev-only: `@tanstack/react-query-devtools` for inspecting the
+cache during development.
 **Storage**:
 - **Persistent secrets**: `expo-secure-store` (iOS Keychain, Android EncryptedSharedPreferences)
   — holds the session JWT only.
-- **Ephemeral cache**: in-memory Zustand store + `expo-image` disk cache (managed by Expo).
-- No SQLite/MMKV/Realm in this feature; all card data is fetched from the server on demand.
+- **Ephemeral cache**:
+  - **Server data** (cards, `/auth/me`) — TanStack Query 5 in-memory cache. `staleTime`
+    and `gcTime` are tuned per query (see `research.md` §11). The cache is **not**
+    persisted to disk in this spec; cold-start always re-fetches.
+  - **UI state** — in-memory Zustand stores (`sessionStore`, `binderStore`).
+  - **Card images** — `expo-image` disk cache (managed by Expo).
+- No SQLite/MMKV/Realm in this feature; all card data is fetched from the server on demand
+  and held in the TanStack cache for the lifetime of the app process.
 
 **Testing**: Jest 30 + ts-jest + `jest-expo` preset + `@testing-library/react-native` 12.
 Co-located `.test.ts(x)` files per Principle III. E2E (Detox/Maestro) deferred to a later
@@ -47,12 +59,23 @@ spec — out of scope here.
 
 **Constraints**:
 - All UI state ownership MUST live in hooks per Principle X. No `useState`/`useEffect` in
-  views, screens, or containers.
+  views, screens, or containers. TanStack Query hooks (`useQuery`, `useInfiniteQuery`,
+  `useMutation`) ARE hooks and so are an allowed primitive in this layer; views still
+  receive their values as named props from a container that destructures the hook result.
 - API responses MUST be validated against shared schemas from `@my-binder/core` before
-  reaching application logic (Principle VII, mobile boundary rule).
+  reaching application logic (Principle VII, mobile boundary rule). Validation runs **inside
+  the `queryFn`** in `apiClient.ts` so an invalid payload throws before TanStack Query
+  caches it; an invalid cache entry is therefore impossible.
 - Session JWT MUST live in `expo-secure-store`, never in `AsyncStorage` or
   `localStorage`-equivalents.
-- Sign-out MUST clear the local session and call Google's token-revoke endpoint per FR-008.
+- Sign-out MUST clear the local session, call Google's token-revoke endpoint per FR-008,
+  AND call `queryClient.clear()` so no per-user response data survives in the TanStack
+  cache after a session ends.
+- TanStack Query's retry policy MUST skip 4xx responses (auth errors should fail fast and
+  route the user, never silently retry); only 5xx and network-level rejections retry, with
+  an exponential back-off (1s → 2s → 4s, max 3 attempts) configured on the QueryClient.
+- Mutations (`POST /auth/google`, `POST /auth/signout`) MUST default to `retry: 0` to
+  avoid duplicate side effects.
 
 **Scale/Scope**: Single user per device. Up to 1,000 cards per binder (SC-007).
 Navigation shape (per the v3 wireframe):
@@ -91,10 +114,10 @@ None remaining. All gates cleared:
 | IV | Single Responsibility | ✅ PASS | Each feature owns container/hook/view; api client, auth client, secure storage are separate single-purpose modules. |
 | V | Transparency & Legibility | ✅ PASS | No magic literals (Google client IDs and revoke URL pulled from env via `expo-constants`); identifiers describe intent. |
 | VI | Layered Architecture | ✅ PASS | Mobile → API server only. Mobile MUST NOT call MTGJSON, the database, or AWS Secrets Manager. Auth and card requests both go through the existing server endpoints. |
-| VII | Strong Typing & Schema Validation | ✅ PASS | TS strict + Ajv validation on every inbound API response. Shared schemas re-used from `@my-binder/core`. Path aliases `@root/*` and `@src/*` declared in `apps/mobile/tsconfig.json`. `type` over `interface` for all new types. |
-| VIII | Error Transparency | ✅ PASS | Every caught error is either re-thrown or logged + surfaced to the user via the auth/api error boundary. No silent swallows in any of the new code paths. |
-| IX | Public API Discipline | ✅ PASS | Services in `apps/mobile/src/services/` (`apiClient`, `authClient`, `secureStorage`) carry full JSDoc with `@example` blocks. `index.ts` files in each services subdirectory are pure barrels. |
-| X | Component Architecture (Mobile) | ✅ PASS | Every UI feature uses Screen → Container → Hook → View per constitution v1.13.2. Route files in `apps/mobile/app/` are the Screen layer (one-line shells); `_layout.tsx` files are the Layout layer (route hierarchy + auth gates only). Containers destructure hook results and pass named props (no spread). `useEffect` is restricted to legitimate external-system cases (secure-storage hydration on app start, Google auth-session result events) with cleanup and exhaustive deps. |
+| VII | Strong Typing & Schema Validation | ✅ PASS | TS strict + Ajv validation on every inbound API response, performed inside the TanStack `queryFn` in `apiClient.ts` so the cache only ever stores schema-validated payloads. Shared schemas re-used from `@my-binder/core`. Path aliases `@root/*` and `@src/*` declared in `apps/mobile/tsconfig.json`. `type` over `interface` for all new types. TanStack Query hooks are typed end-to-end via the `queryFn` return type. |
+| VIII | Error Transparency | ✅ PASS | Every caught error is either re-thrown or logged + surfaced to the user via the auth/api error boundary. TanStack `queryFn`s log original errors before throwing the typed `ApiError` that downstream hooks/views consume; the QueryClient's global `queryCache.onError` and `mutationCache.onError` route 401s to session-clear+Login without swallowing the original cause. No silent swallows in any of the new code paths. |
+| IX | Public API Discipline | ✅ PASS | Services in `apps/mobile/src/services/` (`apiClient`, `queryClient`, `authClient`, `secureStorage`) and the cross-feature TanStack hooks in `apps/mobile/src/hooks/` (`useCardsInfiniteQuery`, `useMeQuery`, `useGoogleSignInMutation`, `useSignOutMutation`) carry full JSDoc with `@example` blocks. `index.ts` files in each services subdirectory are pure barrels. |
+| X | Component Architecture (Mobile) | ✅ PASS | Every UI feature uses Screen → Container → Hook → View per constitution v1.13.2. Route files in `apps/mobile/app/` are the Screen layer (one-line shells); `_layout.tsx` files are the Layout layer (route hierarchy + auth gates only, plus `<QueryClientProvider />` at the Root Stack). Containers destructure hook results — including TanStack Query/Mutation results — and pass named props (no spread). Views never call `useQuery`/`useMutation` directly; those calls live in feature hooks (`useLogin`, `useBinderHome`) which compose the cross-feature TanStack hooks (`useCardsInfiniteQuery`, etc.). `useEffect` is restricted to legitimate external-system cases (secure-storage hydration on app start, Google auth-session result events) with cleanup and exhaustive deps; no `useEffect` is added for data fetching since TanStack Query owns that lifecycle. |
 
 **Pre-implementation gates**: All cleared.
 
@@ -172,8 +195,14 @@ my-binder/
 │           ├── hooks/                   # Cross-feature hooks (Principle X)
 │           │   ├── useSession.ts                # subscribes to session store; one effect for hydration
 │           │   ├── useSession.test.ts
-│           │   ├── useApi.ts                    # typed wrapper around fetch + Ajv validation
-│           │   └── useApi.test.ts
+│           │   ├── useCardsInfiniteQuery.ts     # TanStack useInfiniteQuery for GET /cards (cursor pagination)
+│           │   ├── useCardsInfiniteQuery.test.ts
+│           │   ├── useMeQuery.ts                # TanStack useQuery for GET /auth/me
+│           │   ├── useMeQuery.test.ts
+│           │   ├── useGoogleSignInMutation.ts   # TanStack useMutation for POST /auth/google
+│           │   ├── useGoogleSignInMutation.test.ts
+│           │   ├── useSignOutMutation.ts        # TanStack useMutation for POST /auth/signout + Google revoke + queryClient.clear()
+│           │   └── useSignOutMutation.test.ts
 │           ├── services/                # Subject to Principle IX — JSDoc + index purity
 │           │   ├── auth/
 │           │   │   ├── index.ts                 # re-export only
@@ -183,12 +212,14 @@ my-binder/
 │           │   │   └── sessionStorage.test.ts
 │           │   └── api/
 │           │       ├── index.ts                 # re-export only
-│           │       ├── apiClient.ts             # fetch + Ajv-validated responses
-│           │       └── apiClient.test.ts
-│           ├── stores/                  # Zustand stores (no JSX)
+│           │       ├── apiClient.ts             # fetch + Ajv-validated typed methods (queryFn impls)
+│           │       ├── apiClient.test.ts
+│           │       ├── queryClient.ts           # TanStack QueryClient: retry/back-off, defaults, global onError
+│           │       └── queryClient.test.ts
+│           ├── stores/                  # Zustand stores (no JSX) — UI state only; server state is in TanStack
 │           │   ├── sessionStore.ts              # auth state, JWT, expiry
 │           │   ├── sessionStore.test.ts
-│           │   ├── binderStore.ts               # current page, cards, total count
+│           │   ├── binderStore.ts               # currentPage only; cards/loadState come from TanStack cache
 │           │   └── binderStore.test.ts
 │           └── utils/                   # Pure functions only (Principle X)
 │               ├── pageMath.ts                  # page count derivation, slot indexing
@@ -231,6 +262,10 @@ my-binder/
 - **`expo-router`'s `useRouter()` and `<Redirect />`** are consumed only by hooks
   (`useLogin`, `useAccessDenied`, `useComingSoon`) and route layouts — never by views —
   preserving Principle X's view purity rule.
+- **`<QueryClientProvider />` placement**: mounted in `app/_layout.tsx` (Root Stack), above
+  the auth gate, so both public routes (`login`, `access-denied`) and the entire
+  authenticated subtree share one TanStack `QueryClient` instance. The QueryClient itself
+  is constructed in `src/services/api/queryClient.ts` and imported as a singleton.
 
 **Structure Decision**: Add `apps/mobile` as a new pnpm workspace alongside `apps/server`,
 following the existing monorepo conventions documented in CLAUDE.md and `pnpm-workspace.yaml`.
@@ -258,17 +293,21 @@ and `react-test-renderer` for snapshots. No Vitest, Mocha, or `node:test` (Princ
 |---|---|---|
 | `apps/mobile/src/components/login/useLogin.test.ts` | new | Tap-to-sign-in dispatches Google flow (FR-002, FR-003); successful auth stores JWT and navigates to BinderHome (US1.AS3); cancellation/outage surfaces retryable error and stays on Login (FR-004); allowlist 403 navigates to AccessDenied (FR-005, US1.AS5); already-authenticated launch skips login when session ≤ 7 days (FR-006, US1.AS6); sign-out path revokes Google grant and clears JWT (FR-008, US1.AS7). |
 | `apps/mobile/src/components/login/LoginView.test.tsx` | new | Renders the binder-themed background; renders exactly one "Sign in with Google" CTA; no username/password fields exist (FR-002); error banner renders when `errorMessage` prop is set; disables CTA while `isSigningIn` prop is true. |
-| `apps/mobile/src/components/binder-home/useBinderHome.test.ts` | new | Computes total page count from collection size (FR-013, SC-007); pages forward/backward within bounds (FR-012); empty-collection state shows page 1 of 1 with all slots empty (Edge Case + US2.AS3); current/total page indicator stays in sync (FR-014); never produces phantom cards on partial last page (Edge Case). |
+| `apps/mobile/src/components/binder-home/useBinderHome.test.ts` | new | Composes `useCardsInfiniteQuery` and `binderStore.currentPage`; computes total page count from collection size (FR-013, SC-007); pages forward/backward within bounds (FR-012); empty-collection state shows page 1 of 1 with all slots empty (Edge Case + US2.AS3); current/total page indicator stays in sync (FR-014); never produces phantom cards on partial last page (Edge Case); maps TanStack `isPending`/`isError`/`isFetching` flags into the view-prop shape. |
 | `apps/mobile/src/components/binder-home/BinderHomeView.test.tsx` | new | Renders 3×3 grid (FR-009); occupied slots render `expo-image` with the front-face URL (FR-010); empty slots render the empty-pocket visual variant (FR-011); previous/next controls fire `onPrev`/`onNext` props; page indicator string matches `currentPage / totalPages` (FR-014). |
 | `apps/mobile/src/components/access-denied/useAccessDenied.test.ts` | new | "Try a different account" handler invokes sign-out + navigates back to Login (FR-005); contact CTA opens the configured mailto/URL. |
 | `apps/mobile/src/components/access-denied/AccessDeniedView.test.tsx` | new | Renders the "access not yet granted" copy; renders contact CTA with the configured target. |
 | `apps/mobile/src/hooks/useSession.test.ts` | new | Hydrates from secure storage on first call; expires session after 7 days matching `SESSION_JWT_TTL_DAYS` from `@my-binder/core` (FR-006, FR-007); cleanup unsubscribes on unmount (Principle X cleanup rule). |
-| `apps/mobile/src/hooks/useApi.test.ts` | new | Attaches `Authorization: Bearer <jwt>` when session is valid; validates every response against the `@my-binder/core` schema and rejects malformed payloads (Principle VII); maps server 401 to "session expired" + clears local state; maps server 403 to "allowlist rejection" without clearing the Google grant. |
+| `apps/mobile/src/hooks/useCardsInfiniteQuery.test.ts` | new | Wraps TanStack `useInfiniteQuery` against `apiClient.getCards`; concatenates pages until `nextCursor === null` (matches `contracts/api-client.md` GET /cards behaviour); `staleTime` honours the configured value so a tab switch back to Binder does NOT trigger a re-fetch within the window; `enabled` is gated on `useSession().status === "active"` so it never fires for unauthenticated users; surfaces the union of all-page errors as a single `error` to the consumer; respects the global retry policy (3 attempts on 5xx/network, 0 attempts on 4xx). |
+| `apps/mobile/src/hooks/useMeQuery.test.ts` | new | Wraps TanStack `useQuery` against `apiClient.getMe`; runs on app start when a hydrated session exists (gated on `useSession().status === "active"`); on 401 the global `queryCache.onError` handler clears the local session and routes to Login; on 403 (`AUTH_NOT_ALLOWLISTED`) routes to AccessDenied without clearing the Google grant. |
+| `apps/mobile/src/hooks/useGoogleSignInMutation.test.ts` | new | Wraps TanStack `useMutation` against `apiClient.signInWithGoogle`; default `retry: 0` (no auto-retry on a sign-in mutation); on success persists the session via `sessionStorage` and updates `sessionStore`; on 401 (`AUTH_INVALID_GOOGLE_TOKEN`) surfaces a retryable error per FR-004 and stays on Login; on 403 routes to AccessDenied per FR-005. |
+| `apps/mobile/src/hooks/useSignOutMutation.test.ts` | new | Wraps TanStack `useMutation` against `apiClient.signOut`; runs the documented sign-out side-effect chain even when the server call fails (delete secure-store entries, revoke the Google grant, reset Zustand stores, **call `queryClient.clear()` so no per-user response data lingers in the TanStack cache**, navigate to Login per `contracts/api-client.md`); default `retry: 0`. |
 | `apps/mobile/src/services/auth/googleAuth.test.ts` | new | Wraps `expo-auth-session/providers/google` correctly; calls Google's revoke endpoint on sign-out (FR-008, US1.AS7); surfaces user-cancellation as a typed error (FR-004). |
 | `apps/mobile/src/services/auth/sessionStorage.test.ts` | new | Reads/writes the JWT via `expo-secure-store`; never falls back to `AsyncStorage`; clears storage on sign-out. |
-| `apps/mobile/src/services/api/apiClient.test.ts` | new | Sends requests against the configured base URL; serialises JSON; routes errors through Principle VIII patterns (log original before wrapping). |
+| `apps/mobile/src/services/api/apiClient.test.ts` | new | Typed methods (`getCards`, `getMe`, `signInWithGoogle`, `signOut`) send requests against the configured base URL; serialise JSON; attach `Authorization: Bearer <jwt>` from `sessionStore` when a valid session exists; validate every response against the `@my-binder/core` Ajv schema before resolving (Principle VII — Ajv runs **inside** the queryFn so an invalid payload throws before TanStack caches it); route errors through Principle VIII patterns (log original before wrapping in typed `ApiError`). |
+| `apps/mobile/src/services/api/queryClient.test.ts` | new | The exported `QueryClient` is a singleton with `defaultOptions.queries.retry = 3`, exponential `retryDelay` (1s, 2s, 4s, capped at 30s), `retryOnMount: false`, and `defaultOptions.mutations.retry = 0`; `retry` predicate skips 4xx (auth fails fast); `queryCache.onError` and `mutationCache.onError` route 401 (`AUTH_INVALID_TOKEN`) → clear session + navigate Login, 403 (`AUTH_NOT_ALLOWLISTED`) → navigate AccessDenied; `staleTime` defaults documented in `research.md` §11 are applied. |
 | `apps/mobile/src/stores/sessionStore.test.ts` | new | Setting/clearing the session triggers subscribers; selectors return stable references for the four-layer pattern (Zustand `subscribeWithSelector`). |
-| `apps/mobile/src/stores/binderStore.test.ts` | new | Initial page is 1; advancing past last page is a no-op; collection swap resets to page 1. |
+| `apps/mobile/src/stores/binderStore.test.ts` | new | Holds **only** `currentPage` (server state lives in TanStack); initial page is 1; `nextPage`/`prevPage` clamp at the bounds derived from `useCardsInfiniteQuery` totals; resetting on sign-out returns to page 1. |
 | `apps/mobile/src/utils/pageMath.test.ts` | new | `pageCount(0) === 1`, `pageCount(9) === 1`, `pageCount(10) === 2`, `pageCount(1000) === 112`; slot indexing for partial last pages (Edge Case). |
 | `apps/mobile/app/index.test.tsx` | new | Redirects to `/login` when no session is hydrated (FR-001, SC-006); redirects to `/binder` (resolved through `(authenticated)/(tabs)/binder.tsx`) when a valid ≤7-day session is hydrated (FR-006, US1.AS6). Uses `expo-router/testing-library`. |
 | `apps/mobile/app/(authenticated)/_layout.test.tsx` | new | Auth-gate layout: renders its child `<Stack />` for an authenticated user; renders `<Redirect href="/login" />` when `useSession()` returns `status !== "active"` (FR-001, SC-006). |
@@ -281,8 +320,9 @@ and `react-test-renderer` for snapshots. No Vitest, Mocha, or `node:test` (Princ
 
 Default project floor (80% lines, 80% branches, 80% functions, 80% statements) applies to
 **all new code** under `apps/mobile/src/`. Higher targets for the load-bearing hooks
-(`useLogin`, `useBinderHome`, `useSession`) — 95% lines / 90% branches — because they own
-all auth and pagination logic.
+(`useLogin`, `useBinderHome`, `useSession`) and for the data-fetch primitives
+(`apiClient`, `queryClient`, `useCardsInfiniteQuery`) — 95% lines / 90% branches — because
+they own all auth, pagination, retry, and cache-invalidation logic.
 
 ```jsonc
 // apps/mobile/jest.config.ts — coverageThreshold
@@ -291,7 +331,10 @@ all auth and pagination logic.
     "global": { "branches": 80, "functions": 80, "lines": 80, "statements": 80 },
     "apps/mobile/src/components/login/useLogin.ts":           { "branches": 90, "lines": 95 },
     "apps/mobile/src/components/binder-home/useBinderHome.ts": { "branches": 90, "lines": 95 },
-    "apps/mobile/src/hooks/useSession.ts":                     { "branches": 90, "lines": 95 }
+    "apps/mobile/src/hooks/useSession.ts":                     { "branches": 90, "lines": 95 },
+    "apps/mobile/src/hooks/useCardsInfiniteQuery.ts":          { "branches": 90, "lines": 95 },
+    "apps/mobile/src/services/api/apiClient.ts":               { "branches": 90, "lines": 95 },
+    "apps/mobile/src/services/api/queryClient.ts":             { "branches": 90, "lines": 95 }
   }
 }
 ```
