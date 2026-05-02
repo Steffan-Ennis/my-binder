@@ -19,7 +19,16 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [
+            { "scheme": "com.steffan87.mybinder", "path": "/oauthredirect" }
+          ]
+        }
+      ]
     },
     "web": {
       "output": "static",
@@ -41,7 +50,7 @@
       ]
     ],
     "experiments": {
-      "typedRoutes": true,
+      "typedRoutes": false,
       "reactCompiler": true
     }
   }

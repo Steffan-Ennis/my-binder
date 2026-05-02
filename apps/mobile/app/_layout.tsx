@@ -1,24 +1,27 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { Stack, useRouter } from 'expo-router';
+import { useEffect, type FC } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { queryClient, registerAuthErrorHandler } from '@src/services/api/queryClient';
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+
+const RootLayout: FC = () => {
+  const router = useRouter();
+  useEffect(() => {
+    registerAuthErrorHandler((kind) => {
+      if (kind === 'access_denied') router.replace('/access-denied');
+      else router.replace('/login');
+    });
+  }, [router]);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <StatusBar style="light" />
+      <Stack screenOptions={{ headerShown: false }} />
+    </QueryClientProvider>
   );
-}
+};
+
+export default RootLayout;
