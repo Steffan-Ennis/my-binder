@@ -72,7 +72,16 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T008 Configure error handling and logging infrastructure
 - [ ] T009 Setup environment configuration management
 
-**Checkpoint**: Foundation ready - user story implementation can now begin in parallel
+**Checkpoint**: Foundation ready — user story implementation can now begin in parallel.
+
+> **Phase completion validation gate (Constitution Principle III).** Before this
+> checkpoint is signed off, run `turbo test --filter=<workspace>` and
+> `turbo typecheck --filter=<workspace>` for every workspace touched in this phase.
+> **Both MUST exit 0 and the Jest suite MUST report a 100% pass rate.** Any
+> failing test MUST be investigated at root cause (bleeding state, leaky async,
+> fixture ordering, regression, real defect) and fixed in-place before the
+> checkpoint passes. `.skip` / `.todo` / quarantine / retry-until-green are
+> prohibited.
 
 ---
 
@@ -98,7 +107,13 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T016 [US1] Add validation and error handling
 - [ ] T017 [US1] Add logging for user story 1 operations
 
-**Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
+**Checkpoint**: User Story 1 fully functional and testable independently.
+
+> **Phase completion validation gate (Constitution Principle III).** Run
+> `turbo test --filter=<workspace>` and `turbo typecheck --filter=<workspace>`
+> for every workspace touched in US1. **Both MUST exit 0 and Jest MUST report
+> a 100% pass rate.** Any failure MUST be investigated at root cause before
+> moving to the next story.
 
 ---
 
@@ -120,7 +135,13 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T022 [US2] Implement [endpoint/feature] in src/[location]/[file].py
 - [ ] T023 [US2] Integrate with User Story 1 components (if needed)
 
-**Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
+**Checkpoint**: User Stories 1 AND 2 both work independently.
+
+> **Phase completion validation gate (Constitution Principle III).** Run
+> `turbo test --filter=<workspace>` and `turbo typecheck --filter=<workspace>`
+> for every workspace touched in US2. **Both MUST exit 0 and Jest MUST report
+> a 100% pass rate.** Any failure MUST be investigated at root cause before
+> moving to the next story.
 
 ---
 
@@ -141,7 +162,13 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T027 [US3] Implement [Service] in src/services/[service].py
 - [ ] T028 [US3] Implement [endpoint/feature] in src/[location]/[file].py
 
-**Checkpoint**: All user stories should now be independently functional
+**Checkpoint**: All user stories independently functional.
+
+> **Phase completion validation gate (Constitution Principle III).** Run
+> `turbo test` and `turbo typecheck` across **every** workspace touched by
+> US1+US2+US3. **Both MUST exit 0 and Jest MUST report a 100% pass rate.**
+> Any failure MUST be investigated at root cause before the Polish phase
+> begins.
 
 ---
 
@@ -251,4 +278,9 @@ With multiple developers:
 - Verify tests fail before implementing
 - Commit after each task or logical group
 - Stop at any checkpoint to validate story independently
+- **Phase completion validation gate (Principle III)**: every Checkpoint above
+  is gated on `turbo test` + `turbo typecheck` exiting 0 with a **100% Jest
+  pass rate** across the affected workspaces. Investigate every failure at
+  root cause (bleeding state, leaky async, fixture ordering, regression);
+  `.skip` / `.todo` / quarantine / retry-until-green are prohibited.
 - Avoid: vague tasks, same file conflicts, cross-story dependencies that break independence

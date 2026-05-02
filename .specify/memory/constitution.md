@@ -1,58 +1,69 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.13.1 → 1.13.2
-Bump type: PATCH — accommodates Expo Router's standard `app/` directory at the
-  workspace root. Refines the literal location of the Screen layer in Principle X
-  and the `apps/mobile` workspace src-layout declaration; the four-layer Screen →
-  Container → Hook → View *intent* is unchanged.
+Version change: 1.16.0 → 1.17.0
+Bump type: MINOR — materially expands Principle III (Test-First Development)
+  with a new sub-rule defining the **Phase completion validation gate**:
+  every phase declared in a feature's `tasks.md` (Setup, Foundational, each
+  User Story, Polish) MUST run the affected workspaces' full Jest suite and
+  report a 100% pass rate before the phase is marked complete. Failing
+  tests MUST be investigated at root cause — bleeding state, shared
+  modules, leaky timers, unawaited promises, fixture ordering — and fixed
+  in-place. Skip/`.todo`/quarantine/retry-until-green workarounds are
+  prohibited.
 
-  Locked-in decisions (changes from v1.13.1):
-    - Mobile routing: Expo Router 4 (file-based, built on @react-navigation/
-      native-stack 7). Routes live in `apps/mobile/app/` at the workspace root.
-    - Principle X "Screen" row: location updated from `src/screens/` to `app/`.
-    - apps/mobile workspace src layout: now `apps/mobile/{app,src/{components,
-      hooks,services,stores,utils}}/`. The `src/screens/` directory is removed;
-      `src/navigation/` is also unnecessary (Expo Router's `_layout.tsx` files
-      replace any imperative navigator).
-    - Switching away from Expo Router (e.g., back to imperative React Navigation
-      or to a different routing library) henceforth requires a fresh constitution
-      amendment.
+  The rule complements — it does not replace — the existing co-location,
+  Jest-only, and Unit Testing Phase rules already encoded in Principle III.
+  No principle is removed or redefined.
 
-Last amended: 2026-05-01
+Last amended: 2026-05-02
 
 Modified principles:
-  - X. Component Architecture (Mobile) — Screen-row location and example file paths
-    updated for Expo Router. The four-layer rule, container prop-passing rule, and
-    `useEffect` discipline are unchanged.
+  - III. Test-First Development — added the **Phase completion validation
+    gate** sub-section after the existing "Test co-location rule".
+    Per-workspace Jest preset table, Plan requirement, and co-location
+    rule are unchanged.
 
 Added sections / material expansions:
-  (none — Principle X's wording is refined, not expanded; the Technology Stack
-   `apps/mobile` workspace declaration is updated; no new principles or sections.)
+  - Principle III → "Phase completion validation gate" (new sub-section
+    with allowed/prohibited remediation patterns and rationale).
 
 Removed sections:
-  - Reference to `src/screens/` and `src/navigation/` in `apps/mobile`'s pinned
-    layout — replaced by `app/` (Expo Router convention).
+  (none)
 
 Templates reviewed:
-  ✅ .specify/templates/plan-template.md  — No change required.
+  ✅ .specify/templates/plan-template.md  — No change required (Unit
+     Testing Phase already enumerates test files; the gate runs them).
   ✅ .specify/templates/spec-template.md  — No change required.
-  ✅ .specify/templates/tasks-template.md — No change required.
-  ✅ CLAUDE.md — Already updated as part of spec 002's plan: Active Technologies
-     entry replaced "React Navigation 7 (native stack)" with "Expo Router 4
-     (file-based routing built on @react-navigation/native-stack 7)". Recent
-     Changes entry for spec 002 updated to reflect the routing pivot. No
-     further edits required.
+  ✅ .specify/templates/tasks-template.md — UPDATED: every "Checkpoint"
+     marker now explicitly cites the phase-completion validation gate
+     and references this principle.
+  ⚠ CLAUDE.md — No change required. Active Technologies and scripts
+     already cover `turbo test`; the gate is a process rule, not a
+     tooling change.
 
 Known violations to remediate (⚠ pending):
-  (none — `apps/mobile` has not yet been scaffolded.)
+  (none — this is a forward-looking process rule. It applies to phases
+  declared on or after 2026-05-02; previously-shipped phases are not
+  retroactively in breach.)
 
-Carry-over from 1.13.1 (unchanged):
-  ⚠ specs/001-server-architecture/plan.md — JSDoc → TypeScript migration. Unchanged.
-  ⚠ specs/004-card-data-provider/plan.md — JSDoc → TypeScript migration. Unchanged.
+Carry-over from 1.15.0 (unchanged):
+  ⚠ apps/mobile/package-lock.json — npm lockfile from the create-expo-app
+     bootstrap. MUST be deleted and the workspace re-resolved via
+     `pnpm install` before merge.
+  ⚠ apps/mobile/tsconfig.json — currently declares `paths: { "@/*": ["./*"] }`;
+     Principle VII requires `@root/*` and `@src/*` aliases.
+  ⚠ apps/mobile/hooks/{use-color-scheme.ts,use-color-scheme.web.ts,
+     use-theme-color.ts}, apps/mobile/scripts/reset-project.js,
+     apps/mobile/app/modal.tsx — leftover create-expo-app template files
+     outside the Principle X four-layer structure.
+
+Carry-over from 1.14.0 (unchanged):
+  ⚠ specs/001-server-architecture/plan.md — JSDoc → TypeScript migration.
+  ⚠ specs/004-card-data-provider/plan.md — JSDoc → TypeScript migration.
 
 Deferred TODOs:
-  (none — TODO(MOBILE_PLATFORM) was fully resolved in v1.13.1.)
+  (none)
 -->
 
 # my-binder Constitution
@@ -91,8 +102,9 @@ identical everywhere.
 The per-workspace Jest presets are pinned as follows:
 
 - **`apps/server`**: `ts-jest` (Node test environment).
-- **`apps/mobile`**: **`jest-expo`** preset, with **`@testing-library/react-native` 12.x**
-  for view rendering and `renderHook` for hook tests.
+- **`apps/mobile`**: **`jest-expo`** preset (SDK 54-compatible release), with
+  **`@testing-library/react-native` 13.x** for view rendering and `renderHook` for hook
+  tests.
 - **`packages/core`**: `ts-jest` (Node test environment); pure TypeScript module under test.
 
 Switching any of the above to a different preset or test library requires a fresh
@@ -124,6 +136,75 @@ the per-workspace tooling drift (separate matchers, separate mocks, separate cov
 formats) that accumulates when each package picks its own framework. Requiring an explicit
 Unit Testing Phase in every plan makes the test surface visible at design time rather than
 at implementation time, when scope creep has already happened.
+
+**Phase completion validation gate**: every phase declared in a feature's
+`tasks.md` (Setup, Foundational, each User Story, and Polish) MUST be validated by
+running the affected workspaces' full Jest suite **and reporting a 100% pass rate**
+before the phase is marked complete. The phase's "Checkpoint" line in `tasks.md` is
+not satisfied until:
+
+```bash
+turbo test --filter=<workspace>      # MUST exit 0 — every test passing
+turbo typecheck --filter=<workspace> # MUST exit 0
+```
+
+…both succeed across every workspace touched by the phase. A phase that finishes
+with even one failing test is incomplete by definition.
+
+A failing test MUST be treated as a signal, not a nuisance, and MUST be investigated
+at root cause before the phase advances. Common, non-exhaustive root causes that the
+investigator MUST rule out:
+
+- **Bleeding state** between tests — a shared module, a process-level singleton, a
+  store left mutated by a previous test, a Jest module-cache survivor, a Zustand
+  store with no `beforeEach` reset.
+- **Leaky async work** — unawaited promises, timers/intervals not cleaned up,
+  subscriptions not unsubscribed, fetches still in flight when the test exits.
+- **Fixture ordering** — tests passing only when run in a specific order, or only
+  when run in isolation; usually a symptom of bleeding state.
+- **Real defects** — the test is correctly catching a regression in code under
+  test, or surfacing a pre-existing bug that was previously masked.
+- **Test-environment issues** — `jest-expo` / `ts-jest` config drift, mock
+  hoisting bugs, transformer order, Node version mismatch.
+
+The acceptable remediations are:
+
+- **Fix the regression** in the code under test if the failure is correct.
+- **Fix the test** if the assertion no longer matches the corrected behaviour.
+- **Fix the bleed** at source — add a `beforeEach` reset, a shared `afterAll`
+  cleanup, a fresh `QueryClient` per test, a `jest.resetModules()`, or
+  whatever isolates the failing test from its predecessors.
+- **Open a follow-up task and skip the phase exit** if the failure exposes a
+  real defect that is genuinely out of scope for the current phase. The phase
+  cannot exit while the test is red — it MUST be either fixed in this phase
+  or rewritten to assert the corrected (already-shipped) behaviour. Carving
+  the bug out into a separate, tracked work item is allowed; advancing past
+  it with a still-failing assertion is not.
+
+The prohibited remediations are:
+
+- `it.skip(...)` / `it.todo(...)` / `xit(...)` / `describe.skip(...)` to silence
+  the failure.
+- Quarantining the test into a separate "flaky" suite that is excluded from
+  the phase gate.
+- Re-running until green ("flaky test, will retry") — a non-deterministic
+  test is a defect, not a fact of life.
+- Adding `setTimeout` / `await sleep(N)` to mask a race condition rather than
+  awaiting the actual signal.
+- Wrapping the assertion in `try { expect(...) } catch {}` or downgrading
+  `expect` to `console.warn`.
+- Lowering coverage thresholds to make the phase pass.
+
+Rationale: the moment a single failing test is allowed past a phase boundary,
+every subsequent phase inherits a degraded signal — "is this test failure new,
+or was it already failing?" becomes ambiguous, and bisecting a regression
+across multiple phases costs hours that the gate was supposed to save. State
+bleeding is the most common and most pernicious cause of intermittent failures;
+the bleed is always present, and "passes when re-run" only means the bleed
+happens to clear in time on the second run. Treating every failure as a
+must-fix root-cause investigation keeps test signal trustworthy and prevents
+the gradual accumulation of `.skip`-blocks that turn a green CI badge into a
+lie.
 
 ### IV. Single Responsibility
 
@@ -360,14 +441,15 @@ apps/mobile/src/components/<feature-name>/
 Screens (Expo Router route files) live under `apps/mobile/app/` at the workspace root.
 Each route file is a navigation entry point only — it MUST render exactly one container
 and contain no other logic. The default export MUST be a function component with no
-local state:
+local state, declared per the Component declaration rule below:
 
 ```tsx
 // apps/mobile/app/login.tsx
+import { FC } from 'react';
 import { LoginContainer } from '@src/components/login/LoginContainer';
-export default function Login() {
-  return <LoginContainer />;
-}
+
+const Login: FC = () => <LoginContainer />;
+export default Login;
 ```
 
 Layout files (`apps/mobile/app/**/_layout.tsx`) are permitted to declare the route
@@ -390,6 +472,101 @@ requiring justification in the relevant plan's Complexity Tracking table.
 | View | `src/components/<feature>/<Feature>View.tsx` | Pure JSX rendering of received props; presentational only | Store imports, service imports, navigation imports, `Alert`, `useState`, `useEffect`, `useReducer` |
 | Shared hook | `src/hooks/` | Cross-feature hooks (e.g. `useInference`) | JSX |
 | Utility | `src/utils/` | Pure functions (format, parse, math) | React, hooks, JSX, side effects |
+
+**Component declaration rule.** Every functional React component in `apps/mobile`
+— Screen, Container, and View — MUST be declared as a `const` arrow function
+typed with React's `FC` generic from `react`. Components that render
+`children` MUST use `FC<PropsWithChildren<...>>` (importing
+`PropsWithChildren` from `react`). Bare-function declarations
+(`function Foo(props: FooProps) { ... }`), untyped arrow components
+(`const Foo = (props) => ...`), and ad-hoc `JSX.Element` return-type
+annotations on plain functions are prohibited.
+
+The compliant patterns are:
+
+```tsx
+// REQUIRED — component without children
+import { FC } from 'react';
+
+type CardTileProps = {
+  title: string;
+  onPress: () => void;
+};
+
+const CardTile: FC<CardTileProps> = ({ title, onPress }) => (
+  <Pressable onPress={onPress}>
+    <Text>{title}</Text>
+  </Pressable>
+);
+
+export { CardTile };
+
+// REQUIRED — component that renders children
+import { FC, PropsWithChildren } from 'react';
+
+type ScreenFrameProps = {
+  variant: 'light' | 'dark';
+};
+
+const ScreenFrame: FC<PropsWithChildren<ScreenFrameProps>> = ({ variant, children }) => (
+  <View style={styles[variant]}>{children}</View>
+);
+
+export { ScreenFrame };
+
+// REQUIRED — Screen-layer component with no props
+import { FC } from 'react';
+
+const Login: FC = () => <LoginContainer />;
+export default Login;
+```
+
+The prohibited patterns are:
+
+```tsx
+// PROHIBITED — bare function declaration, no FC annotation
+function CardTile({ title, onPress }: CardTileProps) {
+  return <Pressable onPress={onPress}><Text>{title}</Text></Pressable>;
+}
+
+// PROHIBITED — untyped arrow component
+const CardTile = ({ title, onPress }) => (
+  <Pressable onPress={onPress}><Text>{title}</Text></Pressable>
+);
+
+// PROHIBITED — manual JSX.Element annotation in place of FC
+const CardTile = ({ title, onPress }: CardTileProps): JSX.Element => (
+  <Pressable onPress={onPress}><Text>{title}</Text></Pressable>
+);
+
+// PROHIBITED — children inlined into the props type instead of PropsWithChildren
+type ScreenFrameProps = {
+  variant: 'light' | 'dark';
+  children: React.ReactNode;
+};
+const ScreenFrame: FC<ScreenFrameProps> = ({ variant, children }) => (
+  <View style={styles[variant]}>{children}</View>
+);
+```
+
+Props types MUST follow the `type <Component>Props = { ... }` shape (consistent
+with Principle VII's `type` over `interface` rule), MUST live in the same file
+as the component they describe, and MUST be named with the literal suffix
+`Props` so that `tsc` errors and IDE rename actions stay greppable.
+Components without props MUST simply use `FC` without a generic argument
+(`const Login: FC = () => ...`); explicit empty-object generics
+(`FC<{}>`, `FC<Record<string, never>>`) are not required and add noise.
+
+Rationale: `FC` is the contract surface React's type system already provides
+for "this is a component, not just a function that returns JSX." Pinning every
+component to that contract gives the codebase a single, greppable shape, makes
+the children boundary explicit (PropsWithChildren is a positive declaration
+rather than a stray `children` field that may or may not be honoured), and
+keeps display names attached for React DevTools without requiring per-component
+`.displayName` assignments. Restricting prop types to the `<Component>Props`
+naming convention means a type-error message naming `LoginViewProps` always
+points at exactly one file, keeping refactor blast radius proportional to the
+component being changed.
 
 **Container prop-passing rule.** Containers MUST explicitly destructure the hook
 result and pass individual named props to the view. Spread operators applied to a
@@ -414,6 +591,87 @@ Spreading hides the contract between the hook and the view. When the hook adds a
 field, a spread silently passes it through; when the hook removes a field, the view
 breaks at runtime instead of at `tsc` time. Named props make the data flow visible
 at the call site and let TypeScript catch every drift.
+
+**Hook return-value memoisation rule.** Every non-primitive value produced inside
+an `apps/mobile` hook (any file under `apps/mobile/src/components/<feature>/
+use<Feature>.ts` or `apps/mobile/src/hooks/`) MUST be memoised before it is
+returned, passed to a child component, or used as a dependency of another hook.
+
+- **Functions** (event handlers, callbacks, factory functions) MUST be wrapped in
+  `useCallback` with an exhaustive dependency array.
+- **Objects, arrays, class instances, and any other non-primitive value** MUST be
+  wrapped in `useMemo` with an exhaustive dependency array.
+- **Primitives** — `string`, `number`, `boolean`, `null`, `undefined`, `bigint`,
+  `symbol` — are exempt. Their values are compared by value, so a fresh primitive
+  per render is identity-stable when the underlying data is unchanged.
+
+The rule applies regardless of whether the value is returned from the hook,
+captured in a closure, or passed downward. Values read directly from a Zustand
+selector or TanStack Query result are already reference-stable and do not need
+re-wrapping; values *derived* from them (e.g., `data.map(transform)`,
+`{ ...query.data, foo }`, `() => mutation.mutate(arg)`) MUST be memoised at the
+hook boundary.
+
+The compliant patterns are:
+
+```ts
+// REQUIRED — function wrapped in useCallback
+import { useCallback, useMemo } from 'react';
+
+const useBinderHome = () => {
+  const currentPage = useBinderStore((s) => s.currentPage);             // primitive — exempt
+  const cards = useCardsInfiniteQuery();                                 // query result — already stable
+
+  const visibleCards = useMemo(
+    () => cards.data?.pages.flatMap((p) => p.items) ?? [],
+    [cards.data],
+  );                                                                     // derived array — useMemo
+
+  const handleSwipeRight = useCallback(() => {
+    useBinderStore.getState().setCurrentPage(currentPage + 1);
+  }, [currentPage]);                                                     // function — useCallback
+
+  return { currentPage, visibleCards, handleSwipeRight };
+};
+```
+
+The prohibited patterns are:
+
+```ts
+// PROHIBITED — fresh function reference every render breaks React.memo
+//              on the view and re-fires every downstream useEffect.
+const useBinderHome = () => {
+  const handleSwipeRight = () => {
+    /* ... */
+  };
+  return { handleSwipeRight };
+};
+
+// PROHIBITED — fresh array literal every render; the view's FlatList
+//              re-keys every row even when `data` is unchanged.
+const useBinderHome = () => {
+  const cards = useCardsInfiniteQuery();
+  return { visibleCards: cards.data?.pages.flatMap((p) => p.items) ?? [] };
+};
+
+// PROHIBITED — fresh object literal every render forces every consumer
+//              that depends on `config` to recompute.
+const useBinderHome = () => {
+  return { config: { columns: 3, rows: 3 } };
+};
+```
+
+Rationale: React compares non-primitive values by reference. A new function,
+object, or array on every render forces every consumer to re-render even when
+the underlying data has not changed, breaks `React.memo` on the view layer,
+breaks the dependency arrays of downstream `useEffect` / `useMemo` /
+`useCallback` (turning them into "fire every render" hazards), and amplifies
+cost across the four-layer split. Memoising at the hook boundary makes the
+hook→container→view contract reference-stable by construction and lets the
+`react-hooks/exhaustive-deps` lint rule verify that every dependency is
+declared. This rule pairs with the **Container prop-passing rule** above —
+named props plus stable references give the view a contract the type system
+*and* the React reconciler can both rely on.
 
 **`useEffect` usage discipline.** `useEffect` is an escape hatch for synchronising
 React state with **external systems** (browser/native APIs, subscriptions, network
@@ -492,15 +750,23 @@ my-binder/                     # Repo root (private — not published)
   runs on Node 22. Depends on `packages/core`. Node built-ins are preferred over third-party
   packages. Deployed as a Docker container. `tsconfig.json` MUST enable `strict: true`.
 - **`apps/mobile`**: TypeScript mobile application targeting iOS 15.1+ and Android API 24+.
-  Depends on `packages/core`. `tsconfig.json` MUST enable `strict: true`. Framework:
-  **React Native 0.76 + Expo SDK 52** (managed workflow). Routing: **Expo Router 4**
-  (file-based, built on `@react-navigation/native-stack` 7) — routes live in
-  `apps/mobile/app/` at the workspace root. Store artifacts are produced via EAS Build.
-  Test stack: Jest 30 + `jest-expo` preset + `@testing-library/react-native` 12.x (per
-  Principle III). The workspace layout MUST follow Principle X:
-  `apps/mobile/{app,src/{components,hooks,services,stores,utils}}/`. Switching the
-  framework, routing library, Jest preset, or view-test library requires a constitution
-  amendment.
+  Depends on `packages/core`. `tsconfig.json` MUST enable `strict: true` and declare the
+  `@root/*` + `@src/*` path aliases (Principle VII). Framework: **React Native 0.81.5 +
+  Expo SDK ~54.0** (managed workflow) on **React 19.1**. Language: **TypeScript ~5.9**.
+  Routing: **Expo Router ~6.0** (file-based, built on `@react-navigation/native-stack` 7
+  + `@react-navigation/bottom-tabs` 7) — routes live in `apps/mobile/app/` at the
+  workspace root. Store artifacts are produced via EAS Build. Test stack: Jest 30 +
+  `jest-expo` preset + `@testing-library/react-native` 13.x (per Principle III). The
+  workspace layout MUST follow Principle X:
+  `apps/mobile/{app,src/{components,hooks,services,stores,utils}}/`. The
+  `npx create-expo-app` bootstrap additionally produces template directories
+  (`assets/`, `constants/`, `hooks/`, `scripts/`) and an `eslint.config.js` flat
+  config at the workspace root; `assets/` and `constants/theme.ts` are sanctioned to
+  stay (the design tokens live in `constants/theme.ts`); the rest MUST be merged into
+  `src/` per Principle X or deleted. Package manager: **pnpm only** — any
+  `package-lock.json` produced by the bootstrap MUST be deleted before merge.
+  Switching the framework, routing library, Jest preset, or view-test library
+  requires a constitution amendment.
 - **`packages/core`**: Shared TypeScript code consumed by both apps. Contains: TypeScript
   interfaces and types, JSON Schema constants (Principle VII), and named constants (error
   codes, status values). MUST NOT contain application-specific business logic. MUST NOT
@@ -597,4 +863,4 @@ Each feature plan MUST include a Constitution Check (as defined in
 `.specify/templates/plan-template.md`) verifying compliance with all ten principles before
 implementation begins. Violations MUST be justified in the plan's Complexity Tracking table.
 
-**Version**: 1.13.2 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-01
+**Version**: 1.17.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-02

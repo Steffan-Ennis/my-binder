@@ -15,21 +15,27 @@ Deliver a Google-signed-in personal binder mobile app on iOS and Android. Two us
 ship: (US1) Sign in with Google as the only authentication path with a 7-day session and
 allowlist-gated access; (US2) browse the user's collection in a 3×3 binder-page grid with
 forward/back navigation. Built as `apps/mobile` in the existing pnpm + Turborepo monorepo,
-TypeScript strict, **React Native + Expo SDK 52** (resolved from Phase 0 research; see
-[research.md](./research.md)), Jest + jest-expo for tests (Principle III), and the four-layer
+TypeScript strict, **React Native 0.81.5 + Expo SDK ~54.0** on **React 19.1** (re-pinned at
+constitution v1.15.0 — supersedes the original SDK 52 / RN 0.76 plan after the first
+implementation attempt was abandoned and the workspace re-bootstrapped via
+`npx create-expo-app`), Jest + jest-expo for tests (Principle III), and the four-layer
 Screen → Container → Hook → View component architecture (Principle X) from day one.
 
 ## Technical Context
 
-**Language/Version**: TypeScript 5.7 (`strict: true`), Node 22 (build/test toolchain only)
-**Primary Dependencies**: React Native 0.76 + Expo SDK 52, **Expo Router 4** (file-based
-routing built on React Navigation 7 — picked for its forward-scaling story as the screen
+**Language/Version**: TypeScript ~5.9 (`strict: true`), Node 22 (build/test toolchain only)
+**Primary Dependencies**: React Native 0.81.5 + Expo SDK ~54.0 on React 19.1.0, **Expo
+Router ~6.0** (file-based routing built on `@react-navigation/native-stack` 7 +
+`@react-navigation/bottom-tabs` 7 — picked for its forward-scaling story as the screen
 count grows beyond the initial three), **TanStack Query 5** (`@tanstack/react-query@5`,
 the **server-state layer** — caching, request deduplication, and the exponential-back-off
 retry policy that motivated this dependency choice; see [research.md §11](./research.md#11-server-state-management-tanstack-query)),
 Zustand 5 (UI/auth state — sessions and `currentPage` only; server data lives in the
 TanStack cache), `expo-auth-session` (Google OAuth), `expo-secure-store` (session JWT),
-`expo-image` (caching + lazy loading), `@expo/vector-icons` (tab-bar glyphs for
+`expo-image@~3.0` (caching + lazy loading; bundled with SDK 54), `react-native-reanimated@~4.1`
++ `react-native-worklets@0.5` (UI thread animations on RN 0.81's New Architecture; bootstrap
+shipped both — neither is required by US1/US2 but they remain installed for the binder
+page-turn animation that lands in this spec), `@expo/vector-icons` (tab-bar glyphs for
 Binder/Search/Scan/Profile per the v3 wireframe), `ajv` (response validation per Principle
 VII — runs inside every TanStack `queryFn` before results enter the cache), `@my-binder/core`
 (shared types and schemas). Dev-only: `@tanstack/react-query-devtools` for inspecting the
@@ -46,10 +52,10 @@ cache during development.
 - No SQLite/MMKV/Realm in this feature; all card data is fetched from the server on demand
   and held in the TanStack cache for the lifetime of the app process.
 
-**Testing**: Jest 30 + ts-jest + `jest-expo` preset + `@testing-library/react-native` 12.
-Co-located `.test.ts(x)` files per Principle III. E2E (Detox/Maestro) deferred to a later
-spec — out of scope here.
-**Target Platform**: iOS 15.1+ and Android API 24+ (Expo SDK 52 minimums).
+**Testing**: Jest 30 + ts-jest + `jest-expo` preset (SDK 54-compatible release) +
+`@testing-library/react-native` 13. Co-located `.test.ts(x)` files per Principle III.
+E2E (Detox/Maestro) deferred to a later spec — out of scope here.
+**Target Platform**: iOS 15.1+ and Android API 24+ (Expo SDK 54 minimums).
 **Project Type**: Mobile app workspace inside an existing pnpm + Turborepo monorepo.
 **Performance Goals**:
 - Cold-start to login screen: <2s on a mid-range device (mapped to SC-002).
@@ -95,12 +101,24 @@ Navigation shape (per the v3 wireframe):
 
 None remaining. All gates cleared:
 
-- **Mobile framework gate** — cleared by constitution v1.13.1 (React Native 0.76 + Expo
-  SDK 52, jest-expo, @testing-library/react-native 12).
+- **Mobile framework gate** — re-cleared by constitution v1.15.0 (React Native 0.81.5 +
+  Expo SDK ~54.0 on React 19.1, jest-expo, @testing-library/react-native 13).
+  Supersedes the v1.13.1 pin to RN 0.76 / SDK 52, which was abandoned after the first
+  implementation attempt; see `spec.md` Clarifications §2026-05-02.
 - **Layout gate** — cleared by constitution v1.13.2 (Principle X's Screen row now points
   to `apps/mobile/app/**/*.tsx`; the `apps/mobile` workspace layout in Technology Stack
   is now `{app,src/{components,hooks,services,stores,utils}}/`; a Layout row was added
-  to the layer-rules table covering Expo Router `_layout.tsx` files).
+  to the layer-rules table covering Expo Router `_layout.tsx` files). The same rule
+  applies to Expo Router 6 — file-based routing and `_layout.tsx` semantics are
+  upward-compatible.
+- **Component declaration gate** — cleared by constitution v1.14.0 (every functional
+  React component declared as `const Foo: FC<FooProps> = ...` or
+  `FC<PropsWithChildren<FooProps>>`).
+- **Hook return-value memoisation gate** — cleared by constitution v1.16.0 (every
+  non-primitive returned by a feature hook or cross-feature hook in
+  `apps/mobile/src/components/<feature>/use<Feature>.ts` or
+  `apps/mobile/src/hooks/` MUST be wrapped in `useCallback` (functions) or
+  `useMemo` (objects/arrays/instances) with exhaustive deps).
 
 ## Constitution Check
 
@@ -110,19 +128,21 @@ None remaining. All gates cleared:
 |---|---|---|---|
 | I | Simplicity First | ✅ PASS | Two screens, one shared hook layer, no SQLite, no offline mode, no extra abstractions beyond the constitution-mandated four-layer split. |
 | II | Data Integrity | ✅ PASS | Card data is read-only from the server; no local writes that affect server state. Session JWT is the only persisted datum and lives in OS-secured storage. |
-| III | Test-First Development | ✅ PASS | Unit Testing Phase below enumerates Jest test files. `jest-expo` preset declared (the framework-specific Jest preset called for in the constitution's `MOBILE_PLATFORM` TODO). Co-location rule enforced. |
+| III | Test-First Development | ✅ PASS | Unit Testing Phase below enumerates Jest test files. `jest-expo` preset (SDK 54-compatible release) + `@testing-library/react-native` 13 declared per constitution v1.15.0 Principle III. Co-location rule enforced. |
 | IV | Single Responsibility | ✅ PASS | Each feature owns container/hook/view; api client, auth client, secure storage are separate single-purpose modules. |
 | V | Transparency & Legibility | ✅ PASS | No magic literals (Google client IDs and revoke URL pulled from env via `expo-constants`); identifiers describe intent. |
 | VI | Layered Architecture | ✅ PASS | Mobile → API server only. Mobile MUST NOT call MTGJSON, the database, or AWS Secrets Manager. Auth and card requests both go through the existing server endpoints. |
 | VII | Strong Typing & Schema Validation | ✅ PASS | TS strict + Ajv validation on every inbound API response, performed inside the TanStack `queryFn` in `apiClient.ts` so the cache only ever stores schema-validated payloads. Shared schemas re-used from `@my-binder/core`. Path aliases `@root/*` and `@src/*` declared in `apps/mobile/tsconfig.json`. `type` over `interface` for all new types. TanStack Query hooks are typed end-to-end via the `queryFn` return type. |
 | VIII | Error Transparency | ✅ PASS | Every caught error is either re-thrown or logged + surfaced to the user via the auth/api error boundary. TanStack `queryFn`s log original errors before throwing the typed `ApiError` that downstream hooks/views consume; the QueryClient's global `queryCache.onError` and `mutationCache.onError` route 401s to session-clear+Login without swallowing the original cause. No silent swallows in any of the new code paths. |
 | IX | Public API Discipline | ✅ PASS | Services in `apps/mobile/src/services/` (`apiClient`, `queryClient`, `authClient`, `secureStorage`) and the cross-feature TanStack hooks in `apps/mobile/src/hooks/` (`useCardsInfiniteQuery`, `useMeQuery`, `useGoogleSignInMutation`, `useSignOutMutation`) carry full JSDoc with `@example` blocks. `index.ts` files in each services subdirectory are pure barrels. |
-| X | Component Architecture (Mobile) | ✅ PASS | Every UI feature uses Screen → Container → Hook → View per constitution v1.13.2. Route files in `apps/mobile/app/` are the Screen layer (one-line shells); `_layout.tsx` files are the Layout layer (route hierarchy + auth gates only, plus `<QueryClientProvider />` at the Root Stack). Containers destructure hook results — including TanStack Query/Mutation results — and pass named props (no spread). Views never call `useQuery`/`useMutation` directly; those calls live in feature hooks (`useLogin`, `useBinderHome`) which compose the cross-feature TanStack hooks (`useCardsInfiniteQuery`, etc.). `useEffect` is restricted to legitimate external-system cases (secure-storage hydration on app start, Google auth-session result events) with cleanup and exhaustive deps; no `useEffect` is added for data fetching since TanStack Query owns that lifecycle. |
+| X | Component Architecture (Mobile) | ✅ PASS | Every UI feature uses Screen → Container → Hook → View per constitution v1.13.2 (layout rule), v1.14.0 (Component declaration rule — `const Foo: FC<FooProps> = ...` / `FC<PropsWithChildren<FooProps>>`), and v1.16.0 (Hook return-value memoisation rule — every non-primitive returned by a feature hook or cross-feature hook is wrapped in `useCallback` (functions) or `useMemo` (objects/arrays/instances) with exhaustive deps). Route files in `apps/mobile/app/` are the Screen layer (one-line shells); `_layout.tsx` files are the Layout layer (route hierarchy + auth gates only, plus `<QueryClientProvider />` at the Root Stack). Containers destructure hook results — including TanStack Query/Mutation results — and pass named props (no spread). Views never call `useQuery`/`useMutation` directly; those calls live in feature hooks (`useLogin`, `useBinderHome`) which compose the cross-feature TanStack hooks (`useCardsInfiniteQuery`, etc.). `useEffect` is restricted to legitimate external-system cases (secure-storage hydration on app start, Google auth-session result events) with cleanup and exhaustive deps; no `useEffect` is added for data fetching since TanStack Query owns that lifecycle. |
 
 **Pre-implementation gates**: All cleared.
 
-- ✅ Mobile framework adoption — cleared by constitution v1.13.1.
+- ✅ Mobile framework adoption — re-cleared by constitution v1.15.0 (SDK 54 / RN 0.81.5 / React 19.1 / Expo Router 6 / TS 5.9). Supersedes v1.13.1's SDK 52 pin.
 - ✅ Expo Router layout alignment — cleared by constitution v1.13.2.
+- ✅ FC / PropsWithChildren typing rule — cleared by constitution v1.14.0.
+- ✅ Hook return-value memoisation rule — cleared by constitution v1.16.0.
 
 `/speckit.implement` is now unblocked.
 
@@ -147,8 +167,8 @@ specs/002-mobile-binder-app/
 my-binder/
 ├── apps/
 │   ├── server/                          # @my-binder/server — existing, unchanged
-│   └── mobile/                          # @my-binder/mobile — NEW workspace (Expo Router)
-│       ├── app/                         # Expo Router routes — file = route (file-based)
+│   └── mobile/                          # @my-binder/mobile — bootstrap by `npx create-expo-app` on SDK 54
+│       ├── app/                         # Expo Router 6 routes — file = route (file-based)
 │       │   ├── _layout.tsx                      # Root Stack: providers, error boundary, theme
 │       │   ├── index.tsx                        # Entry route: <Redirect /> based on session
 │       │   ├── login.tsx                        # PUBLIC route — renders <LoginContainer />
@@ -161,11 +181,17 @@ my-binder/
 │       │           ├── search.tsx               # STUB — renders <ComingSoonContainer feature="search" />
 │       │           ├── scan.tsx                 # STUB — renders <ComingSoonContainer feature="scan" />
 │       │           └── profile.tsx              # STUB — renders <ComingSoonContainer feature="profile" />
-│       ├── app.json                     # Expo config (slug, scheme, icon, splash, scheme for deep links)
-│       ├── babel.config.js              # babel-preset-expo (includes expo-router/babel)
-│       ├── jest.config.ts               # preset: 'jest-expo', co-located testMatch
-│       ├── tsconfig.json                # strict: true, paths @root/* and @src/*; extends expo/tsconfig.base
-│       ├── package.json                 # name: @my-binder/mobile, "main": "expo-router/entry"
+│       ├── assets/                      # Bootstrap-supplied; will house custom fonts (Playfair Display) when expo-font lands
+│       ├── constants/
+│       │   └── theme.ts                 # Wireframe v3 design tokens: Colors, Type, Spacing, Radius, Elevation, Motion (already populated)
+│       ├── app.json                     # Expo config (slug, scheme, icon, splash; bootstrap-supplied)
+│       ├── eslint.config.js             # ESLint flat config (bootstrap-supplied; extend eslint-config-expo + react-hooks/exhaustive-deps)
+│       ├── jest.config.ts               # preset: 'jest-expo' (SDK 54), co-located testMatch — TO ADD
+│       ├── jest.setup.ts                # @testing-library/react-native + mocks for expo-secure-store/expo-auth-session/expo-router — TO ADD
+│       ├── app.config.ts                # env loading via expo-constants extra (API_BASE_URL, GOOGLE_*_CLIENT_ID) — TO ADD
+│       ├── tsconfig.json                # strict: true, paths @root/* and @src/* — bootstrap declared @/* and MUST be rewritten
+│       ├── expo-env.d.ts                # Expo type augmentation (bootstrap-supplied)
+│       ├── package.json                 # name: @my-binder/mobile, "main": "expo-router/entry" — bootstrap-supplied; needs scripts cleanup + missing dep installs
 │       └── src/
 │           ├── components/              # Feature components — four-layer split per Principle X
 │           │   ├── login/
@@ -228,7 +254,7 @@ my-binder/
     └── core/                            # existing — mobile imports schemas/types from here
 ```
 
-**Routing model (Expo Router 4)**:
+**Routing model (Expo Router 6)**:
 
 - **File-based routing** — every file under `apps/mobile/app/` is a route. Adding a screen
   means creating a new file, no central navigator file to edit. This is the scaling
@@ -267,15 +293,21 @@ my-binder/
   authenticated subtree share one TanStack `QueryClient` instance. The QueryClient itself
   is constructed in `src/services/api/queryClient.ts` and imported as a singleton.
 
-**Structure Decision**: Add `apps/mobile` as a new pnpm workspace alongside `apps/server`,
-following the existing monorepo conventions documented in CLAUDE.md and `pnpm-workspace.yaml`.
-Internal layout follows **Expo Router conventions**: routes live in `apps/mobile/app/` at
-the workspace root (file = route), and the four-layer feature code lives in
-`apps/mobile/src/{components,hooks,services,stores,utils}/`. Navigation is a three-level
-hierarchy — Root Stack → authenticated Stack (auth gate) → bottom Tab navigator with the
-four wireframe tabs — built entirely from Expo Router `_layout.tsx` files. Principle X's
-four-layer intent is preserved at every route file. Tests are co-located per Principle III
-with no top-level `tests/` directory.
+**Structure Decision**: `apps/mobile` exists as a pnpm workspace alongside `apps/server`
+(re-bootstrapped 2026-05-02 via `npx create-expo-app` on Expo SDK 54). The bootstrap
+already populated `app/_layout.tsx`, `app.json`, `tsconfig.json`, `eslint.config.js`,
+`expo-env.d.ts`, and `assets/`; the wireframe v3 design tokens were laid into
+`constants/theme.ts` the same day. Remaining bootstrap cleanup (delete `package-lock.json`
+in favour of pnpm; rewrite `tsconfig.json` `paths` from `@/*` to `@root/*` + `@src/*`;
+delete the leftover template files `app/modal.tsx`, `hooks/use-color-scheme*.ts`,
+`hooks/use-theme-color.ts`, `scripts/reset-project.js`) is enumerated as Phase 1 tasks
+in `tasks.md`. Internal layout follows **Expo Router 6 conventions**: routes live in
+`apps/mobile/app/` at the workspace root (file = route), and the four-layer feature
+code lives in `apps/mobile/src/{components,hooks,services,stores,utils}/`. Navigation
+is a three-level hierarchy — Root Stack → authenticated Stack (auth gate) → bottom
+Tab navigator with the four wireframe tabs — built entirely from Expo Router
+`_layout.tsx` files. Principle X's four-layer intent is preserved at every route file.
+Tests are co-located per Principle III with no top-level `tests/` directory.
 
 ## Unit Testing Phase
 
@@ -283,9 +315,10 @@ with no top-level `tests/` directory.
 without a completed Unit Testing Phase MUST NOT proceed to task generation
 (`/speckit.tasks`).*
 
-**Test framework**: Jest 30 with `ts-jest` for TypeScript and the `jest-expo` preset for
-React Native runtime/asset handling. `@testing-library/react-native` 12 for view rendering
-and `react-test-renderer` for snapshots. No Vitest, Mocha, or `node:test` (Principle III).
+**Test framework**: Jest 30 with `ts-jest` for TypeScript and the `jest-expo` preset
+(SDK 54-compatible release) for React Native runtime/asset handling.
+`@testing-library/react-native` 13 for view rendering and `react-test-renderer` for
+snapshots. No Vitest, Mocha, or `node:test` (Principle III).
 
 ### Test files to create or update
 
@@ -354,5 +387,12 @@ they own all auth, pagination, retry, and cache-invalidation logic.
 > **Fill ONLY if Constitution Check has violations that must be justified**
 
 No violations. Constitution v1.13.2 aligned Principle X with Expo Router conventions
-(routes under `apps/mobile/app/`, `_layout.tsx` files as the new Layout layer), so the
-prior layout deviation is now an explicitly permitted pattern, not a violation.
+(routes under `apps/mobile/app/`, `_layout.tsx` files as the new Layout layer), v1.14.0
+added the `FC` / `PropsWithChildren` Component declaration rule, v1.15.0 re-pinned
+the `apps/mobile` framework to Expo SDK ~54.0 / RN 0.81.5 / React 19.1 / Expo Router ~6.0
+/ TypeScript ~5.9, and v1.16.0 added the Hook return-value memoisation rule
+(`useCallback` for returned functions, `useMemo` for non-primitives, exhaustive deps) —
+all upward-compatible with the rules above. The bootstrap-cleanup items (delete
+`package-lock.json`, rewrite `tsconfig.json` paths, remove leftover template files)
+are tracked as Phase 1 tasks rather than constitution exceptions; they are required
+compliance work, not deviations.

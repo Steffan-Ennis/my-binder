@@ -1,202 +1,265 @@
+---
+description: "Task list for spec 002-mobile-binder-app — regenerated 2026-05-02 (SDK 54)"
+---
+
 # Tasks: Mobile Binder App
 
 **Input**: Design documents from `/specs/002-mobile-binder-app/`
-**Prerequisites**: plan.md ✅, spec.md ✅, research.md ✅, data-model.md ✅, contracts/api-client.md ✅, quickstart.md ✅
+**Prerequisites**: plan.md, spec.md, data-model.md, contracts/api-client.md, research.md, quickstart.md
+**Constitution**: v1.16.0 — Hook return-value memoisation rule (functions in `useCallback`, non-primitives in `useMemo`); v1.15.0 Expo SDK ~54.0 / RN 0.81.5 / React 19.1 / Expo Router ~6.0 / TS ~5.9 (Principle X tech-stack pin); v1.14.0 Component declaration rule (FC / PropsWithChildren); v1.13.2 Layout-rules table (Expo Router `_layout.tsx`); v1.13.1 four-layer split.
 
-**Tests**: Per Constitution Principle III, **Jest unit tests are REQUIRED** for every new
-module. Tests are written FIRST and MUST FAIL before implementation lands. Co-location rule:
-`<filename>.test.ts(x)` sits next to the file under test. Contract / integration tests are
-NOT generated for this feature (none requested in spec, none required by plan).
+**Context (2026-05-02)**: The first implementation attempt was abandoned and the workspace
+was re-bootstrapped via `npx create-expo-app` against Expo SDK 54.0.33. The bootstrap
+already populated:
+
+- `apps/mobile/package.json` (with `@my-binder/mobile`, `"main": "expo-router/entry"`, RN 0.81.5, React 19.1, Expo Router 6.0.23, TypeScript 5.9.2)
+- `apps/mobile/app.json`
+- `apps/mobile/app/_layout.tsx` (root)
+- `apps/mobile/app/modal.tsx` (template demo — TO DELETE)
+- `apps/mobile/app/(tabs)/` (empty directory — demo files deleted 2026-05-02)
+- `apps/mobile/assets/` (empty `images/` subdir — bootstrap PNGs deleted 2026-05-02; preserved for fonts and future custom assets)
+- `apps/mobile/components/` and `apps/mobile/components/ui/` (empty directories — demo files deleted 2026-05-02)
+- `apps/mobile/constants/theme.ts` (rewritten 2026-05-02 with the wireframe v3 design tokens — Colors, Type, Spacing, Radius, Elevation, Motion, Touch — and verified `tsc --strict`)
+- `apps/mobile/hooks/{use-color-scheme.ts,use-color-scheme.web.ts,use-theme-color.ts}` (template hooks — TO DELETE; theme is consumed directly from `constants/theme.ts`)
+- `apps/mobile/scripts/reset-project.js` (template helper — TO DELETE)
+- `apps/mobile/expo-env.d.ts`, `apps/mobile/eslint.config.js` (flat config), `apps/mobile/tsconfig.json` (declares `"@/*"` paths — TO REWRITE)
+- `apps/mobile/package-lock.json` (npm lockfile — TO DELETE; the monorepo uses pnpm exclusively per CLAUDE.md and constitution v1.15.0)
+- `node_modules/` resolved by npm during bootstrap — will be re-resolved by pnpm in T002
+
+This task list rebuilds against the bootstrap baseline (it does NOT assume an empty
+workspace). Phase 1 reshapes around the bootstrap state: cleanup tasks supersede the
+"create from scratch" tasks of the prior tasks.md revision.
+
+**Tests**: Per Principle III, **Jest unit tests are REQUIRED** for every behaviour-bearing
+file. The test files listed below match the Unit Testing Phase in `plan.md` exactly. Tests
+MUST be written first and MUST FAIL before the matching implementation task is started
+(Red → Green → Refactor).
 
 **Organization**: Tasks are grouped by user story so each story can be implemented and
-tested independently.
+tested independently. Setup and Foundational phases are shared prerequisites.
 
-## Format: `[ID] [P?] [Story] Description`
+## Format
 
-- **[P]**: Can run in parallel (different files, no dependencies on incomplete tasks)
-- **[Story]**: Maps to a user story (US1 = Sign in with Google P1; US2 = Browse the binder home P2)
-- Setup, Foundational, and Polish phases carry NO story label
+`- [ ] TID [P?] [Story?] Description with file path`
 
-## Path Conventions
-
-- New workspace at `apps/mobile/` (pnpm + Turborepo workspace `@my-binder/mobile`)
-- Routes: `apps/mobile/app/...` (Expo Router 4 file-based routing)
-- Feature code: `apps/mobile/src/{components,hooks,services,stores,utils}/`
-- All paths below are absolute from repo root unless otherwise noted
+- `[P]` — task is parallelizable with other `[P]` tasks in the same phase (different files,
+  no dependency on incomplete tasks within the phase).
+- `[Story]` — `[US1]` or `[US2]`, applied only to user-story phases (Phase 3 / Phase 4).
 
 ---
 
-## Phase 1: Setup (Shared Infrastructure)
+## Conventions enforced by every task in this list
 
-**Purpose**: Scaffold the new `@my-binder/mobile` workspace, declare its dependencies, wire
-it into the existing pnpm + Turborepo monorepo, and prepare local config so subsequent
-phases can run `pnpm --filter @my-binder/mobile test` without surprises.
+These constitution rules apply uniformly to every file produced by every task below.
+They are listed once here instead of being repeated in every task description.
 
-- [ ] T001 Create the `apps/mobile/` workspace directory tree (`app/`, `app/(authenticated)/`, `app/(authenticated)/(tabs)/`, `src/components/{login,binder-home,access-denied,coming-soon}/`, `src/hooks/`, `src/services/{api,auth}/`, `src/stores/`, `src/utils/`)
-- [ ] T002 Create `apps/mobile/package.json` declaring `name: "@my-binder/mobile"`, `"main": "expo-router/entry"`, scripts (`dev`, `test`, `typecheck`, `lint`), and runtime deps from plan.md (React Native 0.76, Expo SDK 52, expo-router 4, @tanstack/react-query 5, zustand 5, expo-auth-session, expo-secure-store, expo-image, react-native-pager-view, @expo/vector-icons, ajv 8, `@my-binder/core: workspace:*`) plus dev deps (jest 30, ts-jest, jest-expo, @testing-library/react-native 12, react-test-renderer, @tanstack/react-query-devtools, typescript 5)
-- [ ] T003 [P] Create `apps/mobile/tsconfig.json` extending `expo/tsconfig.base`, `strict: true`, `baseUrl: "."`, `paths: { "@root/*": ["*"], "@src/*": ["src/*"] }`
-- [ ] T004 [P] Create `apps/mobile/babel.config.js` using `babel-preset-expo` (includes the `expo-router/babel` plugin)
-- [ ] T005 [P] Create `apps/mobile/jest.config.ts` with `preset: 'jest-expo'`, co-located `testMatch` (`**/?(*.)+(spec|test).ts?(x)`), and `coverageThreshold` matching plan.md §Unit Testing (80% global; 95% lines / 90% branches on `useLogin`, `useBinderHome`, `useSession`, `useCardsInfiniteQuery`, `apiClient`, `queryClient`)
-- [ ] T006 [P] Create `apps/mobile/jest.setup.ts` with module mocks for `expo-secure-store` and `expo-auth-session/providers/google`
-- [ ] T007 [P] Create `apps/mobile/app.json` (slug `my-binder-mobile`, scheme `mybinder`, `ios.bundleIdentifier`, `android.package`, splash + icon stubs, `extra.apiBaseUrl` placeholder)
-- [ ] T008 [P] Create `apps/mobile/app.config.ts` that loads `apps/mobile/.env.local` via Node `--env-file` (matches the `apps/server` convention) and injects `API_BASE_URL`, `GOOGLE_IOS_CLIENT_ID`, `GOOGLE_ANDROID_CLIENT_ID`, `GOOGLE_WEB_CLIENT_ID` into `expo.extra`
-- [ ] T009 [P] Create `apps/mobile/.env.example` documenting `API_BASE_URL`, `GOOGLE_IOS_CLIENT_ID`, `GOOGLE_ANDROID_CLIENT_ID`, `GOOGLE_WEB_CLIENT_ID` (per quickstart.md §1)
-- [ ] T010 [P] Create `apps/mobile/.gitignore` covering `.env.local`, `.expo/`, `node_modules/`, `coverage/`, `*.tsbuildinfo`
-- [ ] T011 Run `pnpm install` from repo root so the new workspace is registered (root `pnpm-workspace.yaml` already globs `apps/*`); confirm `pnpm --filter @my-binder/mobile exec tsc --noEmit` exits cleanly on the empty source tree
+- **Principle VII (strong typing)**: TypeScript `strict: true`; no `any`; `type` over
+  `interface`; path aliases `@root/*` and `@src/*` instead of `../` traversals; Ajv
+  validation on every inbound API response (runs **inside** the TanStack `queryFn`).
+- **Principle IX (public API discipline)**: every public function under `apps/mobile/src/services/`
+  and every cross-feature hook under `apps/mobile/src/hooks/` carries a JSDoc block with
+  `@param`, `@returns`, `@throws`, and `@example`. `index.ts` files are pure barrels.
+- **Principle X (component architecture)**:
+  - Screen → Container → Hook → View. Containers destructure hook results and pass
+    individual named props (no spread).
+  - **Component declaration rule (v1.14.0)**: every functional React component MUST be
+    declared as `const Foo: FC<FooProps> = (...) => { ... }`. Components that render
+    `children` use `FC<PropsWithChildren<FooProps>>`. The `FooProps` type lives in the
+    same file as the component, named with the literal `Props` suffix.
+  - **Hook return-value memoisation rule (v1.16.0)**: every non-primitive value
+    produced inside a hook in `apps/mobile/src/components/<feature>/use<Feature>.ts`
+    or `apps/mobile/src/hooks/` MUST be memoised before being returned, passed to a
+    child, or used as a dependency. Functions via `useCallback`, objects/arrays/
+    instances via `useMemo`, both with exhaustive deps. Primitives are exempt.
+    Values read directly from a Zustand selector or a TanStack Query result are
+    already reference-stable; values *derived* from them
+    (`data.map(transform)`, `() => mutation.mutate(arg)`, `{ ...query.data, foo }`)
+    MUST be memoised at the hook boundary. Every hook task in this list inherits
+    this rule.
+  - `useEffect` is restricted to legitimate external-system synchronisation (secure-store
+    hydration, auth-session result events). Cleanup mandatory; exhaustive deps mandatory.
+  - Views never import stores or services. Hooks own all state and effects. Views
+    consume design tokens via `apps/mobile/constants/theme.ts` (`Colors.dark.*`,
+    `Type.display`, `Spacing.md`, etc.) — never hard-coded hex or pixel values.
+- **Principle III (test-first)**: every test file is co-located with the file under test
+  as `<filename>.test.ts(x)`. No top-level `tests/` directory.
+- **Tech-stack pin (constitution v1.15.0)**: every install/upgrade in this feature MUST
+  resolve compatible versions of Expo SDK ~54.0, RN 0.81.5, React 19.1, Expo Router
+  ~6.0, TypeScript ~5.9. Adding a dependency that forces a version skew requires a
+  constitution amendment.
+
+---
+
+## Phase 1: Setup (Bootstrap Cleanup + Wiring)
+
+**Purpose**: Bring the create-expo-app SDK 54 bootstrap into compliance with the
+constitution and the spec — delete leftover template files, switch from npm to pnpm,
+rewrite the path aliases, install missing dependencies, and add the Jest + env config
+the bootstrap omits.
+
+- [ ] T001 Delete `apps/mobile/app/modal.tsx` (template demo screen — not in scope for spec 002)
+- [ ] T002 [P] Delete `apps/mobile/hooks/use-color-scheme.ts`, `apps/mobile/hooks/use-color-scheme.web.ts`, `apps/mobile/hooks/use-theme-color.ts` (template theme hooks — superseded by direct imports from `apps/mobile/constants/theme.ts`)
+- [ ] T003 [P] Delete `apps/mobile/scripts/reset-project.js` and the empty `apps/mobile/scripts/` directory (template helper not used by this monorepo)
+- [ ] T004 [P] Delete `apps/mobile/package-lock.json` (npm lockfile from `npx create-expo-app`; the workspace re-resolves through pnpm in T006)
+- [ ] T005 [P] Rewrite `apps/mobile/tsconfig.json` so `compilerOptions.paths` declares `"@root/*": ["./*"]` and `"@src/*": ["./src/*"]` (replacing the bootstrap's `"@/*": ["./*"]` per Principle VII), keep `extends: "expo/tsconfig.base"` and `strict: true`, and update `include` to `["app/**/*", "src/**/*", "constants/**/*", "*.ts", "*.tsx", "expo-env.d.ts"]`
+- [ ] T006 Run `rm -rf apps/mobile/node_modules` then `pnpm install` from the repo root to re-resolve `@my-binder/mobile` through pnpm and update the root `pnpm-lock.yaml`. Confirm `pnpm-workspace.yaml`'s `apps/*` glob already covers the new workspace (no edit required)
+- [ ] T007 Update `apps/mobile/package.json` scripts to `dev` (`expo start`), `test` (`jest`), `typecheck` (`tsc --noEmit`), `build` (`expo export` placeholder), `lint` (`expo lint`); remove the `reset-project` script line (helper deleted in T003); add the `@my-binder/core` workspace dependency (currently absent from the bootstrap)
+- [ ] T008 [P] Install runtime dependencies into `apps/mobile/`: `@tanstack/react-query@^5`, `zustand@^5`, `expo-auth-session@~7`, `expo-crypto@~15`, `expo-secure-store@~15`, `react-native-pager-view@~7`, `ajv@^8`, plus the workspace `@my-binder/core`. Use `pnpm --filter @my-binder/mobile add <pkg>` so the root lockfile updates (`expo-image`, `@expo/vector-icons`, `expo-constants`, `react-native-reanimated`, `react-native-worklets` are already pinned by the bootstrap and do NOT need re-installing)
+- [ ] T009 [P] Install dev dependencies into `apps/mobile/`: `jest@^30`, `jest-expo@~54` (SDK 54-compatible preset), `ts-jest@^29`, `@types/jest@^30`, `@testing-library/react-native@^13`, `react-test-renderer@^19.1`, `eslint-plugin-react-hooks@^5`, `@tanstack/react-query-devtools@^5`. Use `pnpm --filter @my-binder/mobile add -D <pkg>`
+- [ ] T010 [P] Create `apps/mobile/jest.config.ts` with `preset: 'jest-expo'`, `setupFilesAfterEach: ['./jest.setup.ts']`, `testMatch: ['**/?(*.)+(spec|test).[jt]s?(x)']`, the `coverageThreshold` block from `plan.md`'s Unit Testing Phase (80% global; 90/95% on the load-bearing hooks), `transform` overrides for `.ts`/`.tsx` via `ts-jest`, and `moduleNameMapper` aligning with the new `@root/*` + `@src/*` aliases
+- [ ] T011 [P] Create `apps/mobile/jest.setup.ts` registering `@testing-library/react-native/extend-expect`, mocking `expo-secure-store`, `expo-auth-session`, `expo-router`, and `expo-constants` per `jest-expo` SDK 54 guidance, plus a Reanimated mock (`require('react-native-reanimated/mock')`) so component tests don't load the worklet runtime
+- [ ] T012 [P] Create `apps/mobile/app.config.ts` (TypeScript config function) that imports `apps/mobile/app.json`, then layers `process.env.API_BASE_URL`, `GOOGLE_IOS_CLIENT_ID`, `GOOGLE_ANDROID_CLIENT_ID`, `GOOGLE_WEB_CLIENT_ID` into `expo.extra` so `expo-constants` reads them at runtime. Delete `apps/mobile/app.json` only if `app.config.ts` fully replaces it; otherwise import-and-extend pattern is acceptable (Expo SDK 54 supports both files cooperating)
+- [ ] T013 [P] Create `apps/mobile/.env.example` documenting `API_BASE_URL`, `GOOGLE_IOS_CLIENT_ID`, `GOOGLE_ANDROID_CLIENT_ID`, `GOOGLE_WEB_CLIENT_ID` (matches `quickstart.md` §1)
+- [ ] T014 [P] Update `apps/mobile/.gitignore` (currently bootstrap-default) to additionally cover `.env.local`, `.env`, `coverage/`, `*.tsbuildinfo`, `dist/`. Keep the bootstrap-supplied entries (`node_modules/`, `.expo/`)
+- [ ] T015 [P] Update `apps/mobile/eslint.config.js` to extend the bootstrap's `eslint-config-expo` flat config with `eslint-plugin-react-hooks`'s `recommended-latest` rules, with `react-hooks/exhaustive-deps` set to `error` per Principle X
+- [ ] T016 [P] Replace `apps/mobile/README.md` with a brief workspace summary linking to `specs/002-mobile-binder-app/quickstart.md` for run/test commands and `specs/002-mobile-binder-app/plan.md` for architecture
+- [ ] T017 Verify `pnpm --filter @my-binder/mobile typecheck` passes against the now-empty source tree (`constants/theme.ts` already typechecked clean; expect zero errors), `pnpm --filter @my-binder/mobile test --listTests` enumerates zero tests successfully, and `turbo typecheck` from the repo root recognises `@my-binder/mobile`
+
+**Checkpoint**: Bootstrap is constitution-compliant. `expo start` boots a blank
+authenticated-redirect-empty app; `turbo typecheck` and `pnpm test` succeed against
+zero source files. Foundational phase can now begin.
 
 ---
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-**Purpose**: Build the cross-cutting layer that BOTH user stories depend on — schema-validating
-API client, TanStack `QueryClient` singleton with retry/onError routing, secure session
-storage, session store + hook, page math util, the routing skeleton (Root Stack, auth gate,
-4-tab navigator), and the shared `<ComingSoonContainer />` that mounts on the Search/Scan/Profile
-tabs.
+**Purpose**: Cross-cutting utilities, stores, services, cross-feature hooks, and the entire
+Expo Router 6 layout/navigation skeleton. None of these are story-specific — they are
+prerequisites for both US1 and US2.
 
-**⚠️ CRITICAL**: No user-story work begins until this phase is complete.
+**⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-### Tests for Foundational (Jest, REQUIRED — write FIRST, ensure they FAIL) ⚠️
+### Foundational tests (write FIRST; they MUST FAIL before implementation)
 
-- [ ] T012 [P] Create `apps/mobile/src/services/api/ApiError.test.ts` covering construction, `status`, `code`, and Principle VIII logging behaviour
-- [ ] T013 [P] Create `apps/mobile/src/services/api/apiClient.test.ts` covering bearer-header attachment from `sessionStore`, JSON serialisation, Ajv validation success + failure (`SchemaValidationError`), and error mapping for 400 / 401 (`AUTH_INVALID_TOKEN` & `AUTH_INVALID_GOOGLE_TOKEN`) / 403 (`AUTH_NOT_ALLOWLISTED`) / 5xx / network rejection (synthetic `NETWORK_OFFLINE`)
-- [ ] T014 [P] Create `apps/mobile/src/services/api/queryClient.test.ts` covering `defaultOptions.queries.retry` skipping 4xx, `retryDelay` schedule (1s → 2s → 4s, capped 30s), `defaultOptions.mutations.retry === 0`, `refetchOnWindowFocus: false`, `retryOnMount: false`, `queryCache.onError` routing 401 → clear session + navigate Login, `mutationCache.onError` routing 403 → navigate AccessDenied
-- [ ] T015 [P] Create `apps/mobile/src/services/auth/sessionStorage.test.ts` covering read/write/clear of `session.jwt` and `session.iat` via `expo-secure-store`; never falls back to `AsyncStorage`
-- [ ] T016 [P] Create `apps/mobile/src/stores/sessionStore.test.ts` covering set/clear, selector stability under `subscribeWithSelector`, and `status` transitions
-- [ ] T017 [P] Create `apps/mobile/src/hooks/useSession.test.ts` covering hydration from secure storage on first call, expiry computed against `SESSION_JWT_TTL_DAYS` from `@my-binder/core` (FR-006, FR-007), and cleanup on unmount
-- [ ] T018 [P] Create `apps/mobile/src/utils/pageMath.test.ts` asserting `pageCount(0) === 1`, `pageCount(9) === 1`, `pageCount(10) === 2`, `pageCount(1000) === 112`, plus partial-last-page slot indexing
-- [ ] T019 [P] Create `apps/mobile/src/components/coming-soon/useComingSoon.test.ts` covering `feature` union (`"search" | "scan" | "profile"`) → wireframe-aligned title/message/Ionicons glyph; throws on unrecognised value
-- [ ] T020 [P] Create `apps/mobile/src/components/coming-soon/ComingSoonView.test.tsx` (renders title/message/icon from props; accessibility role announces feature; no store/service imports — Principle X view purity)
-- [ ] T021 [P] Create `apps/mobile/app/index.test.tsx` covering redirect to `/login` when no session and to `/binder` when a hydrated session is `≤ 7d` old (FR-001, FR-006, SC-006); uses `expo-router/testing-library`
-- [ ] T022 [P] Create `apps/mobile/app/(authenticated)/_layout.test.tsx` covering `<Redirect href="/login" />` when `useSession().status !== "active"`, else renders the child `<Stack />`
-- [ ] T023 [P] Create `apps/mobile/app/(authenticated)/(tabs)/_layout.test.tsx` covering exactly 4 tabs in wireframe order (Binder, Search, Scan, Profile), Binder is the initial route, each tab declares its `@expo/vector-icons` glyph, active-state styling matches the wireframe
-- [ ] T024 [P] Create `apps/mobile/app/(authenticated)/(tabs)/search.test.tsx`, `scan.test.tsx`, and `profile.test.tsx` — each asserts the route file is a one-line shell rendering exactly `<ComingSoonContainer feature="…" />` with no local state (Principle X)
+- [ ] T018 [P] Author Jest tests in `apps/mobile/src/utils/pageMath.test.ts` covering `pageCount(0) === 1`, `pageCount(9) === 1`, `pageCount(10) === 2`, `pageCount(1000) === 112`, and slot-indexing for partial last pages (Edge Case in spec)
+- [ ] T019 [P] Author Jest tests in `apps/mobile/src/stores/sessionStore.test.ts` for set/clear, subscriber notification via `subscribeWithSelector`, and stable selector references (per `plan.md`'s Unit Testing Phase)
+- [ ] T020 [P] Author Jest tests in `apps/mobile/src/stores/binderStore.test.ts` proving the store holds **only** `currentPage` (no card list), initial value `1`, `nextPage`/`prevPage` clamps at the `totalPages` derived from `useCardsInfiniteQuery`, and resets to `1` on sign-out
+- [ ] T021 [P] Author Jest tests in `apps/mobile/src/services/auth/sessionStorage.test.ts` for read/write through `expo-secure-store`, no `AsyncStorage` fallback, and full clear-on-sign-out
+- [ ] T022 [P] Author Jest tests in `apps/mobile/src/services/auth/googleAuth.test.ts` covering `expo-auth-session/providers/google` wrapping (FR-002, FR-003), Google revoke endpoint call on sign-out (FR-008), and a typed `UserCancelledError` surfaced when the user cancels (FR-004)
+- [ ] T023 [P] Author Jest tests in `apps/mobile/src/services/api/apiClient.test.ts` for typed methods `getCards`, `getMe`, `signInWithGoogle`, `signOut`; `Authorization: Bearer <jwt>` attachment from `sessionStore` when active (and absence when inactive); Ajv validation against `@my-binder/core` schemas inside the queryFn before resolve; original-error logging before throwing the typed `ApiError` per Principle VIII
+- [ ] T024 [P] Author Jest tests in `apps/mobile/src/services/api/queryClient.test.ts` proving `defaultOptions.queries.retry = 3` with exponential `retryDelay` (1s → 2s → 4s, ceiling 30s); 4xx skipped by the retry predicate; `defaultOptions.mutations.retry = 0`; `refetchOnWindowFocus: false`; `retryOnMount: false`; `queryCache.onError` handles 401 (clear session + route Login) and 403 (route AccessDenied); `mutationCache.onError` does the same
+- [ ] T025 [P] Author Jest tests in `apps/mobile/src/hooks/useSession.test.ts` covering hydrate-once-on-mount from `sessionStorage`, expiry exactly at `iat + SESSION_JWT_TTL_DAYS * 86400` (FR-006, FR-007), unsubscribe on unmount (Principle X cleanup rule), and reference-stability of any returned non-primitive (`renderHook` re-renders return the same object/function references when inputs are unchanged — v1.16.0 memoisation rule)
+- [ ] T026 [P] Author Jest tests in `apps/mobile/src/hooks/useMeQuery.test.ts` wrapping TanStack `useQuery` against `apiClient.getMe`; gated on `useSession().status === "active"`; on 401 the global `queryCache.onError` clears session and routes Login; on 403 routes AccessDenied; `staleTime: 60_000`, `gcTime: 300_000` per `contracts/api-client.md`
+- [ ] T027 [P] Author Jest tests in `apps/mobile/src/components/coming-soon/useComingSoon.test.ts` returning a wireframe-aligned title/message/Ionicons name for each `feature` value (`"search"`, `"scan"`, `"profile"`) and throwing on unrecognised values
+- [ ] T028 [P] Author Jest tests in `apps/mobile/src/components/coming-soon/ComingSoonView.test.tsx` proving title/message/icon render from props, accessibility role announces the feature, and no store/service imports exist (Principle X view purity)
+- [ ] T029 [P] Author Jest tests in `apps/mobile/app/index.test.tsx` using `expo-router/testing-library` proving redirect to `/login` when no hydrated session (FR-001, SC-006) and redirect to `/binder` when a valid ≤7-day session is hydrated (FR-006, US1.AS6)
+- [ ] T030 [P] Author Jest tests in `apps/mobile/app/(authenticated)/_layout.test.tsx` proving the auth gate renders `<Redirect href="/login" />` when `useSession().status !== "active"` and renders the child `<Stack />` otherwise
+- [ ] T031 [P] Author Jest tests in `apps/mobile/app/(authenticated)/(tabs)/_layout.test.tsx` proving exactly four tabs (Binder, Search, Scan, Profile) in the wireframe order with Binder as the initial route, and that each tab declares its `@expo/vector-icons` (Ionicons) glyph and label per the v3 wireframe
+- [ ] T032 [P] Author Jest tests in `apps/mobile/app/(authenticated)/(tabs)/search.test.tsx` proving the route is a one-line shell rendering exactly `<ComingSoonContainer feature="search" />`
+- [ ] T033 [P] Author Jest tests in `apps/mobile/app/(authenticated)/(tabs)/scan.test.tsx` proving the route is a one-line shell rendering exactly `<ComingSoonContainer feature="scan" />`
+- [ ] T034 [P] Author Jest tests in `apps/mobile/app/(authenticated)/(tabs)/profile.test.tsx` proving the route is a one-line shell rendering exactly `<ComingSoonContainer feature="profile" />`
 
-### Implementation for Foundational
+### Foundational implementation
 
-- [ ] T025 Create `apps/mobile/src/services/api/ApiError.ts` (typed error class with `status`, `code: ErrorCode`, original-cause preservation per Principle VIII)
-- [ ] T026 Create `apps/mobile/src/services/api/apiClient.ts` exposing typed methods `getCards`, `getMe`, `signInWithGoogle`, `signOut`; `fetch` + bearer attachment from `sessionStore`; reads `extra.apiBaseUrl` from `expo-constants`; runs Ajv validation against `@my-binder/core/schemas/{auth,card}.json` BEFORE returning; maps server `error.code` values to `ApiError` instances per `contracts/api-client.md` Error Mapping table; logs original error before throwing (Principle VIII)
-- [ ] T027 Create `apps/mobile/src/services/api/queryClient.ts` exporting a singleton `QueryClient` configured per research.md §11: `retry` predicate skipping 4xx, `retryDelay: attempt => Math.min(1000 * 2 ** attempt, 30_000)`, `refetchOnWindowFocus: false`, `retryOnMount: false`, `defaultOptions.mutations.retry: 0`; registers `queryCache.onError` and `mutationCache.onError` to route `AUTH_INVALID_TOKEN` → clear session + navigate `/login` and `AUTH_NOT_ALLOWLISTED` → navigate `/access-denied`
-- [ ] T028 [P] Create `apps/mobile/src/services/api/index.ts` as a pure barrel re-export (Principle IX)
-- [ ] T029 [P] Create `apps/mobile/src/services/auth/sessionStorage.ts` wrapping `expo-secure-store` for `session.jwt` and `session.iat`; on clear, deletes both keys; never touches `AsyncStorage`
-- [ ] T030 [P] Create `apps/mobile/src/services/auth/index.ts` as a pure barrel re-export (Principle IX) — populated incrementally as US1 lands `googleAuth.ts`
-- [ ] T031 Create `apps/mobile/src/stores/sessionStore.ts` (Zustand 5 with `subscribeWithSelector`; fields per data-model.md §Session: `jwt`, `iat`, `userId`, `email`, `status`; selectors `selectStatus`, `selectJwt`, `selectIdentity` returning stable references)
-- [ ] T032 Create `apps/mobile/src/hooks/useSession.ts` (subscribes to `sessionStore`; hydrates from `sessionStorage` once via a mount-time `useEffect` with empty cleanup — the legitimate Principle X external-system case; computes `status` from `iat + SESSION_JWT_TTL_DAYS * 86400` against `Date.now() / 1000`)
-- [ ] T033 [P] Create `apps/mobile/src/utils/pageMath.ts` (pure functions: `pageCount(n)`, `slotIndex(absoluteIndex)`, `pageSlice(cards, currentPage)`)
-- [ ] T034 Create `apps/mobile/src/components/coming-soon/useComingSoon.ts` (typed `feature: "search" | "scan" | "profile"` → `{ title, message, iconName }` from a const map; throws on unrecognised values)
-- [ ] T035 Create `apps/mobile/src/components/coming-soon/ComingSoonView.tsx` (props-only: `title`, `message`, `iconName`; renders an `<Ionicons />` glyph + `<Text />` block; accessibility role `header`)
-- [ ] T036 Create `apps/mobile/src/components/coming-soon/ComingSoonContainer.tsx` (accepts `feature` prop; destructures `useComingSoon(feature)`; passes named props to `<ComingSoonView />`)
-- [ ] T037 Create `apps/mobile/app/_layout.tsx` (Root Stack: providers, error boundary, theme; mounts `<QueryClientProvider client={queryClient}>` from `@src/services/api/queryClient`; body is `<Stack />` exposing `login`, `access-denied`, `(authenticated)` as siblings)
-- [ ] T038 Create `apps/mobile/app/index.tsx` (reads `useSession()`; `<Redirect href="/login" />` when not active, else `<Redirect href="/(authenticated)/(tabs)/binder" />`)
-- [ ] T039 Create `apps/mobile/app/(authenticated)/_layout.tsx` (auth gate: `<Redirect href="/login" />` when `useSession().status !== "active"`; else body is `<Stack />` so future authenticated stack routes can sit above the tabs)
-- [ ] T040 Create `apps/mobile/app/(authenticated)/(tabs)/_layout.tsx` (`<Tabs />` with 4 `<Tabs.Screen />` entries — Binder, Search, Scan, Profile — Binder is the initial route, each declares an Ionicons glyph: `book(-outline)`, `search(-outline)`, `scan(-outline)`, `person(-outline)`; active state uses the filled variant per research.md §10)
-- [ ] T041 [P] Create `apps/mobile/app/(authenticated)/(tabs)/search.tsx` as a one-line shell `<ComingSoonContainer feature="search" />`
-- [ ] T042 [P] Create `apps/mobile/app/(authenticated)/(tabs)/scan.tsx` as a one-line shell `<ComingSoonContainer feature="scan" />`
-- [ ] T043 [P] Create `apps/mobile/app/(authenticated)/(tabs)/profile.tsx` as a one-line shell `<ComingSoonContainer feature="profile" />`
-- [ ] T044 Create `apps/mobile/app/(authenticated)/(tabs)/binder.tsx` as a TEMPORARY one-line shell rendering a minimal placeholder view (e.g., `<Text>Binder coming online…</Text>`); **US2 (T079) replaces the body to render `<BinderHomeContainer />`** — the placeholder exists only so the tab navigator compiles during US1
+- [ ] T035 [P] Implement `apps/mobile/src/utils/pageMath.ts` exporting pure `pageCount(cardCount: number): number` and `slotIndex(cardIndex: number): { pageNumber: number; slot: number }` per data-model.md
+- [ ] T036 [P] Implement `apps/mobile/src/stores/sessionStore.ts` as a Zustand 5 store with `subscribeWithSelector`, holding `{ jwt, iat, userId, email, status: "idle" | "active" | "expired" }` and exposing `setSession`, `clearSession`, `markExpired` per `data-model.md` Session entity
+- [ ] T037 [P] Implement `apps/mobile/src/stores/binderStore.ts` as a Zustand 5 store holding **only** `currentPage` plus `nextPage`/`prevPage`/`reset` per `data-model.md` Binder entity (server data lives in TanStack cache, never here)
+- [ ] T038 [P] Implement `apps/mobile/src/services/auth/sessionStorage.ts` wrapping `expo-secure-store` with `readSession()`, `writeSession({ jwt, iat })`, `clearSession()`. Include JSDoc with `@example` per Principle IX
+- [ ] T039 [P] Implement `apps/mobile/src/services/auth/googleAuth.ts` wrapping `expo-auth-session/providers/google`. Export `useGoogleAuthRequest()` (hook) and `revokeGoogleGrant(token)` (function). Include JSDoc with `@example` per Principle IX
+- [ ] T040 Implement `apps/mobile/src/services/api/apiClient.ts` with typed methods `getCards(cursor?)`, `getMe()`, `signInWithGoogle({ idToken })`, `signOut()`. Read `apiBaseUrl` from `expo-constants`. Attach `Authorization: Bearer <jwt>` from `sessionStore` when active. Validate every response with Ajv against `@my-binder/core/schemas/{auth,card}.json` before resolving. Throw typed `ApiError` (with original `cause`); log original before throwing per Principle VIII. Full JSDoc per Principle IX
+- [ ] T041 Implement `apps/mobile/src/services/api/queryClient.ts` exporting a singleton `QueryClient` with `defaultOptions.queries.retry = 3`, exponential `retryDelay` (1s → 2s → 4s, ceiling 30s), retry-predicate skipping 4xx, `defaultOptions.mutations.retry = 0`, `refetchOnWindowFocus: false`, `retryOnMount: false`. Wire `queryCache.onError` and `mutationCache.onError` to route 401 → clear session + Login and 403 → AccessDenied. Full JSDoc per Principle IX
+- [ ] T042 [P] Implement `apps/mobile/src/services/auth/index.ts` as a pure barrel re-exporting `googleAuth` and `sessionStorage` (Principle IX index purity)
+- [ ] T043 [P] Implement `apps/mobile/src/services/api/index.ts` as a pure barrel re-exporting `apiClient`, `queryClient`, `ApiError`, and the response/error types (Principle IX index purity)
+- [ ] T044 Implement `apps/mobile/src/hooks/useSession.ts` consuming `sessionStore` + `sessionStorage`. Single `useEffect` for one-shot hydration on first mount with cleanup. Returns `{ status, userId, email, jwt }` typed object. Full JSDoc per Principle IX
+- [ ] T045 Implement `apps/mobile/src/hooks/useMeQuery.ts` wrapping TanStack `useQuery` over `apiClient.getMe`, gated `enabled: useSession().status === "active"`, `staleTime: 60_000`, `gcTime: 300_000`. Full JSDoc per Principle IX
+- [ ] T046 [P] Implement `apps/mobile/src/components/coming-soon/useComingSoon.ts` resolving the `feature` union (`"search" | "scan" | "profile"`) to `{ title, message, iconName }`. Co-located `type ComingSoonResult = ...` returned from the hook
+- [ ] T047 [P] Implement `apps/mobile/src/components/coming-soon/ComingSoonView.tsx` as a pure view component declared `const ComingSoonView: FC<ComingSoonViewProps> = ({ title, message, iconName }) => ...` per the v1.14.0 Component declaration rule. Renders title (`Type.title`), message (`Type.body`), and Ionicons glyph using design tokens from `apps/mobile/constants/theme.ts`; no store or service imports
+- [ ] T048 Implement `apps/mobile/src/components/coming-soon/ComingSoonContainer.tsx` as `const ComingSoonContainer: FC<ComingSoonContainerProps> = ({ feature }) => { const { title, message, iconName } = useComingSoon({ feature }); return <ComingSoonView title={title} message={message} iconName={iconName} />; }`. Depends on T046 + T047
+- [ ] T049 Update `apps/mobile/app/_layout.tsx` (Root Stack — Layout layer; bootstrap-supplied stub) to `const RootLayout: FC = () => (<QueryClientProvider client={queryClient}><Stack screenOptions={...} /></QueryClientProvider>)`. Hosts the global error boundary. Default-export the component. Apply `Colors.dark` background by default. Depends on T041
+- [ ] T050 Implement `apps/mobile/app/index.tsx` (entry route) as `const Index: FC = () => { const { status } = useSession(); return status === 'active' ? <Redirect href="/binder" /> : <Redirect href="/login" />; }`. Default-export the component. Depends on T044
+- [ ] T051 Implement `apps/mobile/app/(authenticated)/_layout.tsx` (auth gate — Layout layer) as `const AuthenticatedLayout: FC = () => { const { status } = useSession(); if (status !== 'active') return <Redirect href="/login" />; return <Stack />; }`. Default-export. Depends on T044
+- [ ] T052 Implement `apps/mobile/app/(authenticated)/(tabs)/_layout.tsx` (Tabs — Layout layer) declaring exactly four `<Tabs.Screen />` entries (Binder, Search, Scan, Profile) in the v3-wireframe order with Binder as `initialRouteName`. Each screen sets its `tabBarLabel` and Ionicons `tabBarIcon`. Apply `Colors.dark.tabBarBackground` and `Colors.dark.tabIconSelected` (gold) / `Colors.dark.tabIconDefault` (rose) from theme tokens. Default export `const TabsLayout: FC = () => <Tabs ...>...</Tabs>`
+- [ ] T053 [P] Implement `apps/mobile/app/(authenticated)/(tabs)/search.tsx` as `const Search: FC = () => <ComingSoonContainer feature="search" />; export default Search;`. Depends on T048
+- [ ] T054 [P] Implement `apps/mobile/app/(authenticated)/(tabs)/scan.tsx` as `const Scan: FC = () => <ComingSoonContainer feature="scan" />; export default Scan;`. Depends on T048
+- [ ] T055 [P] Implement `apps/mobile/app/(authenticated)/(tabs)/profile.tsx` as `const Profile: FC = () => <ComingSoonContainer feature="profile" />; export default Profile;`. Depends on T048
 
-**Checkpoint**: Foundation ready. The four-tab shell renders, Search/Scan/Profile show the
-"Coming Soon" placeholder, all infrastructure tests pass, and US1 + US2 can now begin —
-in parallel if desired.
+**Checkpoint**: Workspace boots in `expo start`; an unauthenticated user sees the (empty) Login route via `app/index.tsx` redirect; the authenticated tab navigator renders Search/Scan/Profile placeholders styled with the wireframe v3 design tokens. US1 and US2 implementation phases can now run in parallel.
 
 ---
 
 ## Phase 3: User Story 1 — Sign In with Google (Priority: P1) 🎯 MVP
 
-**Goal**: Deliver Google-only sign-in with a 7-day session, allowlist-gated access, and
-sign-out that revokes the Google grant. After this phase, an allowlisted user can launch
-the app, complete Google's flow in the in-app browser, and land on the placeholder Binder
-tab. A non-allowlisted user lands on AccessDenied. Sign-out clears state and forces full
-re-consent on next sign-in.
+**Goal**: Deliver Google-only sign-in with the 7-day session, the allowlist-rejection
+"access not yet granted" screen, and the sign-out flow that revokes the Google grant
+(FR-001 through FR-008).
 
-**Independent Test**: Launch the app, tap "Sign in with Google", complete Google's flow
-in a test account that's on the server allowlist, and confirm the user lands on the Binder
-tab with their identity reflected (`useMeQuery` hydrated). Repeat with a non-allowlisted
-account → AccessDenied. Sign out and reopen → Google's full consent flow appears.
+**Independent Test**: Launch the app on a simulator, tap "Sign in with Google", complete
+Google's auth in a test account on the server allowlist, and confirm the app lands inside
+the authenticated tab navigator (the Binder tab will be empty until US2 lands; an empty
+state is acceptable for this independent test). Repeat with a non-allowlisted account and
+confirm the AccessDenied screen renders. Sign out and confirm the next sign-in re-presents
+the full Google consent flow.
 
-### Tests for User Story 1 (Jest, REQUIRED — write FIRST) ⚠️
+### Tests for User Story 1 (Jest unit tests REQUIRED — write FIRST and confirm RED)
 
-- [ ] T045 [P] [US1] Create `apps/mobile/src/services/auth/googleAuth.test.ts` covering `expo-auth-session/providers/google` wrapping (PKCE, in-app browser per FR-003), Google revoke endpoint POST on sign-out (FR-008, US1.AS7), and user-cancellation surfaced as a typed error (FR-004)
-- [ ] T046 [P] [US1] Create `apps/mobile/src/hooks/useGoogleSignInMutation.test.ts` covering wraps TanStack `useMutation` against `apiClient.signInWithGoogle`, default `retry: 0`, on success persists JWT via `sessionStorage` and updates `sessionStore`, on `AUTH_INVALID_GOOGLE_TOKEN` (401) surfaces retryable error per FR-004, on `AUTH_NOT_ALLOWLISTED` (403) routes to `/access-denied` per FR-005
-- [ ] T047 [P] [US1] Create `apps/mobile/src/hooks/useMeQuery.test.ts` covering wraps TanStack `useQuery` against `apiClient.getMe`, gated on `useSession().status === "active"` via `enabled`, `staleTime: 60_000`, on 401 the global `queryCache.onError` clears local session + routes to Login, on 403 routes to AccessDenied without clearing the Google grant
-- [ ] T048 [P] [US1] Create `apps/mobile/src/hooks/useSignOutMutation.test.ts` covering wraps TanStack `useMutation` against `apiClient.signOut`, `retry: 0`, runs the documented sign-out chain even when the server call fails (delete secure-store entries → revoke Google grant → reset Zustand stores → call `queryClient.clear()` → navigate `/login`)
-- [ ] T049 [P] [US1] Create `apps/mobile/src/components/login/useLogin.test.ts` covering `handleSignIn` dispatches the Google flow + sign-in mutation (FR-002, FR-003), success navigates to `/binder` (US1.AS3), cancellation/outage surfaces a retryable error and stays on Login (FR-004), allowlist 403 navigates to AccessDenied (FR-005, US1.AS5), already-authenticated launch with `≤ 7d` session skips Login (FR-006, US1.AS6), `handleSignOut` revokes Google grant + clears JWT + clears the TanStack cache (FR-008, US1.AS7)
-- [ ] T050 [P] [US1] Create `apps/mobile/src/components/login/LoginView.test.tsx` covering binder-themed background renders, exactly one "Sign in with Google" CTA exists, no username/password fields are present (FR-002), error banner renders when `errorMessage` prop is set, CTA disabled while `isSigningIn` prop is `true`
-- [ ] T051 [P] [US1] Create `apps/mobile/app/login.test.tsx` (one-line-shell test: default export renders exactly `<LoginContainer />` with no local state — Principle X)
-- [ ] T052 [P] [US1] Create `apps/mobile/src/components/access-denied/useAccessDenied.test.ts` covering "Try a different account" handler invokes sign-out + navigates to `/login` (FR-005), contact CTA opens the configured mailto / URL
-- [ ] T053 [P] [US1] Create `apps/mobile/src/components/access-denied/AccessDeniedView.test.tsx` covering renders the "access not yet granted" copy, renders the contact CTA with the configured target (no store/service imports — Principle X)
-- [ ] T054 [P] [US1] Create `apps/mobile/app/access-denied.test.tsx` (one-line-shell test: default export renders exactly `<AccessDeniedContainer />`)
+- [ ] T056 [P] [US1] Author Jest tests in `apps/mobile/src/hooks/useGoogleSignInMutation.test.ts` wrapping TanStack `useMutation` over `apiClient.signInWithGoogle`; `retry: 0`; on success persists session via `sessionStorage` and updates `sessionStore`; on 401 (`AUTH_INVALID_GOOGLE_TOKEN`) surfaces a retryable error per FR-004; on 403 (`AUTH_NOT_ALLOWLISTED`) routes to AccessDenied per FR-005
+- [ ] T057 [P] [US1] Author Jest tests in `apps/mobile/src/hooks/useSignOutMutation.test.ts` wrapping TanStack `useMutation` over `apiClient.signOut`; runs the full side-effect chain even when the server call fails (delete secure-store keys, revoke Google grant, reset Zustand stores, call `queryClient.clear()`, navigate to Login per `contracts/api-client.md`); `retry: 0`
+- [ ] T058 [P] [US1] Author Jest tests in `apps/mobile/src/components/login/useLogin.test.ts` covering: tap-to-sign-in dispatches the Google flow (FR-002, FR-003); successful auth + active session navigates to `/binder` (US1.AS3); cancellation/outage surfaces a retryable error and stays on Login (FR-004); 403 navigates to AccessDenied (FR-005, US1.AS5); already-active session on launch skips Login (FR-006, US1.AS6); sign-out path revokes Google + clears JWT (FR-008, US1.AS7); and `onSignInPress`/`onSignOutPress` references remain identity-stable across re-renders when their dependencies are unchanged (v1.16.0 memoisation rule)
+- [ ] T059 [P] [US1] Author Jest tests in `apps/mobile/src/components/login/LoginView.test.tsx` rendering the Collectors Album masthead via `Type.display` + `Colors.dark.accent` (gold), `Type.overline` for "ULTRA · ESTABLISHED · 1972", a single white-surface "Sign in with Google" CTA at `Touch.buttonHeight`, no username/password fields (FR-002), error banner when `errorMessage` prop is set, and disabled CTA when `isSigningIn` is `true`
+- [ ] T060 [P] [US1] Author Jest tests in `apps/mobile/src/components/access-denied/useAccessDenied.test.ts` covering "try a different account" → sign-out + navigate to Login (FR-005), and contact CTA opens the configured mailto/URL
+- [ ] T061 [P] [US1] Author Jest tests in `apps/mobile/src/components/access-denied/AccessDeniedView.test.tsx` rendering the "access not yet granted" copy via `Type.title` + `Type.body` and the contact CTA on the crimson background
+- [ ] T062 [P] [US1] Author Jest tests in `apps/mobile/app/login.test.tsx` proving the route is a one-line shell rendering exactly `<LoginContainer />`
+- [ ] T063 [P] [US1] Author Jest tests in `apps/mobile/app/access-denied.test.tsx` proving the route is a one-line shell rendering exactly `<AccessDeniedContainer />`
 
 ### Implementation for User Story 1
 
-- [ ] T055 [P] [US1] Create `apps/mobile/src/services/auth/googleAuth.ts` wrapping `expo-auth-session/providers/google` (PKCE flow, ASWebAuthenticationSession on iOS / Custom Tabs on Android per FR-003); exposes `signInWithGoogle()` returning `{ idToken, accessToken }` and `revokeGoogleGrant(accessToken)` POSTing to `https://oauth2.googleapis.com/revoke?token=<token>` per FR-008; surfaces user-cancellation as a typed `GoogleAuthError`
-- [ ] T056 [P] [US1] Create `apps/mobile/src/hooks/useGoogleSignInMutation.ts` (TanStack `useMutation`; `mutationFn: apiClient.signInWithGoogle`; `retry: 0`; on success persist `{ jwt, iat }` via `sessionStorage`, set `sessionStore` to `status: "active"`, navigate to `/(authenticated)/(tabs)/binder`)
-- [ ] T057 [P] [US1] Create `apps/mobile/src/hooks/useMeQuery.ts` (TanStack `useQuery`; `queryKey: ["auth", "me"]`; `queryFn: apiClient.getMe`; `staleTime: 60_000`; `gcTime: 5 * 60_000`; `enabled: useSession().status === "active"`)
-- [ ] T058 [P] [US1] Create `apps/mobile/src/hooks/useSignOutMutation.ts` (TanStack `useMutation`; `mutationFn: apiClient.signOut`; `retry: 0`; an `onSettled` handler runs the side-effect chain regardless of server-call outcome — `sessionStorage.clear()` → `googleAuth.revokeGoogleGrant()` → `sessionStore.reset()` → `binderStore.reset()` → `queryClient.clear()` → `router.replace("/login")` per `contracts/api-client.md` POST /auth/signout)
-- [ ] T059 [US1] Create `apps/mobile/src/components/login/useLogin.ts` (composes `useSession`, `useGoogleSignInMutation`, `useSignOutMutation`; exposes `handleSignIn`, `handleSignOut`, `errorMessage`, `isSigningIn` for the view; maps mutation `error` codes to FR-004 / FR-005 user copy)
-- [ ] T060 [US1] Create `apps/mobile/src/components/login/LoginView.tsx` (props-only: binder-themed background asset, single "Sign in with Google" CTA per FR-002, optional error banner from `errorMessage`, CTA disabled when `isSigningIn`)
-- [ ] T061 [US1] Create `apps/mobile/src/components/login/LoginContainer.tsx` (destructures `useLogin()` and passes named props — no spread — to `<LoginView />`)
-- [ ] T062 [US1] Create `apps/mobile/app/login.tsx` as a one-line shell rendering `<LoginContainer />`
-- [ ] T063 [P] [US1] Create `apps/mobile/src/components/access-denied/useAccessDenied.ts` (composes `useSignOutMutation`; exposes `handleTryDifferentAccount`, `handleContact`, `contactTarget`)
-- [ ] T064 [P] [US1] Create `apps/mobile/src/components/access-denied/AccessDeniedView.tsx` (props-only: "access not yet granted" copy per FR-005, contact CTA, "try a different account" CTA)
-- [ ] T065 [US1] Create `apps/mobile/src/components/access-denied/AccessDeniedContainer.tsx` (destructures `useAccessDenied()` and passes named props to `<AccessDeniedView />`)
-- [ ] T066 [US1] Create `apps/mobile/app/access-denied.tsx` as a one-line shell rendering `<AccessDeniedContainer />`
+- [ ] T064 [P] [US1] Implement `apps/mobile/src/hooks/useGoogleSignInMutation.ts` as a TanStack `useMutation` wrapper over `apiClient.signInWithGoogle` with the side effects above. Full JSDoc per Principle IX
+- [ ] T065 [P] [US1] Implement `apps/mobile/src/hooks/useSignOutMutation.ts` as a TanStack `useMutation` wrapper over `apiClient.signOut` running the documented sign-out chain even on server failure. Full JSDoc per Principle IX
+- [ ] T066 [P] [US1] Implement `apps/mobile/src/components/login/useLogin.ts` composing `useGoogleAuthRequest`, `useGoogleSignInMutation`, `useSignOutMutation`, `useSession`, and `useRouter` (from `expo-router`). Returns `{ isSigningIn, errorMessage, onSignInPress }`. Full JSDoc per Principle IX
+- [ ] T067 [P] [US1] Implement `apps/mobile/src/components/login/LoginView.tsx` as `const LoginView: FC<LoginViewProps> = ({ isSigningIn, errorMessage, onSignInPress }) => ...` per the v1.14.0 Component declaration rule. Renders the wireframe v3 front page: `Colors.dark.background` crimson gradient, `Type.overline` masthead "ULTRA · ESTABLISHED · 1972", binder glyph in `Colors.dark.accent`, `Type.display` "Collectors Album" title (italic serif), `Type.subtitleItalic` "digital edition", and a `Colors.light.background`-surfaced "Sign in with Google" CTA at `Touch.buttonHeight` / `Radius.pill` with `Type.bodyStrong`. Optional error banner uses `Colors.dark.error`. No store/service imports
+- [ ] T068 [US1] Implement `apps/mobile/src/components/login/LoginContainer.tsx` as `const LoginContainer: FC = () => { const { isSigningIn, errorMessage, onSignInPress } = useLogin(); return <LoginView isSigningIn={isSigningIn} errorMessage={errorMessage} onSignInPress={onSignInPress} />; }`. Depends on T066 + T067
+- [ ] T069 [P] [US1] Implement `apps/mobile/src/components/access-denied/useAccessDenied.ts` exposing `{ contactHref, onTryDifferentAccount }`. Full JSDoc per Principle IX
+- [ ] T070 [P] [US1] Implement `apps/mobile/src/components/access-denied/AccessDeniedView.tsx` as `const AccessDeniedView: FC<AccessDeniedViewProps> = ({ contactHref, onTryDifferentAccount }) => ...` per the v1.14.0 Component declaration rule. Uses `Colors.dark.background` + `Type.title` headline + `Type.body` for the explanatory copy, `Colors.dark.accent` for the contact CTA
+- [ ] T071 [US1] Implement `apps/mobile/src/components/access-denied/AccessDeniedContainer.tsx` as `const AccessDeniedContainer: FC = () => { const { contactHref, onTryDifferentAccount } = useAccessDenied(); return <AccessDeniedView contactHref={contactHref} onTryDifferentAccount={onTryDifferentAccount} />; }`. Depends on T069 + T070
+- [ ] T072 [US1] Implement `apps/mobile/app/login.tsx` as `const Login: FC = () => <LoginContainer />; export default Login;`. Depends on T068
+- [ ] T073 [US1] Implement `apps/mobile/app/access-denied.tsx` as `const AccessDenied: FC = () => <AccessDeniedContainer />; export default AccessDenied;`. Depends on T071
 
-**Checkpoint**: User Story 1 is fully functional and testable independently — sign-in
-flow, allowlist rejection, 7-day session, and sign-out all work end-to-end. The Binder tab
-still shows its placeholder body (T044); US2 lands the real grid next.
+**Checkpoint**: User Story 1 is independently testable — sign-in (allowlisted), allowlist rejection, and sign-out + re-consent all work end-to-end against the running server, and the front-page screen visually matches `front-page.png` from the spec.
 
 ---
 
-## Phase 4: User Story 2 — Browse the Binder Home Screen (Priority: P2)
+## Phase 4: User Story 2 — Browse the Binder (Priority: P2)
 
 **Goal**: Render the user's collection in a 3×3 grid that visually mirrors a physical
-9-pocket binder page, with native paging (`react-native-pager-view`), occupied/empty slot
-variants, and a current/total page indicator. After this phase, an authenticated user with
-cards in their collection sees all of them paginated 9 to a page; an empty collection
-shows page 1 of 1 with all empty slots; partial last pages do not render phantom cards.
+9-pocket binder page, with forward/back page navigation across the full collection
+(FR-009 through FR-014).
 
-**Independent Test**: Sign in with an account that has 0, 9, 11, and 1000 cards (in
-turn — see quickstart.md SC-007); confirm the 3×3 grid renders, occupied slots show the
-front-face image, empty slots use the empty-pocket variant, and pages 1, 1, 2, and 112
-respectively are reachable via swipe + previous/next controls.
+**Independent Test**: With an active session (seeded via test harness or by completing
+US1 sign-in), render the `Binder` tab and confirm the 3×3 grid appears, occupied slots
+show the front-face image, empty slots show the empty-pocket variant, the page indicator
+reads `1 / N`, and forward/back navigation moves through pages without phantom cards on
+partial last pages (Edge Case in spec). Repeat for collection sizes 0, 9, 11, and 1000
+to cover SC-007.
 
-### Tests for User Story 2 (Jest, REQUIRED — write FIRST) ⚠️
+### Tests for User Story 2 (Jest unit tests REQUIRED — write FIRST and confirm RED)
 
-- [ ] T067 [P] [US2] Create `apps/mobile/src/hooks/useCardsInfiniteQuery.test.ts` covering wraps TanStack `useInfiniteQuery` against `apiClient.getCards`, concatenates pages until `nextCursor === null` (matches `contracts/api-client.md` GET /cards), `staleTime: 5 * 60_000` keeps a tab-switch back to Binder from refetching within the window, gated on `useSession().status === "active"` via `enabled`, surfaces the union of all-page errors as a single `error`, respects the global retry policy (3 on 5xx/network, 0 on 4xx)
-- [ ] T068 [P] [US2] Create `apps/mobile/src/stores/binderStore.test.ts` covering Zustand store holds **only** `currentPage`, initial value 1, `nextPage`/`prevPage` clamp at the bounds derived from a TanStack-supplied total, `reset()` returns to page 1 (called from `useSignOutMutation`)
-- [ ] T069 [P] [US2] Create `apps/mobile/src/components/binder-home/useBinderHome.test.ts` covering composes `useCardsInfiniteQuery` and `binderStore.currentPage`, computes `totalPages = max(1, ceil(cards.length / 9))` per FR-013, pages forward/backward within bounds (FR-012), empty-collection state shows page 1 of 1 with all slots empty (Edge Case + US2.AS3), partial last page never produces phantom cards (Edge Case), maps TanStack `isPending`/`isError`/`isFetching` flags into a `loadState: "idle" | "loading" | "ready" | "error"` view-prop
-- [ ] T070 [P] [US2] Create `apps/mobile/src/components/binder-home/BinderHomeView.test.tsx` covering renders 3×3 grid (FR-009), occupied slots render `expo-image` with `frontFaceImageUrl` (FR-010), empty slots render the empty-pocket visual variant (FR-011), previous/next controls fire `onPrev`/`onNext` named props, page indicator string matches `currentPage / totalPages` (FR-014), `react-native-pager-view` is the paging primitive, no store/service imports (Principle X view purity)
-- [ ] T071 [P] [US2] Create `apps/mobile/app/(authenticated)/(tabs)/binder.test.tsx` (one-line-shell test: default export renders exactly `<BinderHomeContainer />` with no local state — Principle X)
+- [ ] T074 [P] [US2] Author Jest tests in `apps/mobile/src/hooks/useCardsInfiniteQuery.test.ts` wrapping TanStack `useInfiniteQuery` against `apiClient.getCards` per `contracts/api-client.md`: page concatenation until `nextCursor === null`, `staleTime: 5 * 60_000`, `gcTime: 30 * 60_000`, `enabled: useSession().status === "active"`, and the global retry policy (3 on 5xx/network, 0 on 4xx)
+- [ ] T075 [P] [US2] Author Jest tests in `apps/mobile/src/components/binder-home/useBinderHome.test.ts` covering composition with `useCardsInfiniteQuery` + `binderStore.currentPage`; total page count from `cards.length` (FR-013, SC-007); forward/backward bounds (FR-012); empty-collection state (page 1 of 1, all slots empty — Edge Case + US2.AS3); never produces phantom cards on partial last pages; maps TanStack `isPending`/`isError`/`isFetching` flags into the view-prop shape; and the `slots` array, `onPrev`/`onNext` handlers, and any other returned non-primitives keep referentially stable across re-renders when their input deps are unchanged (v1.16.0 memoisation rule — `slots` is `useMemo` over `(cards, currentPage)`; handlers are `useCallback`)
+- [ ] T076 [P] [US2] Author Jest tests in `apps/mobile/src/components/binder-home/BinderHomeView.test.tsx` rendering the 3×3 grid (FR-009) inside `react-native-pager-view`, occupied slots use `expo-image` with the `frontFaceImageUrl` (FR-010) on a `Colors.dark.pocketEmpty` pocket background, empty slots render the `Colors.dark.pocketEmpty` empty-pocket variant (FR-011), `previous`/`next` controls fire `onPrev`/`onNext` props, the page indicator string matches `currentPage / totalPages` (FR-014) using `Type.caption`, and the page-turn animation duration matches `Motion.pageTurn`
+- [ ] T077 [P] [US2] Author Jest tests in `apps/mobile/app/(authenticated)/(tabs)/binder.test.tsx` proving the route is a one-line shell rendering exactly `<BinderHomeContainer />`
 
 ### Implementation for User Story 2
 
-- [ ] T072 [P] [US2] Create `apps/mobile/src/hooks/useCardsInfiniteQuery.ts` (TanStack `useInfiniteQuery`; `queryKey: ["cards"]`; `queryFn: apiClient.getCards`; `getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined`; `staleTime: 5 * 60_000`; `gcTime: 30 * 60_000`; `enabled: useSession().status === "active"`)
-- [ ] T073 [P] [US2] Create `apps/mobile/src/stores/binderStore.ts` (Zustand 5; field `currentPage: number`; actions `nextPage(totalPages)`, `prevPage()`, `reset()`; clamps at `[1, totalPages]`)
-- [ ] T074 [US2] Create `apps/mobile/src/components/binder-home/useBinderHome.ts` (composes `useCardsInfiniteQuery` + `binderStore.currentPage`; flattens `data.pages.flatMap(p => p.cards)` into a `Card[]`; computes `totalPages` via `pageMath.pageCount`; derives the visible page slice via `pageMath.pageSlice`; maps TanStack flags into `loadState`; clamps `currentPage` if it exceeds `totalPages` after a refresh)
-- [ ] T075 [US2] Create `apps/mobile/src/components/binder-home/BinderHomeView.tsx` (props-only: 3×3 grid laid out via `FlatList` with `numColumns: 3` and `getItemLayout`, `removeClippedSubviews` enabled per research.md §6; occupied slots render `<Image source={{ uri }} />` from `expo-image` with `cachePolicy="memory-disk"`; empty slots render an empty-pocket variant; page navigation via `react-native-pager-view`; current/total page indicator string at the bottom)
-- [ ] T076 [US2] Create `apps/mobile/src/components/binder-home/BinderHomeContainer.tsx` (destructures `useBinderHome()` and passes named props to `<BinderHomeView />`)
-- [ ] T077 [US2] Replace the body of `apps/mobile/app/(authenticated)/(tabs)/binder.tsx` (created at T044) with a one-line shell rendering `<BinderHomeContainer />`
+- [ ] T078 [P] [US2] Implement `apps/mobile/src/hooks/useCardsInfiniteQuery.ts` as a TanStack `useInfiniteQuery` wrapper over `apiClient.getCards` with `getNextPageParam: (last) => last.nextCursor ?? undefined`. Full JSDoc per Principle IX
+- [ ] T079 [P] [US2] Implement `apps/mobile/src/components/binder-home/useBinderHome.ts` composing `useCardsInfiniteQuery` and `binderStore`. Returns `{ pageNumber, totalPages, slots, loadState, errorMessage, onPrev, onNext }`. Full JSDoc per Principle IX
+- [ ] T080 [P] [US2] Implement `apps/mobile/src/components/binder-home/BinderHomeView.tsx` as `const BinderHomeView: FC<BinderHomeViewProps> = ({ pageNumber, totalPages, slots, loadState, errorMessage, onPrev, onNext }) => ...` per the v1.14.0 Component declaration rule. Renders the 3×3 grid via `react-native-pager-view` and `expo-image`; pocket background `Colors.dark.pocketEmpty`, page indicator `Type.caption` + `Colors.dark.textMuted`, page-turn duration `Motion.pageTurn`. No store/service imports
+- [ ] T081 [US2] Implement `apps/mobile/src/components/binder-home/BinderHomeContainer.tsx` as `const BinderHomeContainer: FC = () => { const { pageNumber, totalPages, slots, loadState, errorMessage, onPrev, onNext } = useBinderHome(); return <BinderHomeView pageNumber={pageNumber} totalPages={totalPages} slots={slots} loadState={loadState} errorMessage={errorMessage} onPrev={onPrev} onNext={onNext} />; }`. Depends on T079 + T080
+- [ ] T082 [US2] Implement `apps/mobile/app/(authenticated)/(tabs)/binder.tsx` as `const Binder: FC = () => <BinderHomeContainer />; export default Binder;`. Depends on T081
 
-**Checkpoint**: Both user stories work independently. US1 sign-in lands on a real Binder
-grid; US2's grid is testable on its own with a stubbed `useCardsInfiniteQuery` per its
-test plan.
+**Checkpoint**: Both User Stories operate end-to-end. The Binder tab renders the user's collection across pages on the wireframe-v3 crimson background; the other three tabs still show "Coming Soon" placeholders.
 
 ---
 
 ## Phase 5: Polish & Cross-Cutting Concerns
 
-**Purpose**: Wire the mobile workspace into the existing Turborepo pipeline, audit for
-constitution-discipline drift, run quickstart's manual checks, and update the project's
-top-level documentation so future contributors know `apps/mobile` exists.
-
-- [ ] T078 Verify `apps/mobile` is registered with Turborepo end-to-end: run `turbo dev --filter=@my-binder/mobile`, `turbo test --filter=@my-binder/mobile`, and `turbo typecheck --filter=@my-binder/mobile`, confirming each task discovers and runs the workspace
-- [ ] T079 [P] Backfill JSDoc with `@example` blocks on the public-facing services (`apps/mobile/src/services/api/{apiClient,queryClient,ApiError}.ts`, `apps/mobile/src/services/auth/{googleAuth,sessionStorage}.ts`) and on the cross-feature TanStack hooks (`apps/mobile/src/hooks/{useCardsInfiniteQuery,useMeQuery,useGoogleSignInMutation,useSignOutMutation,useSession}.ts`) per Principle IX
-- [ ] T080 [P] Run `pnpm --filter @my-binder/mobile test --coverage` and confirm the floors declared in `apps/mobile/jest.config.ts` are met (80 % global; 95 % lines / 90 % branches on `useLogin`, `useBinderHome`, `useSession`, `useCardsInfiniteQuery`, `apiClient`, `queryClient`)
-- [ ] T081 [P] Run the quickstart.md "End-to-end success criteria (manual)" checks SC-001 → SC-008 plus the "Tab shell verification" table on at least one iOS Simulator and one Android emulator; record results in the PR description
-- [ ] T082 [P] Audit every new `useEffect` in `apps/mobile/src/` against plan.md's Principle X allow-list (secure-storage hydration in `useSession`, Google auth-session result events in `useLogin`); remove or refactor any incidental ones; ensure each remaining one returns a cleanup function and has exhaustive deps
-- [ ] T083 [P] Add `apps/mobile/README.md` pointing to `specs/002-mobile-binder-app/quickstart.md` and documenting the three nvm/pnpm/Expo commands needed to run locally (matches the `apps/server/README.md` pattern)
-- [ ] T084 [P] Update root `CLAUDE.md` "Project Structure" to mention `apps/mobile/` and "Active Technologies" to confirm React Native 0.76 + Expo SDK 52, Expo Router 4, TanStack Query 5, Zustand 5, expo-auth-session, expo-secure-store, expo-image, react-native-pager-view, @expo/vector-icons, ajv 8, jest-expo, @testing-library/react-native 12 are now in use
+- [ ] T083 [P] Create `apps/mobile/docs/architecture.md` documenting the four-layer Principle X split for this workspace, the v1.14.0 `FC` / `PropsWithChildren` component-declaration rule, the v1.15.0 SDK 54 / RN 0.81.5 / React 19.1 / Expo Router 6 / TS 5.9 tech-stack pin, the v1.16.0 Hook return-value memoisation rule (with the canonical `useCallback`/`useMemo` patterns from `useLogin` and `useBinderHome`), the `useEffect` discipline rules, and how view components consume design tokens from `apps/mobile/constants/theme.ts`. Include concrete examples from the implemented features
+- [ ] T084 [P] Create `apps/mobile/docs/auth.md` documenting the Google OAuth flow (`expo-auth-session`), the 7-day session policy, the allowlist rejection path, and the sign-out side-effect chain (revoke → clear secure-store → reset stores → `queryClient.clear()` → navigate Login)
+- [ ] T085 Run `turbo typecheck` from the repo root and confirm zero errors across `@my-binder/core`, `@my-binder/server`, and `@my-binder/mobile`
+- [ ] T086 Run `pnpm --filter @my-binder/mobile test --coverage` from the repo root and confirm every threshold in `apps/mobile/jest.config.ts` passes (80% global, 90/95% on the load-bearing hooks)
+- [ ] T087 Run `pnpm --filter @my-binder/mobile lint` and confirm `react-hooks/exhaustive-deps` reports zero violations. Manually review every hook in `apps/mobile/src/hooks/` and `apps/mobile/src/components/<feature>/use<Feature>.ts` for v1.16.0 memoisation compliance: every returned function MUST be wrapped in `useCallback`, every returned object/array/instance MUST be wrapped in `useMemo`, and every dependency array MUST be exhaustive. Suppressions of `exhaustive-deps` are only permitted with an adjacent comment naming the invariant that makes the missing dep safe
+- [ ] T088 Run `turbo build --filter=@my-binder/mobile` from the repo root and confirm the workspace builds cleanly under SDK 54
+- [ ] T089 Execute the manual checks in `specs/002-mobile-binder-app/quickstart.md` §"End-to-end success criteria" (SC-001 through SC-008) plus the "Tab shell verification" table on at least one iOS Simulator and one Android emulator
+- [ ] T090 Update the root `CLAUDE.md` "Recent Changes" section with the spec 002 completion note (workspace re-bootstrapped on SDK 54, US1 + US2 shipped, constitution v1.15.0 enforced)
 
 ---
 
@@ -204,76 +267,117 @@ top-level documentation so future contributors know `apps/mobile` exists.
 
 ### Phase Dependencies
 
-- **Phase 1 (Setup)**: No dependencies — can start immediately.
-- **Phase 2 (Foundational)**: Depends on Phase 1 completion — BLOCKS all user stories.
-- **Phase 3 (US1) and Phase 4 (US2)**: Both depend only on Phase 2; can proceed in parallel
-  by separate developers. US2 requires the placeholder `binder.tsx` from T044 only as a
-  starting point — its real body is landed in T077 (one-line shell). US2 does NOT depend
-  on US1.
-- **Phase 5 (Polish)**: Depends on US1 + US2 being complete.
+- **Setup (Phase 1)**: No dependencies — can start immediately.
+- **Foundational (Phase 2)**: Depends on Setup completion. **Blocks both user stories.**
+- **User Story 1 (Phase 3)**: Depends on Foundational completion. Independent of US2.
+- **User Story 2 (Phase 4)**: Depends on Foundational completion. Independent of US1.
+- **Polish (Phase 5)**: Depends on US1 + US2 completion (and at minimum, on whichever stories are being shipped).
 
-### Within a User Story
+### Within Phase 1 (Setup) — bootstrap cleanup
 
-- Tests (Principle III) — written FIRST and MUST FAIL before implementation lands.
-- Services / stores / utils — built before the hooks that consume them.
-- Hooks — built before containers that destructure them.
-- Containers — built before route files (one-line shells).
-- View files have no internal dependencies on hooks/stores (Principle X view purity), so
-  view tests + view files can be parallel with hook work.
+- **T001, T002, T003, T004, T005** are independent file-level operations and can run in parallel.
+- **T006 `pnpm install`** depends on T004 (delete `package-lock.json`) and T007 (package.json scripts/deps cleanup) — schedule T007 just before T006.
+- **T008 + T009** run after T006 (need a clean pnpm install before adding more deps).
+- **T010, T011, T012, T013, T014, T015, T016** can run in parallel after T006.
+- **T017** is the verification gate at the end.
 
-### Parallel Opportunities
+### Within Phase 2 (Foundational)
 
-- All `[P]` tasks within a phase touch different files and have no incomplete dependencies.
-- All Phase 1 config-file tasks (T003 – T010) are independent of each other.
-- All Foundational test files (T012 – T024) are independent of each other and of any
-  implementation file in their phase — they can be authored in one parallel sweep.
-- All US1 test files (T045 – T054) are independent of each other.
-- All US2 test files (T067 – T071) are independent of each other.
-- US1 implementation tasks T055 – T058 (each in its own file under `services/auth/` or
-  `hooks/`) and US1 implementation tasks T063 – T064 (`access-denied` view + hook in
-  separate files) are independent of each other.
-- US2 implementation tasks T072 – T073 (separate files under `hooks/` and `stores/`) are
-  independent of each other.
+- **All test tasks (T018–T034)** can run in parallel — different files, no cross-dependencies.
+- **Stores, utils, services that don't import each other** (T035, T036, T037, T038, T039, T042, T043, T046, T047) can run in parallel.
+- **T040 `apiClient.ts`** depends on `@my-binder/core` schemas and `sessionStore.ts` (T036).
+- **T041 `queryClient.ts`** depends on `apiClient.ts` (T040) for `ApiError` and on `sessionStore` for routing.
+- **T044 `useSession.ts`** depends on T036 + T038.
+- **T045 `useMeQuery.ts`** depends on T040 + T041 + T044.
+- **T048 `ComingSoonContainer.tsx`** depends on T046 + T047.
+- **T049 `app/_layout.tsx`** depends on T041 (`queryClient`).
+- **T050 `app/index.tsx`** depends on T044 (`useSession`).
+- **T051 `app/(authenticated)/_layout.tsx`** depends on T044.
+- **T052 `app/(authenticated)/(tabs)/_layout.tsx`** depends on `theme.ts` (already in place) for tab-bar tokens.
+- **T053, T054, T055** (search/scan/profile tab files) depend on T048 (`ComingSoonContainer`).
+
+### Within Phase 3 (US1)
+
+- **All test tasks (T056–T063)** can run in parallel.
+- **T064, T065, T066, T067, T069, T070** can run in parallel (different files).
+- **T068 `LoginContainer.tsx`** depends on T066 + T067.
+- **T071 `AccessDeniedContainer.tsx`** depends on T069 + T070.
+- **T072 `app/login.tsx`** depends on T068.
+- **T073 `app/access-denied.tsx`** depends on T071.
+
+### Within Phase 4 (US2)
+
+- **All test tasks (T074–T077)** can run in parallel.
+- **T078, T079, T080** can run in parallel.
+- **T081 `BinderHomeContainer.tsx`** depends on T079 + T080.
+- **T082 `app/(authenticated)/(tabs)/binder.tsx`** depends on T081.
+
+### Within Phase 5 (Polish)
+
+- **T083 + T084** can run in parallel (different docs).
+- **T085, T086, T087, T088** are verification gates and can run in parallel; each must pass before the feature is declared shipped.
+- **T089** is manual and depends on T085–T088 having passed.
+- **T090** depends on the full feature being verified.
 
 ---
 
-## Parallel Example: Foundational Phase Test Burst
+## Parallel Example: Phase 1 — bootstrap cleanup
 
 ```bash
-# Launch all 13 Foundational test files in one parallel sweep — different files,
-# no incomplete dependencies, all expected to fail until the matching implementation
-# file lands. Each invocation creates a single co-located *.test.ts(x) file.
-
-# Services tier
-Task: "Create apps/mobile/src/services/api/ApiError.test.ts"
-Task: "Create apps/mobile/src/services/api/apiClient.test.ts"
-Task: "Create apps/mobile/src/services/api/queryClient.test.ts"
-Task: "Create apps/mobile/src/services/auth/sessionStorage.test.ts"
-
-# State tier
-Task: "Create apps/mobile/src/stores/sessionStore.test.ts"
-Task: "Create apps/mobile/src/hooks/useSession.test.ts"
-
-# Util + ComingSoon tier
-Task: "Create apps/mobile/src/utils/pageMath.test.ts"
-Task: "Create apps/mobile/src/components/coming-soon/useComingSoon.test.ts"
-Task: "Create apps/mobile/src/components/coming-soon/ComingSoonView.test.tsx"
-
-# Routing tier
-Task: "Create apps/mobile/app/index.test.tsx"
-Task: "Create apps/mobile/app/(authenticated)/_layout.test.tsx"
-Task: "Create apps/mobile/app/(authenticated)/(tabs)/_layout.test.tsx"
-Task: "Create apps/mobile/app/(authenticated)/(tabs)/{search,scan,profile}.test.tsx"
+# All file-level cleanup tasks target distinct paths and have no dependencies:
+T001  app/modal.tsx (delete)
+T002  hooks/use-color-scheme.ts, use-color-scheme.web.ts, use-theme-color.ts (delete)
+T003  scripts/reset-project.js + scripts/ (delete)
+T004  package-lock.json (delete)
+T005  tsconfig.json (rewrite paths)
+# After all of the above land, run T007 (package.json edits) → T006 (pnpm install) sequentially.
+# Then T008–T016 in parallel, then T017 verification.
 ```
 
-## Parallel Example: US1 Service + Hook Implementation Burst
+## Parallel Example: Phase 2 Test Authoring
 
 ```bash
-# Once Foundational is green, launch US1's service + hook implementations in parallel.
-Task: "Implement apps/mobile/src/services/auth/googleAuth.ts"
-Task: "Implement apps/mobile/src/hooks/useGoogleSignInMutation.ts"
-Task: "Implement apps/mobile/src/hooks/useMeQuery.ts"
-Task: "Implement apps/mobile/src/hooks/useSignOutMutation.ts"
+# All foundational test files target distinct paths and have no source dependencies
+# (the source files don't exist yet — that's the point of writing tests first).
+T018  src/utils/pageMath.test.ts
+T019  src/stores/sessionStore.test.ts
+T020  src/stores/binderStore.test.ts
+T021  src/services/auth/sessionStorage.test.ts
+T022  src/services/auth/googleAuth.test.ts
+T023  src/services/api/apiClient.test.ts
+T024  src/services/api/queryClient.test.ts
+T025  src/hooks/useSession.test.ts
+T026  src/hooks/useMeQuery.test.ts
+T027  src/components/coming-soon/useComingSoon.test.ts
+T028  src/components/coming-soon/ComingSoonView.test.tsx
+T029  app/index.test.tsx
+T030  app/(authenticated)/_layout.test.tsx
+T031  app/(authenticated)/(tabs)/_layout.test.tsx
+T032  app/(authenticated)/(tabs)/search.test.tsx
+T033  app/(authenticated)/(tabs)/scan.test.tsx
+T034  app/(authenticated)/(tabs)/profile.test.tsx
+```
+
+## Parallel Example: Phase 3 (US1) — Hooks + Views
+
+```bash
+# After T056–T063 land RED, the hooks and views can be authored in parallel:
+T064  src/hooks/useGoogleSignInMutation.ts
+T065  src/hooks/useSignOutMutation.ts
+T066  src/components/login/useLogin.ts
+T067  src/components/login/LoginView.tsx
+T069  src/components/access-denied/useAccessDenied.ts
+T070  src/components/access-denied/AccessDeniedView.tsx
+# T068 and T071 (Containers) join after their hook + view land.
+```
+
+## Parallel Example: Phase 4 (US2) — Hooks + Views
+
+```bash
+T078  src/hooks/useCardsInfiniteQuery.ts
+T079  src/components/binder-home/useBinderHome.ts
+T080  src/components/binder-home/BinderHomeView.tsx
+# T081 (Container) joins after T079 + T080.
 ```
 
 ---
@@ -282,49 +386,66 @@ Task: "Implement apps/mobile/src/hooks/useSignOutMutation.ts"
 
 ### MVP First (US1 only)
 
-1. Complete Phase 1: Setup.
-2. Complete Phase 2: Foundational (CRITICAL — blocks both stories).
-3. Complete Phase 3: US1 Sign in with Google.
-4. **STOP and VALIDATE**: run quickstart.md SC-001, SC-002, SC-004, SC-006, SC-008 plus
-   the "Allowlist rejection" edge case. The placeholder Binder tab from T044 is acceptable
-   at this checkpoint — US1's independent test does not require the 3×3 grid.
+1. Complete Phase 1 (Setup / bootstrap cleanup).
+2. Complete Phase 2 (Foundational) — including the `(tabs)` layout and the three Coming
+   Soon stub tabs so the auth-success landing surface looks correct even with US2 deferred.
+3. Complete Phase 3 (US1).
+4. **Stop and validate**: sign-in, allowlist rejection, sign-out + re-consent all work
+   end-to-end. The Binder tab is empty (a placeholder is acceptable for MVP).
+5. Optionally ship a TestFlight / internal Android build at this point.
 
 ### Incremental Delivery
 
-1. Phase 1 + Phase 2 → Foundation ready.
-2. Add US1 → MVP demo.
-3. Add US2 → Full feature demo against quickstart.md SC-003, SC-005, SC-007.
-4. Phase 5 polish → ship.
+1. MVP (above) ships US1.
+2. Phase 4 ships US2 — the Binder tab becomes live without changes to any other route.
+3. Phase 5 polishes documentation, verifies coverage and typecheck, and runs the manual
+   quickstart matrix on iOS + Android.
 
 ### Parallel Team Strategy
 
-With multiple developers:
+Once Phase 2 (Foundational) lands:
 
-1. One developer completes Phase 1 (Setup) — single-threaded by nature (workspace bootstrap).
-2. The team shares Phase 2 (Foundational) — split the test burst (T012 – T024) and the
-   implementation files (T025 – T044) across people; the auth gate / tab navigator can be
-   one workstream and the API/storage layer another.
-3. Once Foundational is green:
-   - Developer A: US1 (Phase 3) — auth flow + AccessDenied screen.
-   - Developer B: US2 (Phase 4) — cards infinite query + binder grid.
-4. The two stories integrate at T077 (binder route swap) and T084 (CLAUDE.md update).
+- Developer A picks up Phase 3 (US1).
+- Developer B picks up Phase 4 (US2).
+- The two phases share no source files, so the work is genuinely parallel — only the
+  Polish phase needs both streams green.
 
 ---
 
 ## Notes
 
-- `[P]` tasks have no dependencies on incomplete tasks within the phase and write to
-  different files.
-- `[Story]` labels (US1, US2) appear ONLY on user-story phase tasks (Phases 3 and 4).
-  Setup, Foundational, and Polish phases carry NO story label.
-- Tests must FAIL before implementation lands (Principle III). Run
-  `pnpm --filter @my-binder/mobile test -- <test-file>` after each test creation to
-  confirm the expected failure.
-- Commit after each task or logical group. Each phase ends at a natural checkpoint where
-  `turbo test --filter=@my-binder/mobile` should pass.
-- Avoid: vague tasks, same-file conflicts, cross-story dependencies that break the
-  US1-vs-US2 independence guarantee.
-- `apps/mobile/app/(authenticated)/(tabs)/binder.tsx` is intentionally created twice —
-  once in T044 (placeholder so the tab navigator compiles during US1) and once in T077
-  (real shell rendering `<BinderHomeContainer />`). The two tasks edit the SAME file in
-  sequence — they are NOT parallelizable across phases.
+- **Constitution v1.16.0**: every non-primitive value returned from any hook in
+  `apps/mobile/src/components/<feature>/use<Feature>.ts` or `apps/mobile/src/hooks/`
+  MUST be memoised — functions via `useCallback`, objects/arrays/instances via
+  `useMemo`. Primitives are exempt. Values read straight from a Zustand selector or a
+  TanStack Query result are already reference-stable; values *derived* from them
+  must be memoised at the hook boundary. ESLint's `react-hooks/exhaustive-deps`
+  catches missing dependencies but does not catch missing memoisation; reviewers must.
+- **Constitution v1.15.0**: every install/upgrade in this feature MUST resolve compatible
+  versions of Expo SDK ~54.0, RN 0.81.5, React 19.1, Expo Router ~6.0, TypeScript ~5.9.
+  Adding a dependency that forces a version skew (e.g., one that pins React 18 or RN
+  ≤0.80) requires a constitution amendment.
+- **Constitution v1.14.0**: every functional component declared in this feature MUST be
+  `const Foo: FC<FooProps> = (...) => { ... }` (or `FC<PropsWithChildren<FooProps>>` when
+  the component renders `children`). The `<Component>Props` type lives in the same file.
+  This is enforced by code review; ESLint flags `react-hooks/exhaustive-deps` violations
+  but does not (yet) enforce the FC-declaration rule, so reviewers must catch it.
+- **Design tokens**: views import colour, type, spacing, radius, elevation, motion, and
+  touch-target tokens from `apps/mobile/constants/theme.ts`. Hard-coded hex values or
+  pixel literals in views are a Principle V (transparency / no magic literals) violation.
+- **Tests fail before implementation**: every test task in Phase 2/3/4 MUST land RED
+  before the matching implementation task is started. Commit the RED tests separately
+  from the implementation that turns them GREEN so the Red→Green transition is visible
+  in `git log`.
+- **No Container.test.tsx files**: Containers are one-line glue per Principle X; their
+  behaviour is covered by the Hook test (logic) and the View test (render). Adding a
+  Container test would duplicate coverage.
+- **Bootstrap pre-state acknowledged**: tasks assume the SDK 54 bootstrap layout
+  (already on disk: `app/_layout.tsx`, `app.json`, `eslint.config.js`, `expo-env.d.ts`,
+  `assets/`, `constants/theme.ts`, `tsconfig.json` with `@/*` alias). Phase 1 cleanup
+  brings it into compliance; Phases 2–5 build on top. Do NOT delete `apps/mobile/`
+  wholesale and start over — the bootstrap is the agreed baseline per spec.md
+  Clarifications §2026-05-02.
+- **Branch name caveat**: the current branch is `feat/002-scaffold-mobile-app`, which
+  does not match speckit's `NNN-name` convention. Either rename to `002-mobile-binder-app`
+  before merging or accept the deviation (matches `plan.md`'s branch note).

@@ -17,6 +17,11 @@ support multi factor authentication from a provider. We'll start with google."
 - Q: What is the mobile session duration before requiring fresh Google sign-in? → A: 7 days, matching server `SESSION_JWT_TTL_DAYS`
 - Q: What does sign-out do? → A: Clear local session JWT AND revoke the Google grant so the user must re-consent (full Google flow) on next sign-in
 
+### Session 2026-05-02
+
+- Q: The first implementation attempt was abandoned and `apps/mobile/` was re-bootstrapped from `npx create-expo-app` on Expo SDK 54. What should be done with the template scaffolding the bootstrap left behind (demo screens, `HelloWave`/`ThemedText` components, Expo logo PNGs)? → A: Hybrid — delete the demo files in `app/(tabs)/`, `assets/images/`, `components/`, `components/ui/`, but preserve the template configs (`tsconfig.json` paths-to-be-rewritten, `eslint.config.js`, `app.json`, `expo-env.d.ts`, `assets/`) and update `apps/mobile/constants/theme.ts` to the wireframe v3 design tokens (deep crimson cover + warm dusty-gold accent + display serif). Subsequent feature work rebuilds against this slimmer baseline rather than wiping or fully refactoring the template.
+- Q: The bootstrap actually pins `react-native@0.81.5` + `expo@~54.0` + `react@19.1` + `expo-router@~6.0` + `typescript@~5.9`, not RN 0.82 as initially mentioned. Should the constitution and plan be updated to those actual versions or force-upgraded to RN 0.82? → A: Pin the actual bootstrap versions (Option A). RN 0.82 is not yet certified on Expo SDK 54; the cleaner upgrade window is Expo SDK 55 when it ships with first-class RN 0.82 support. The constitution amendment, plan.md "Active Technologies" + Technical Context, tasks.md T002, and root CLAUDE.md MUST all reflect SDK 54.0.x / RN 0.81.5 / React 19.1 / Expo Router 6 / TypeScript 5.9.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Sign In with Google (Priority: P1)

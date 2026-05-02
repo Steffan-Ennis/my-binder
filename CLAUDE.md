@@ -22,6 +22,35 @@ This is a **pnpm + Turborepo monorepo**. Workspaces:
 ```
 my-binder/
 ├── apps/
+│   ├── mobile/                         # @my-binder/mobile — React Native 0.81.5 + Expo SDK ~54.0 + React 19.1 (spec 002, re-bootstrapped 2026-05-02)
+│   │   ├── app/                        # Expo Router 6 file-based routes (Root Stack → auth gate → 4-tab)
+│   │   │   ├── _layout.tsx             # Root Stack — providers, QueryClientProvider, error boundary
+│   │   │   ├── index.tsx               # <Redirect /> based on useSession() status
+│   │   │   ├── login.tsx               # PUBLIC — <LoginContainer />
+│   │   │   ├── access-denied.tsx       # PUBLIC — <AccessDeniedContainer />
+│   │   │   └── (authenticated)/
+│   │   │       ├── _layout.tsx         # Auth gate — <Redirect /> when no active session
+│   │   │       └── (tabs)/             # Bottom-tab navigator (4 tabs per v3 wireframe)
+│   │   │           ├── _layout.tsx     # <Tabs /> — Binder is initial route
+│   │   │           ├── binder.tsx      # PRIVATE — <BinderHomeContainer />
+│   │   │           └── {search,scan,profile}.tsx  # STUBS — <ComingSoonContainer />
+│   │   ├── assets/                     # Bootstrap-supplied dir; future Playfair Display custom font lands here
+│   │   ├── constants/
+│   │   │   └── theme.ts                # Wireframe v3 design tokens — Colors, Type, Spacing, Radius, Elevation, Motion, Touch
+│   │   ├── src/
+│   │   │   ├── components/             # Feature components (Container → Hook → View per Principle X)
+│   │   │   │   ├── login/{LoginContainer,LoginView,useLogin}.tsx
+│   │   │   │   ├── binder-home/{BinderHomeContainer,BinderHomeView,useBinderHome}.tsx
+│   │   │   │   ├── access-denied/{AccessDeniedContainer,AccessDeniedView,useAccessDenied}.tsx
+│   │   │   │   └── coming-soon/{ComingSoonContainer,ComingSoonView,useComingSoon}.tsx
+│   │   │   ├── hooks/                  # Cross-feature TanStack hooks + useSession
+│   │   │   ├── services/
+│   │   │   │   ├── api/{ApiError,apiClient,queryClient,schemas,index}.ts
+│   │   │   │   └── auth/{googleAuth,sessionStorage,index}.ts
+│   │   │   ├── stores/{sessionStore,binderStore}.ts
+│   │   │   └── utils/pageMath.ts
+│   │   ├── app.config.ts | app.json | eslint.config.js | jest.config.ts | jest.setup.ts | tsconfig.json | expo-env.d.ts
+│   │   └── package.json
 │   └── server/                         # @my-binder/server — Fastify API
 │       ├── src/
 │       │   ├── app.ts                  # Fastify app builder (SDK init, plugin registration)
@@ -164,18 +193,19 @@ Required Postgres vars: `DATABASE_URL` (hostname, despite the name), `DATABASE_P
 - **`@duckdb/node-api`** — retained only as the MTGJSON SDK's parquet cache backend (spec 011 FR-006)
 - **Google OAuth (`google-auth-library`)** — sign-in with allowlist gate stored in the `allowed_users` table (spec 011)
 - **AWS Lambda + API Gateway HTTP API** — production runtime, defined via CDK (spec 009)
-- **React Native 0.76 + Expo SDK 52** — `apps/mobile` framework (spec 002 plan); managed workflow with EAS Build for store artifacts. Pinned by upcoming constitution amendment (resolves the open `TODO(MOBILE_PLATFORM)`)
-- **Expo Router 4** (file-based routing built on `@react-navigation/native-stack` 7 + `@react-navigation/bottom-tabs` 7) — `apps/mobile` routes live in `apps/mobile/app/` at the workspace root with a three-level hierarchy: Root Stack → `(authenticated)/_layout.tsx` (auth gate) → `(authenticated)/(tabs)/_layout.tsx` (4-tab bar matching the v3 wireframe: Binder live, Search/Scan/Profile as `<ComingSoonContainer />` stubs deferred to specs 003+) (spec 002). Constitution v1.13.2 already aligned Principle X with Expo Router conventions.
+- **React Native 0.81.5 + Expo SDK ~54.0 on React 19.1** — `apps/mobile` framework (spec 002, re-bootstrapped 2026-05-02 via `npx create-expo-app` after the first SDK 52 attempt was abandoned); managed workflow with EAS Build for store artifacts. Pinned by constitution v1.15.0 (supersedes the v1.13.1 SDK 52 / RN 0.76 pin)
+- **Expo Router ~6.0** (file-based routing built on `@react-navigation/native-stack` 7 + `@react-navigation/bottom-tabs` 7) — `apps/mobile` routes live in `apps/mobile/app/` at the workspace root with a three-level hierarchy: Root Stack → `(authenticated)/_layout.tsx` (auth gate) → `(authenticated)/(tabs)/_layout.tsx` (4-tab bar matching the v3 wireframe: Binder live, Search/Scan/Profile as `<ComingSoonContainer />` stubs deferred to specs 003+) (spec 002). Constitution v1.13.2 aligned Principle X with Expo Router conventions; v1.15.0 re-pinned the major version to 6.
 - **`@expo/vector-icons` (Ionicons)** — tab-bar glyphs for Binder/Search/Scan/Profile, matching the iOS-style wireframe language (spec 002).
 - **TanStack Query 5** (`@tanstack/react-query@5`) — `apps/mobile` server-state layer; provides caching, request deduplication, and exponential-back-off retry on top of `apiClient.ts` (which remains the typed fetch + Ajv-validation queryFn body). Default policy: queries retry 3× on 5xx/network with `1s → 2s → 4s` back-off (cap 30s) and skip 4xx; mutations `retry: 0`; `refetchOnWindowFocus: false`. `<QueryClientProvider />` is mounted at the Root Stack in `apps/mobile/app/_layout.tsx`. Per-endpoint hooks: `useCardsInfiniteQuery`, `useMeQuery`, `useGoogleSignInMutation`, `useSignOutMutation` (spec 002).
 - **Zustand 5** with `subscribeWithSelector` — `apps/mobile` UI/auth state stores (`sessionStore`; `binderStore` holds `currentPage` only); server state lives in the TanStack cache. Selectors keep the four-layer Principle X view-store boundary clean (spec 002)
 - **`expo-auth-session/providers/google`** — Google OAuth 2.0 flow inside an in-app browser (ASWebAuthenticationSession on iOS, Custom Tabs on Android); satisfies FR-003 of spec 002
 - **`expo-secure-store`** — session JWT persistence on `apps/mobile` (Keychain on iOS, EncryptedSharedPreferences on Android); 7-day TTL via `SESSION_JWT_TTL_DAYS` from `@my-binder/core` (spec 002)
 - **`expo-image`** + **`react-native-pager-view`** — card front-face caching and native paging for the 3×3 binder grid; required to hit SC-005 (60fps swipe) at SC-007 scale (1000 cards) (spec 002)
-- **`jest-expo`** preset + **`@testing-library/react-native` 12** — `apps/mobile` test stack on top of Jest 30 (Principle III); `renderHook` for hook tests, RN render for view tests (spec 002)
+- **`jest-expo`** preset (SDK 54-compatible) + **`@testing-library/react-native` 13** — `apps/mobile` test stack on top of Jest 30 (Principle III); `renderHook` for hook tests, RN render for view tests; reference-stability assertions verify the v1.16.0 hook return-value memoisation rule (spec 002)
 
 ## Recent Changes
-- **002-mobile-binder-app (plan)**: Drafted the implementation plan for `apps/mobile`. Stack: React Native 0.76 + Expo SDK 52, **Expo Router 4 (file-based routing, `apps/mobile/app/` at workspace root) with a three-level hierarchy: Root Stack → `(authenticated)` auth gate → `(tabs)` bottom-tab navigator** matching the v3 wireframe (Binder live, Search/Scan/Profile as `<ComingSoonContainer />` stubs deferred to specs 003+), **TanStack Query 5** as the server-state layer (caching + exponential-back-off retry on top of an `apiClient.ts` queryFn), Zustand 5 (UI/auth state — `sessionStore`, `binderStore.currentPage` only), `expo-auth-session` (Google), `expo-secure-store` (7-day session JWT), `expo-image` + `react-native-pager-view` (3×3 binder grid), `@expo/vector-icons` (tab glyphs). Architecture follows constitution Principle X (Screen → Container → Hook → View) and Principle III (Jest + `jest-expo` + `@testing-library/react-native`). Two user stories: Google-only sign-in with allowlist gate (US1), 3×3 binder browse (US2). All pre-implementation gates cleared; `/speckit.tasks` and `/speckit.implement` are unblocked.
+- **002-mobile-binder-app (re-bootstrap, 2026-05-02)**: First implementation attempt was abandoned after build failures and `apps/mobile/` was re-bootstrapped via `npx create-expo-app` on **Expo SDK 54.0.33 / React Native 0.81.5 / React 19.1 / Expo Router 6.0.23 / TypeScript 5.9.2**. Constitution amended to **v1.15.0** (re-pins the mobile tech stack, supersedes the v1.13.1 SDK 52 / RN 0.76 pin) and **v1.16.0** (adds Hook return-value memoisation rule to Principle X — `useCallback` for returned functions, `useMemo` for non-primitives, exhaustive deps; primitives exempt; values from Zustand selectors/TanStack Query results are already stable, derived values must be memoised at the hook boundary). `spec.md` Clarifications §2026-05-02 records the re-bootstrap and version-pin decisions. Bootstrap-cleanup tracked as Phase 1 of the regenerated `tasks.md` (delete `package-lock.json` → pnpm install; rewrite `tsconfig.json` paths from `@/*` to `@root/*` + `@src/*`; delete leftover template files `app/modal.tsx`, `hooks/use-color-scheme*.ts`, `hooks/use-theme-color.ts`, `scripts/reset-project.js`). `apps/mobile/constants/theme.ts` rewritten with the wireframe v3 design tokens (deep crimson cover + warm dusty-gold accent + display-serif `Type` roles + 4-pt `Spacing` + `Radius` + `Elevation` + `Motion` + `Touch`); `tsc --strict` passes. The four template directories `app/(tabs)`, `assets/images`, `components`, `components/ui` were stripped of their demo files (22 PNG/TSX deletions) and stand empty awaiting feature work.
+- **002-mobile-binder-app (plan)**: Drafted the implementation plan for `apps/mobile`. Stack (post-v1.15.0): React Native 0.81.5 + Expo SDK ~54.0 on React 19.1, **Expo Router 6 (file-based routing, `apps/mobile/app/` at workspace root) with a three-level hierarchy: Root Stack → `(authenticated)` auth gate → `(tabs)` bottom-tab navigator** matching the v3 wireframe (Binder live, Search/Scan/Profile as `<ComingSoonContainer />` stubs deferred to specs 003+), **TanStack Query 5** as the server-state layer (caching + exponential-back-off retry on top of an `apiClient.ts` queryFn), Zustand 5 (UI/auth state — `sessionStore`, `binderStore.currentPage` only), `expo-auth-session` (Google), `expo-secure-store` (7-day session JWT), `expo-image` + `react-native-pager-view` (3×3 binder grid), `@expo/vector-icons` (tab glyphs). Architecture follows constitution Principle X (Screen → Container → Hook → View; FC declaration rule v1.14.0; Hook memoisation rule v1.16.0) and Principle III (Jest 30 + `jest-expo` SDK 54 preset + `@testing-library/react-native` 13). Two user stories: Google-only sign-in with allowlist gate (US1), 3×3 binder browse (US2). All pre-implementation gates cleared; `/speckit.tasks` regenerated against the SDK 54 baseline and `/speckit.implement` is unblocked.
 - Adopted TypeScript 5 (strict) project-wide — replaces JavaScript + JSDoc approach
 - Adopted pnpm monorepo with Turborepo: `apps/server`, `apps/mobile`, `packages/core`
 - **007-google-oauth-auth**: Added Google OAuth + guest mode — `POST /auth/google`, `GET /auth/me`, `POST /auth/signout`; auth plugin decorates `request.identity`; users table in DuckDB; session JWTs (HS256, 7-day TTL)
