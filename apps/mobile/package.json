@@ -13,7 +13,8 @@
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "build": "expo export",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "adb:reverse": "./scripts/adb-reverse.sh"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
