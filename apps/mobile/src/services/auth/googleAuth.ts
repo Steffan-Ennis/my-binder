@@ -1,6 +1,7 @@
 import { revokeAsync } from 'expo-auth-session';
-import * as Google from 'expo-auth-session/providers/google';
+import { GoogleSignin, ConfigureParams } from '@react-native-google-signin/google-signin';
 import Constants from 'expo-constants';
+import {useCallback} from "react";
 
 const GOOGLE_REVOKE_ENDPOINT = 'https://oauth2.googleapis.com/revoke';
 
@@ -22,6 +23,11 @@ const getExtra = (): ExtraConfig => {
   return (extra ?? {}) as ExtraConfig;
 };
 
+GoogleSignin.configure({
+  iosClientId: getExtra().googleIosClientId,
+  webClientId: getExtra().googleWebClientId
+})
+
 /**
  * Construct the Google OAuth request hook for use within `useLogin`.
  *
@@ -33,16 +39,12 @@ const getExtra = (): ExtraConfig => {
  */
 export const useGoogleAuthRequest = () => {
   const extra = getExtra();
-  const [ request, response, promptAsync ] = Google.useAuthRequest({
-    iosClientId: extra.googleIosClientId,
-    androidClientId: extra.googleAndroidClientId,
-    webClientId: extra.googleWebClientId,
-  });
 
-  console.log('[google-auth] redirectUri =', request?.redirectUri);
-  console.log('[google-auth] clientId    =', request?.clientId);
+  const signIn = useCallback(async () => {
+    return await GoogleSignin.signIn()
+  }, [])
 
-  return [ request, response, promptAsync ]
+  return signIn
 };
 
 /**

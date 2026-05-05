@@ -125,13 +125,12 @@ const fetchJson = async <T>(input: {
  *   await writeSession({ jwt: result.token!, iat: Math.floor(Date.now() / 1000) });
  */
 export const signInWithGoogle = async (input: { idToken: string }): Promise<GoogleSignInResponse> => {
-  const body = await fetchJson<GoogleSignInResponse>({
+  return await fetchJson<GoogleSignInResponse>({
     path: '/auth/google',
     method: 'POST',
     body: input,
     validator: validateGoogleSignInResponse,
-  });
-  return body as GoogleSignInResponse;
+  }) as GoogleSignInResponse;
 };
 
 /**
