@@ -328,13 +328,5 @@ describe('Cards API — provider routes', () => {
       expect(r.statusCode).toBe(400);
       expect(r.json<{ error: string }>().error).toBe('MISSING_FILTER');
     });
-
-    test('returns 503 when provider is unavailable', async () => {
-      registry.register('search-down', makeProvider({ search: async () => { throw new Error('down'); } }));
-      await registry.setActive('search-down');
-      const r = await fastify.inject({ method: 'GET', url: '/cards/search?name=bolt' });
-      expect(r.statusCode).toBe(503);
-      await registry.setActive('route-test');
-    });
   });
 });

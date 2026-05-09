@@ -260,10 +260,12 @@ describe('cardService — provider-backed functions', () => {
       await registry.setActive('search');
     });
 
-    test('throws ProviderUnavailableError when provider errors', async () => {
-      registry.register('search-broken', makeProvider({ search: async () => { throw new Error('disk error'); } }));
+    test('Bubbles up original errors', async () => {
+      const error = new Error('disk error')
+
+      registry.register('search-broken', makeProvider({ search: async () => { throw error; } }));
       await registry.setActive('search-broken');
-      await expect(() => searchCards({ name: 'x' })).rejects.toThrow(ProviderUnavailableError);
+      await expect(() => searchCards({ name: 'x' })).rejects.toThrow(error);
     });
   });
 });
