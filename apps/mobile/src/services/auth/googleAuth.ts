@@ -1,9 +1,6 @@
-import { revokeAsync } from 'expo-auth-session';
-import { GoogleSignin, ConfigureParams } from '@react-native-google-signin/google-signin';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import Constants from 'expo-constants';
 import {useCallback} from "react";
-
-const GOOGLE_REVOKE_ENDPOINT = 'https://oauth2.googleapis.com/revoke';
 
 export class UserCancelledError extends Error {
   readonly name = 'UserCancelledError';
@@ -38,7 +35,6 @@ GoogleSignin.configure({
  *   if (request) await promptAsync();
  */
 export const useGoogleAuthRequest = () => {
-  const extra = getExtra();
 
   const signIn = useCallback(async () => {
     return await GoogleSignin.signIn()
@@ -60,5 +56,5 @@ export const useGoogleAuthRequest = () => {
  */
 export const revokeGoogleGrant = async (token: string): Promise<void> => {
   if (!token) return;
-  await revokeAsync({ token }, { revocationEndpoint: GOOGLE_REVOKE_ENDPOINT });
+  await GoogleSignin.revokeAccess();
 };

@@ -33,6 +33,28 @@
 
 [Gates determined based on constitution file]
 
+### Dependency Currency Check (Principle XI)
+
+*GATE: REQUIRED for any feature that adds a new entry to `dependencies`,
+`devDependencies`, or `peerDependencies` in any `package.json`. Skip the
+table entirely if the feature adds no new packages.*
+
+For each new package introduced by this feature, list the chosen version and
+confirm it is the registry's current stable (or the framework-mandated version
+per Principle XI's framework carve-out). If any chosen version is older than
+current stable, or the package is registry-flagged deprecated, populate the
+"Justification" column with a concrete blocker (peer-dep ceiling, active CVE
+in latest, breaking-change incompatibility, missing types, framework pin,
+etc.). "Preference" or "we'll bump later" is not a justification — open a
+Complexity Tracking row instead.
+
+| Package | Workspace | Chosen version | Current stable | Justification (only if off-stable) |
+|---|---|---|---|---|
+| `<pkg>` | `apps/<workspace>` | `^x.y.z` | `^x.y.z` | _all latest stable — no entry needed_ |
+
+> If every new package matches current stable, write a single row stating
+> "No off-stable selections" and delete the example row above.
+
 ## Project Structure
 
 ### Documentation (this feature)

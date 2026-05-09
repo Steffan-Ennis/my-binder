@@ -13,14 +13,22 @@ jest.mock('expo-secure-store', () => ({
   WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY',
 }));
 
-jest.mock('expo-auth-session/providers/google', () => ({
-  useAuthRequest: jest.fn(() => [null, null, jest.fn()]),
-}));
-
-jest.mock('expo-auth-session', () => ({
-  makeRedirectUri: jest.fn(() => 'mybinder://redirect'),
-  ResponseType: { Token: 'token', IdToken: 'id_token' },
-  revokeAsync: jest.fn(),
+jest.mock('@react-native-google-signin/google-signin', () => ({
+  GoogleSignin: {
+    configure: jest.fn(),
+    hasPlayServices: jest.fn(async () => true),
+    signIn: jest.fn(),
+    signOut: jest.fn(),
+    revokeAccess: jest.fn(),
+    getCurrentUser: jest.fn(() => null),
+    getTokens: jest.fn(),
+  },
+  statusCodes: {
+    SIGN_IN_CANCELLED: 'SIGN_IN_CANCELLED',
+    IN_PROGRESS: 'IN_PROGRESS',
+    PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE',
+    SIGN_IN_REQUIRED: 'SIGN_IN_REQUIRED',
+  },
 }));
 
 jest.mock('expo-constants', () => ({

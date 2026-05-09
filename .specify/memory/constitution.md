@@ -1,53 +1,76 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.16.0 → 1.17.0
+Version change: 1.18.0 → 1.19.0
 Bump type: MINOR — materially expands Principle III (Test-First Development)
-  with a new sub-rule defining the **Phase completion validation gate**:
-  every phase declared in a feature's `tasks.md` (Setup, Foundational, each
-  User Story, Polish) MUST run the affected workspaces' full Jest suite and
-  report a 100% pass rate before the phase is marked complete. Failing
-  tests MUST be investigated at root cause — bleeding state, shared
-  modules, leaky timers, unawaited promises, fixture ordering — and fixed
-  in-place. Skip/`.todo`/quarantine/retry-until-green workarounds are
-  prohibited.
+  with a new "Mobile mocking conventions" sub-section codifying the two-tier
+  mocking pattern used by `apps/mobile`: module-level defaults declared once
+  in `apps/mobile/jest.setup.ts`, plus per-test typed spies installed via
+  `jest.spyOn` in `beforeEach`. The trigger was the review of
+  `apps/mobile/src/services/auth/googleAuth.test.ts`, which is the canonical
+  example of the pattern. The new sub-section pins:
+    - which third-party native/Expo modules MUST live in `jest.setup.ts`,
+    - the typed-spy declaration shape
+      (`jest.SpyInstance<ReturnType<typeof X.method>>`),
+    - the `beforeEach` install rule (no manual `mockClear`, no per-test
+      `jest.mock`),
+    - the prohibition on re-mocking a module that already has a default,
+    - and the rule that adding a new native/Expo dependency MUST land its
+      `jest.setup.ts` mock in the same PR.
 
-  The rule complements — it does not replace — the existing co-location,
-  Jest-only, and Unit Testing Phase rules already encoded in Principle III.
-  No principle is removed or redefined.
+  No existing principle is removed or redefined. Other workspaces
+  (`apps/server`, `packages/core`) are unaffected — the sub-section is
+  scoped to `apps/mobile` because that is where the React Native/Expo
+  module surface lives.
 
-Last amended: 2026-05-02
+Last amended: 2026-05-09
 
-Modified principles:
-  - III. Test-First Development — added the **Phase completion validation
-    gate** sub-section after the existing "Test co-location rule".
-    Per-workspace Jest preset table, Plan requirement, and co-location
-    rule are unchanged.
+Added principles:
+  (none — Principle III expanded, not added)
 
-Added sections / material expansions:
-  - Principle III → "Phase completion validation gate" (new sub-section
-    with allowed/prohibited remediation patterns and rationale).
+Modified sections:
+  - Principle III. Test-First Development — added "Mobile mocking
+    conventions" sub-section between the Test co-location rule and the
+    Phase completion validation gate.
 
 Removed sections:
   (none)
 
 Templates reviewed:
-  ✅ .specify/templates/plan-template.md  — No change required (Unit
-     Testing Phase already enumerates test files; the gate runs them).
-  ✅ .specify/templates/spec-template.md  — No change required.
-  ✅ .specify/templates/tasks-template.md — UPDATED: every "Checkpoint"
-     marker now explicitly cites the phase-completion validation gate
-     and references this principle.
-  ⚠ CLAUDE.md — No change required. Active Technologies and scripts
-     already cover `turbo test`; the gate is a process rule, not a
-     tooling change.
+  ✅ .specify/templates/plan-template.md  — UPDATED: added a one-line note
+     under "Test files to create or update" pointing at the Mobile mocking
+     conventions sub-section so any new mobile test file lands its module
+     mocks in `jest.setup.ts` rather than in the test file itself.
+  ✅ .specify/templates/spec-template.md  — No change required (specs are
+     technology-agnostic).
+  ✅ .specify/templates/tasks-template.md — No change required (mocking
+     rules apply at test-write time; tasks already cite the test file they
+     touch).
+  ⚠ CLAUDE.md — No change required. The "Active Technologies" list already
+     names `jest-expo` and `@testing-library/react-native`; the new
+     sub-section codifies how those tools are wired together rather than
+     adding new ones.
+
+Carry-over from 1.18.0 (unchanged):
+  ⚠ apps/mobile/src/services/auth/googleAuth.ts — uses
+     `expo-auth-session/providers/google`, which the Expo docs flag as
+     deprecated. Migration is tracked in
+     `todo/migrate-google-auth-to-google-signin.md`. Per Principle XI,
+     either the migration completes or the deprecated dependency MUST be
+     justified in the spec 002 Complexity Tracking table. Note: the
+     `googleAuth.test.ts` reviewed for this amendment already targets the
+     replacement (`@react-native-google-signin/google-signin`), so the
+     migration is mid-flight at the time of writing.
 
 Known violations to remediate (⚠ pending):
-  (none — this is a forward-looking process rule. It applies to phases
-  declared on or after 2026-05-02; previously-shipped phases are not
-  retroactively in breach.)
+  ⚠ apps/mobile/src/services/auth/googleAuth.ts — uses
+     `expo-auth-session/providers/google`, which the Expo docs flag as
+     deprecated. Migration is tracked in
+     `todo/migrate-google-auth-to-google-signin.md`. Per Principle XI,
+     either the migration completes or the deprecated dependency MUST be
+     justified in the spec 002 Complexity Tracking table.
 
-Carry-over from 1.15.0 (unchanged):
+Carry-over from 1.17.0 (unchanged):
   ⚠ apps/mobile/package-lock.json — npm lockfile from the create-expo-app
      bootstrap. MUST be deleted and the workspace re-resolved via
      `pnpm install` before merge.
@@ -725,6 +748,98 @@ class — effects that fight the render loop and produce stale UI — before it 
 the codebase. These rules align with React's official "You Might Not Need an
 Effect" guidance and the canonical React `eslint-plugin-react-hooks` ruleset.
 
+### XI. Dependency Currency
+
+Every package introduced into any `package.json` (root or workspace) MUST be
+pinned to the **most recent stable release** of that package at the moment it
+is added. Selecting a deprecated package, a known end-of-life version, or any
+version older than current stable requires an explicit, recorded justification
+— preference is not a justification.
+
+**Rules.**
+
+- **Default**: a new dependency MUST resolve to the registry's `latest`
+  dist-tag (or the package's documented "stable" channel if it does not use
+  npm's `latest`) at the time of addition. The resolver determines this with
+  `pnpm view <pkg> version` (or `npm view`); the result is the only sanctioned
+  starting point for the version range.
+- **Range syntax**: use the package ecosystem's idiomatic carat range
+  (`"<pkg>": "^x.y.z"`) where `x.y.z` is the most recent stable. Tilde
+  (`~x.y.z`) is required only when the upstream framework's published
+  dependency manifest specifies it (e.g., the Expo SDK 54 `expo-*` modules
+  ship as tilde ranges — Expo treats minor bumps as breaking).
+- **Pre-releases excluded**: alpha, beta, RC, canary, nightly, and `next`
+  dist-tag versions are not "stable" for the purpose of this rule and MUST
+  NOT be introduced as a default. Adopting a pre-release requires the same
+  justification trail as adopting a deprecated version.
+- **Workspace links exempt**: `workspace:*` and `workspace:^x.y.z` ranges
+  pointing into the monorepo are not external versions and are out of scope
+  for this rule.
+- **Framework-pinned packages**: when a package's version is dictated by a
+  framework already pinned in the Technology Stack section (Expo SDK, React
+  Native, React, Expo Router, Jest preset, `@testing-library/react-native`,
+  etc.), the framework's recommended version for that SDK is the "stable"
+  version. The framework pin overrides the registry-`latest` rule because
+  the surrounding stack is itself pinned.
+- **Off-stable selections require justification**: if the introduced version
+  is older than current stable, or if the package is flagged deprecated by
+  the registry, the relevant feature plan's Complexity Tracking table (or,
+  for changes outside a feature, the PR description) MUST contain an entry
+  naming:
+  1. The package and the version chosen.
+  2. The current stable version that was *not* chosen.
+  3. The concrete blocker (peer-dep ceiling, active CVE in latest,
+     breaking-change incompatibility with another pinned dep, lack of types,
+     etc.) that forced the off-stable choice. "Preference", "stability
+     concerns" without a citation, or "we'll bump it later" are not concrete
+     blockers.
+  4. The follow-up TODO item or tracked task that will resolve the gap.
+
+**Workarounds prohibited.** Aliasing a missing transitive into a workspace
+via `"<helper>": "link:<package>/sub/path"` (or any equivalent
+`file:`/`link:` punning) is **never** an acceptable substitute for declaring
+the real dependency. If a transitive helper is required at runtime (e.g.,
+`@babel/runtime/helpers/interopRequireWildcard`), the package supplying it
+(`@babel/runtime`) MUST be added as a direct devDependency at the most
+recent stable version per the rule above. Missing-transitive errors are a
+diagnostic; the fix is to install the package, not to invent a fake alias
+entry.
+
+**Bump cadence.** Drift after introduction is *not* a breach — packages
+move, our `package.json` does not auto-track. Planned dependency upgrades
+happen via dedicated bump tasks tracked in `todo/` or in a feature plan.
+Principle XI governs the moment a dependency *enters* `package.json`; it
+does not require continuous re-pinning.
+
+**Process at PR-time.**
+
+1. Identify every new line under `dependencies` / `devDependencies` /
+   `peerDependencies` in any `package.json` in the diff.
+2. For each, confirm the chosen version is the registry's current stable
+   (or the framework-mandated version per the carve-out above).
+3. If any chosen version is older than stable, ensure the Complexity
+   Tracking entry exists and is concrete; if the version is current stable,
+   no entry is required.
+4. The reviewer MUST verify (1)–(3) before approving. A PR that adds a
+   deprecated or off-stable dependency with no justification fails the
+   Constitution Check and MUST NOT be merged.
+
+Rationale: outdated and deprecated dependencies compound migration cost
+silently — every month a deprecated package stays in `package.json`, the
+gap to its successor widens, and the eventual migration consumes
+disproportionate engineering time (the in-flight
+`expo-auth-session/providers/google` →
+`@react-native-google-signin/google-signin` migration is the canonical
+example). Worse, missing or mis-aliased dependencies surface as confusing
+test-runner errors ("Cannot find module …/interopRequireWildcard") that
+look like tooling bugs but are really schema breaches in `package.json`.
+Pinning to current stable by default keeps the cost of upgrade
+proportional to the upgrade itself, lets `pnpm audit` produce signal
+instead of noise, and forces every off-stable choice to surface a
+deliberate rationale at the moment the choice is made — when the context
+is fresh — rather than at the moment a future engineer has to reverse-
+engineer it.
+
 ## Technology Stack
 
 The system is a **monorepo** managed with **pnpm workspaces** and **Turborepo**. Each
@@ -780,7 +895,9 @@ my-binder/                     # Repo root (private — not published)
   selectively suppressed with `@ts-ignore` or `as any` casts without documented justification
   in the relevant plan or PR.
 - **pnpm**: Package manager for all workspaces. `pnpm-lock.yaml` is the canonical lock file.
-  Direct `node_modules` manipulation outside of pnpm is prohibited.
+  Direct `node_modules` manipulation outside of pnpm is prohibited. New dependencies MUST
+  be selected per Principle XI (Dependency Currency) — most-recent-stable by default,
+  off-stable choices justified in the relevant plan's Complexity Tracking table.
 - **Turborepo**: Task orchestration. `turbo.json` defines the task dependency graph. Tasks:
   `build` (tsc), `test`, `dev`, `typecheck` (tsc --noEmit). Turborepo ensures `packages/core`
   is built before dependents. Remote cache MAY be used to skip unchanged workspaces in CI.
@@ -860,7 +977,8 @@ a version bump per semantic versioning:
 - **PATCH**: clarification, wording improvement, or non-semantic refinement.
 
 Each feature plan MUST include a Constitution Check (as defined in
-`.specify/templates/plan-template.md`) verifying compliance with all ten principles before
-implementation begins. Violations MUST be justified in the plan's Complexity Tracking table.
+`.specify/templates/plan-template.md`) verifying compliance with all eleven principles
+before implementation begins. Violations MUST be justified in the plan's Complexity
+Tracking table.
 
-**Version**: 1.17.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-02
+**Version**: 1.18.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-09
