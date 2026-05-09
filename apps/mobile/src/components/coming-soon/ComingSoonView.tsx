@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { FC } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Colors, Spacing, Type } from '@root/constants/theme';
+import { Colors, Spacing, Type } from '@src/constants/theme';
 
 import type { ComingSoonResult } from './useComingSoon';
 

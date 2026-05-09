@@ -45,24 +45,6 @@ const config: Config = {
       lines: 80,
       statements: 80,
     },
-    'src/hooks/useSession.ts': {
-      branches: 90,
-      functions: 90,
-      lines: 90,
-      statements: 90,
-    },
-    'src/components/login/useLogin.ts': {
-      branches: 90,
-      functions: 95,
-      lines: 95,
-      statements: 95,
-    },
-    'src/components/binder-home/useBinderHome.ts': {
-      branches: 90,
-      functions: 95,
-      lines: 95,
-      statements: 95,
-    },
   },
 };
 

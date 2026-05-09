@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { FC } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Colors, Radius, Spacing, Touch, Type } from '@root/constants/theme';
+import { Colors, Radius, Spacing, Touch, Type } from '@src/constants/theme';
 
 export type LoginViewProps = {
   isSigningIn: boolean;

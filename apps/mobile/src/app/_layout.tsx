@@ -5,8 +5,6 @@ import { StatusBar } from 'expo-status-bar';
 
 import { queryClient, registerAuthErrorHandler } from '@src/services/api/queryClient';
 
-
-
 const RootLayout: FC = () => {
   const router = useRouter();
   useEffect(() => {

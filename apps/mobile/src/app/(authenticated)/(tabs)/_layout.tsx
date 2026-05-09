@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import type { FC } from 'react';
 
-import { Colors } from '@root/constants/theme';
+import { Colors } from '@src/constants/theme';
 
 const TabsLayout: FC = () => (
   <Tabs

@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Colors, Radius, Spacing, Touch, Type } from '@root/constants/theme';
+import { Colors, Radius, Spacing, Touch, Type } from '@src/constants/theme';
 
 export type AccessDeniedViewProps = {
   contactHref: string;

@@ -9,6 +9,7 @@ export default (): ExpoConfig => {
 
   return {
     ...base,
+
     android: {
       ...base.android,
       package: "com.steffan87.mybinder",
@@ -20,5 +21,5 @@ export default (): ExpoConfig => {
       googleAndroidClientId: process.env.GOOGLE_ANDROID_CLIENT_ID,
       googleWebClientId: process.env.GOOGLE_WEB_CLIENT_ID,
     },
-  };
+  } as ExpoConfig;
 };
