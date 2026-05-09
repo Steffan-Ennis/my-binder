@@ -131,6 +131,12 @@ List every Jest test file that will be created or updated by this feature, with 
 co-located path (`<filename>.test.ts` next to the file under test, per Principle III's
 co-location rule). E2E tests, if any, live under `tests/e2e/`.
 
+> **Mobile mocks (`apps/mobile` only):** any new third-party native or Expo dependency
+> introduced by this feature MUST land its mock entry in `apps/mobile/jest.setup.ts` in
+> the same PR. Per-test mocks via in-file `jest.mock(...)` are prohibited; use
+> `jest.spyOn` against the shared mock instead. See the **Mobile mocking conventions**
+> sub-section of Principle III.
+
 | Test file | Status | Behaviours covered (mapped to FR-### where applicable) |
 |---|---|---|
 | `apps/<workspace>/src/<path>/<file>.test.ts` | new \| update | <bullet list of behaviours> |

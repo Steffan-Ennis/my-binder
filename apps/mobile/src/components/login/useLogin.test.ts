@@ -1,79 +1,97 @@
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
+import * as ExpoRouter from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
 import { createElement } from 'react';
 
-import * as apiModule from '@src/services/api/apiClient';
+import { apiClient } from '@src/services/api/apiClient';
 import { ApiError } from '@src/services/api/ApiError';
 import { useSessionStore } from '@src/stores/sessionStore';
 
 import { useLogin } from './useLogin';
 
-const mockedUseAuthRequest = Google.useAuthRequest as jest.Mock;
-const mockedUseRouter = useRouter as jest.Mock;
-const mockedSet = SecureStore.setItemAsync as jest.Mock;
+type SignInResponse = Awaited<ReturnType<typeof GoogleSignin.signIn>>;
 
-let client: QueryClient;
-const replaceSpy = jest.fn();
-const promptAsync = jest.fn();
+const successResponse = (idToken = 'gid'): SignInResponse =>
+  ({ type: 'success', data: { idToken } } as unknown as SignInResponse);
 
-const wrapper = ({ children }: { children: ReactNode }) =>
-  createElement(QueryClientProvider, { client }, children);
+const cancelledResponse = (): SignInResponse =>
+  ({ type: 'cancelled', data: null } as unknown as SignInResponse);
 
-const ok = { user: { id: 'u1', email: 'u1@example.com' }, token: 'jwt.value' };
-
-const setAuthResponse = (response: unknown) => {
-  mockedUseAuthRequest.mockReturnValue([{ url: 'x' }, response, promptAsync]);
+const okSignInPayload = {
+  user: { id: 'u1', email: 'u1@example.com' },
+  token: 'jwt.value',
 };
 
-beforeEach(() => {
-  mockedSet.mockReset();
-  mockedSet.mockResolvedValue(undefined);
-  mockedUseRouter.mockReturnValue({ push: jest.fn(), replace: replaceSpy, back: jest.fn() });
-  replaceSpy.mockReset();
-  promptAsync.mockReset();
-  setAuthResponse(null);
-  useSessionStore.setState({
-    jwt: null,
-    iat: null,
-    userId: null,
-    email: null,
-    status: 'idle',
-  });
-  client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: 0 } } });
-  jest.spyOn(apiModule.apiClient, 'signInWithGoogle').mockReset();
-});
-
-afterEach(() => {
-  client.cancelQueries();
-  client.clear();
-  client.unmount();
-});
-
 describe('useLogin', () => {
-  it('exposes a stable onSignInPress that calls promptAsync', async () => {
+  let mockedSignIn: jest.SpyInstance<ReturnType<typeof GoogleSignin.signIn>>;
+  let mockedSetItemAsync: jest.SpyInstance<ReturnType<typeof SecureStore.setItemAsync>>;
+  let mockedSignInWithGoogle: jest.SpyInstance<ReturnType<typeof apiClient.signInWithGoogle>>;
+  let mockedUseRouter: jest.SpyInstance<ReturnType<typeof ExpoRouter.useRouter>>;
+  let replaceSpy: jest.Mock;
+  let client: QueryClient;
+
+  const wrapper = ({ children }: { children: ReactNode }) =>
+    createElement(QueryClientProvider, { client }, children);
+
+  beforeEach(() => {
+    mockedSignIn = jest.spyOn(GoogleSignin, 'signIn');
+    mockedSetItemAsync = jest
+      .spyOn(SecureStore, 'setItemAsync')
+      .mockResolvedValue(undefined);
+    mockedSignInWithGoogle = jest.spyOn(apiClient, 'signInWithGoogle');
+
+    replaceSpy = jest.fn();
+    mockedUseRouter = jest.spyOn(ExpoRouter, 'useRouter').mockReturnValue({
+      push: jest.fn(),
+      replace: replaceSpy,
+      back: jest.fn(),
+    } as unknown as ReturnType<typeof ExpoRouter.useRouter>);
+
+    useSessionStore.setState({
+      jwt: null,
+      iat: null,
+      userId: null,
+      email: null,
+      status: 'idle',
+    });
+
+    client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: 0 } },
+    });
+  });
+
+  afterEach(() => {
+    client.cancelQueries();
+    client.clear();
+    client.unmount();
+    mockedSignIn.mockRestore();
+    mockedSetItemAsync.mockRestore();
+    mockedSignInWithGoogle.mockRestore();
+    mockedUseRouter.mockRestore();
+  });
+
+  it('exposes a stable onSignInPress that calls GoogleSignin.signIn', async () => {
+    mockedSignIn.mockResolvedValue(cancelledResponse());
+
     const { result, rerender } = renderHook(() => useLogin(), { wrapper });
-    const first = result.current.onSignInPress;
-    rerender(undefined);
-    expect(result.current.onSignInPress).toBe(first);
+    await act(async () => {
+      await result.current.onSignInPress();
+    });
+    expect(mockedSignIn).toHaveBeenCalled();
+  });
+
+  it('navigates to /binder after a successful sign-in', async () => {
+    mockedSignIn.mockResolvedValue(successResponse());
+    mockedSignInWithGoogle.mockResolvedValue(okSignInPayload);
+
+    const { result } = renderHook(() => useLogin(), { wrapper });
 
     await act(async () => {
       await result.current.onSignInPress();
     });
-    expect(promptAsync).toHaveBeenCalled();
-  });
-
-  it('navigates to /binder after a successful sign-in', async () => {
-    jest.spyOn(apiModule.apiClient, 'signInWithGoogle').mockResolvedValue(ok);
-    setAuthResponse({
-      type: 'success',
-      params: { id_token: 'gid', access_token: 'gat' },
-      authentication: { accessToken: 'gat', idToken: 'gid' },
-    });
-
-    const { result } = renderHook(() => useLogin(), { wrapper });
 
     await waitFor(() => expect(useSessionStore.getState().status).toBe('active'));
     await waitFor(() => expect(replaceSpy).toHaveBeenCalledWith('/binder'));
@@ -81,23 +99,29 @@ describe('useLogin', () => {
   });
 
   it('surfaces a retryable error on user cancellation and stays on Login', async () => {
-    setAuthResponse({ type: 'cancel' });
+    mockedSignIn.mockResolvedValue(cancelledResponse());
+
     const { result } = renderHook(() => useLogin(), { wrapper });
+
+    await act(async () => {
+      await result.current.onSignInPress();
+    });
+
     await waitFor(() => expect(result.current.errorMessage).not.toBeNull());
     expect(replaceSpy).not.toHaveBeenCalledWith('/binder');
   });
 
   it('surfaces a retryable error on AUTH_INVALID_GOOGLE_TOKEN and stays on Login', async () => {
-    jest
-      .spyOn(apiModule.apiClient, 'signInWithGoogle')
-      .mockRejectedValue(new ApiError({ message: 'bad', status: 401, kind: 'AUTH_INVALID_GOOGLE_TOKEN' }));
-    setAuthResponse({
-      type: 'success',
-      params: { id_token: 'gid' },
-      authentication: { accessToken: 'gat', idToken: 'gid' },
-    });
+    mockedSignIn.mockResolvedValue(successResponse());
+    mockedSignInWithGoogle.mockRejectedValue(
+      new ApiError({ message: 'bad', status: 401, kind: 'AUTH_INVALID_GOOGLE_TOKEN' }),
+    );
 
     const { result } = renderHook(() => useLogin(), { wrapper });
+
+    await act(async () => {
+      await result.current.onSignInPress();
+    });
 
     await waitFor(() => expect(result.current.errorMessage).not.toBeNull());
     expect(replaceSpy).not.toHaveBeenCalledWith('/binder');
@@ -105,16 +129,16 @@ describe('useLogin', () => {
   });
 
   it('navigates to /access-denied when the server returns AUTH_NOT_ALLOWLISTED', async () => {
-    jest
-      .spyOn(apiModule.apiClient, 'signInWithGoogle')
-      .mockRejectedValue(new ApiError({ message: 'no', status: 403, kind: 'AUTH_NOT_ALLOWLISTED' }));
-    setAuthResponse({
-      type: 'success',
-      params: { id_token: 'gid' },
-      authentication: { accessToken: 'gat', idToken: 'gid' },
-    });
+    mockedSignIn.mockResolvedValue(successResponse());
+    mockedSignInWithGoogle.mockRejectedValue(
+      new ApiError({ message: 'no', status: 403, kind: 'AUTH_NOT_ALLOWLISTED' }),
+    );
 
-    renderHook(() => useLogin(), { wrapper });
+    const { result } = renderHook(() => useLogin(), { wrapper });
+
+    await act(async () => {
+      await result.current.onSignInPress();
+    });
 
     await waitFor(() => expect(replaceSpy).toHaveBeenCalledWith('/access-denied'));
   });
@@ -134,21 +158,21 @@ describe('useLogin', () => {
   });
 
   it('flips isSigningIn while the mutation is pending and back when settled', async () => {
-    let resolveFn: (v: typeof ok) => void = () => {};
-    jest
-      .spyOn(apiModule.apiClient, 'signInWithGoogle')
-      .mockImplementation(() => new Promise((res) => { resolveFn = res; }));
-    setAuthResponse({
-      type: 'success',
-      params: { id_token: 'gid' },
-      authentication: { accessToken: 'gat', idToken: 'gid' },
-    });
+    let resolveFn: (v: typeof okSignInPayload) => void = () => {};
+    mockedSignIn.mockResolvedValue(successResponse());
+    mockedSignInWithGoogle.mockImplementation(
+      () => new Promise((res) => { resolveFn = res; }),
+    );
 
     const { result } = renderHook(() => useLogin(), { wrapper });
+
+    await act(async () => {
+      await result.current.onSignInPress();
+    });
     await waitFor(() => expect(result.current.isSigningIn).toBe(true));
 
     await act(async () => {
-      resolveFn(ok);
+      resolveFn(okSignInPayload);
     });
     await waitFor(() => expect(result.current.isSigningIn).toBe(false));
   });

@@ -160,6 +160,126 @@ formats) that accumulates when each package picks its own framework. Requiring a
 Unit Testing Phase in every plan makes the test surface visible at design time rather than
 at implementation time, when scope creep has already happened.
 
+**Mobile mocking conventions** (`apps/mobile`). Tests in `apps/mobile` run under the
+`jest-expo` preset against React Native and Expo modules that have no implementation in a
+Node test environment. Mocks are split between two scopes; mixing them or re-implementing
+either scope inside the other is prohibited.
+
+1. **Module-level defaults in `apps/mobile/jest.setup.ts`.** Every third-party native or
+   Expo module that the production code imports MUST have a single default mock declared
+   at the top of `jest.setup.ts`. The mock MUST cover every method and constant the
+   production code reads. The currently-required entries are:
+
+   - `react-native-reanimated` → the official `react-native-reanimated/mock` shim.
+   - `expo-secure-store` → all of `getItemAsync`, `setItemAsync`, `deleteItemAsync`, plus
+     the `WHEN_UNLOCKED` / `WHEN_UNLOCKED_THIS_DEVICE_ONLY` constants.
+   - `@react-native-google-signin/google-signin` → the full `GoogleSignin` surface
+     (`configure`, `hasPlayServices`, `signIn`, `signOut`, `revokeAccess`,
+     `getCurrentUser`, `getTokens`) and the `statusCodes` enum.
+   - `expo-constants` → an `expoConfig.extra` object with deterministic test client IDs
+     and API base URL.
+   - `expo-router` → `Redirect`, `Stack` (with `Stack.Screen`), `Tabs` (with
+     `Tabs.Screen`), `useRouter`, and `usePathname` — enough to render any layout file in
+     a unit test without a real router.
+
+   Adding a new native or Expo dependency to `apps/mobile/package.json` MUST land the
+   matching mock entry in `jest.setup.ts` *in the same PR*. A test that fails because a
+   module mock is missing is a constitution breach against this rule, not a test bug.
+
+2. **Per-test spies via `jest.spyOn`.** Inside each `describe` block, individual tests
+   layer call-shape assertions on top of the default mock by spying the already-mocked
+   method. The spies MUST follow this shape:
+
+   - **Typed.** Declare each spy as
+     `jest.SpyInstance<ReturnType<typeof Module.method>>` so a renamed method or changed
+     signature surfaces at `tsc` time, not at runtime.
+   - **Installed in `beforeEach`.** Spies are created in a single `beforeEach` per
+     `describe`, never at the top of the file or inside individual `it` blocks. This
+     gives every test a fresh call history without manual `mockClear` plumbing.
+   - **Restored only when behaviour was replaced.** A spy that only observes (no
+     `mockImplementation` / `mockResolvedValue`) does not need `mockRestore`. A spy that
+     replaces behaviour MUST restore in `afterEach` so the default from `jest.setup.ts`
+     comes back for the next test.
+
+   Per-test `jest.mock(...)` calls inside test files are prohibited. If the default mock
+   from `jest.setup.ts` does not match a specific test's needs, override the relevant
+   method on the shared mock via `mockImplementation` / `mockResolvedValue` /
+   `mockRejectedValue` rather than re-mocking the module wholesale.
+
+The compliant pattern (canonical reference:
+`apps/mobile/src/services/auth/googleAuth.test.ts`):
+
+```ts
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { renderHook } from '@testing-library/react-native';
+import { useGoogleAuthRequest, revokeGoogleGrant } from './googleAuth';
+
+describe('googleAuth', () => {
+  let mockedSignIn: jest.SpyInstance<ReturnType<typeof GoogleSignin.signIn>>;
+  let mockedRevoke: jest.SpyInstance<ReturnType<typeof GoogleSignin.revokeAccess>>;
+
+  beforeEach(() => {
+    mockedSignIn = jest.spyOn(GoogleSignin, 'signIn');
+    mockedRevoke = jest.spyOn(GoogleSignin, 'revokeAccess');
+  });
+
+  it('invokes GoogleSignin.signIn from the hook', async () => {
+    const { result } = renderHook(() => useGoogleAuthRequest());
+    await result.current();
+    expect(mockedSignIn).toHaveBeenCalledWith();
+  });
+
+  it('revokes via GoogleSignin.revokeAccess', async () => {
+    await revokeGoogleGrant('access-token');
+    expect(mockedRevoke).toHaveBeenCalledWith();
+  });
+});
+```
+
+The prohibited patterns are:
+
+```ts
+// PROHIBITED — re-mocking a module that already has a default in jest.setup.ts.
+//              The two mocks fight each other and the resulting behaviour is order-
+//              dependent.
+jest.mock('@react-native-google-signin/google-signin', () => ({ /* ... */ }));
+
+// PROHIBITED — untyped spy. A renamed `signIn` method or a changed return shape
+//              compiles cleanly and surfaces only when the test actually runs.
+const mockedSignIn = jest.spyOn(GoogleSignin, 'signIn');
+
+// PROHIBITED — spy installed at describe-level. The single instance bleeds call
+//              history across `it` blocks and ties test correctness to file order.
+describe('googleAuth', () => {
+  const mockedSignIn = jest.spyOn(GoogleSignin, 'signIn');
+  // ...
+});
+
+// PROHIBITED — manual mockClear inside a single `it` block. The beforeEach hook
+//              already does this for the whole suite; manual clears mask the very
+//              state-bleed bugs the gate is designed to surface.
+it('signs in', () => {
+  mockedSignIn.mockClear();
+  // ...
+});
+```
+
+Hook tests MUST use `renderHook` from `@testing-library/react-native` (not the older
+`@testing-library/react-hooks`, which is unmaintained for RN 0.81 / React 19). View
+tests MUST use the `render` export from the same package. No other render utility is
+permitted in `apps/mobile`.
+
+Rationale: declaring native and Expo mocks once in `jest.setup.ts` gives every suite a
+consistent baseline — a hook's collaborators behave identically across unit, view, and
+integration tests, and adding a method to a native module requires editing exactly one
+place. Per-test typed spies layered on top of those baselines let individual tests assert
+call shape without redefining the mock, and typing each spy with
+`jest.SpyInstance<ReturnType<typeof ...>>` ties the test to the production type
+contract so a renamed method or changed signature is caught at `tsc` time. Forbidding
+in-file `jest.mock(...)` keeps the global mock surface auditable from a single file —
+when a future engineer asks "what does Jest think `expo-secure-store` is?" the answer
+is always "look at `jest.setup.ts`," never "grep every `*.test.ts`."
+
 **Phase completion validation gate**: every phase declared in a feature's
 `tasks.md` (Setup, Foundational, each User Story, and Polish) MUST be validated by
 running the affected workspaces' full Jest suite **and reporting a 100% pass rate**
@@ -981,4 +1101,4 @@ Each feature plan MUST include a Constitution Check (as defined in
 before implementation begins. Violations MUST be justified in the plan's Complexity
 Tracking table.
 
-**Version**: 1.18.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-09
+**Version**: 1.19.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-09
