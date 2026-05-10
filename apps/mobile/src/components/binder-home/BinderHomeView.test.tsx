@@ -1,7 +1,7 @@
 import type { Card } from '@my-binder/core';
 import { fireEvent, render } from '@testing-library/react-native';
 
-import { BinderHomeView, type BinderHomeViewProps } from './BinderHomeView';
+import BinderHomeView, { type BinderHomeViewProps } from './BinderHomeView';
 
 const makeCard = (id: string, name: string): Card => ({
   id,
@@ -22,12 +22,11 @@ const defaults: BinderHomeViewProps = {
   isError: false,
   isSearchActive: false,
   searchQuery: '',
+  hasActiveQuery: false,
+  handlePagerSelected: jest.fn(),
   onSearchOpen: jest.fn(),
   onSearchChange: jest.fn(),
   onSearchClear: jest.fn(),
-  onNextPage: jest.fn(),
-  onPrevPage: jest.fn(),
-  onPageChange: jest.fn(),
   onProfilePress: jest.fn(),
   onRetryPress: jest.fn(),
 };

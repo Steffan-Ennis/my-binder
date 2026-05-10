@@ -1,68 +1,66 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.18.0 → 1.19.0
-Bump type: MINOR — materially expands Principle III (Test-First Development)
-  with a new "Mobile mocking conventions" sub-section codifying the two-tier
-  mocking pattern used by `apps/mobile`: module-level defaults declared once
-  in `apps/mobile/jest.setup.ts`, plus per-test typed spies installed via
-  `jest.spyOn` in `beforeEach`. The trigger was the review of
-  `apps/mobile/src/services/auth/googleAuth.test.ts`, which is the canonical
-  example of the pattern. The new sub-section pins:
-    - which third-party native/Expo modules MUST live in `jest.setup.ts`,
-    - the typed-spy declaration shape
-      (`jest.SpyInstance<ReturnType<typeof X.method>>`),
-    - the `beforeEach` install rule (no manual `mockClear`, no per-test
-      `jest.mock`),
-    - the prohibition on re-mocking a module that already has a default,
-    - and the rule that adding a new native/Expo dependency MUST land its
-      `jest.setup.ts` mock in the same PR.
+Version change: 1.19.0 → 1.20.0
+Bump type: MINOR — materially expands Principle X (Component Architecture
+  — Mobile) with a new "State locality rule" sub-section codifying where
+  React state MUST live in `apps/mobile`. The rule pins a strict
+  hierarchy:
+    1. Single-component state lives inside the component's
+       `use<Feature>.ts` hook (`useState` / `useReducer`).
+    2. State shared between two or more *unrelated* components (no
+       parent → descendant relationship between consumers) lives in a
+       Zustand store under `apps/mobile/src/stores/`.
+    3. State shared along a parent → descendant chain stays in the
+       parent's hook and flows downward through props; promotion to a
+       Zustand store requires an additional unrelated consumer.
 
-  No existing principle is removed or redefined. Other workspaces
-  (`apps/server`, `packages/core`) are unaffected — the sub-section is
-  scoped to `apps/mobile` because that is where the React Native/Expo
-  module surface lives.
+  The trigger was the binder-home refactor (spec 016) that moved
+  `currentPage` out of `binderStore` and into `useBinderHome.ts` after
+  the page indicator was collocated inside the binder view, leaving the
+  store with a single consumer. The deletion of
+  `apps/mobile/src/stores/binderStore.ts` exposed an unwritten convention
+  that this amendment now codifies: Zustand is reserved for genuinely
+  shared state, never for hook-local state lifted "in case" another
+  component needs it later.
 
-Last amended: 2026-05-09
+  No existing principle is removed or redefined. The state-locality
+  rule sits between the Hook return-value memoisation rule and the
+  `useEffect` usage discipline sub-section because all three govern
+  hook implementation patterns. The rule applies only to `apps/mobile`;
+  `apps/server` and `packages/core` have no React state surface.
+
+Last amended: 2026-05-10
 
 Added principles:
-  (none — Principle III expanded, not added)
+  (none — Principle X expanded, not added)
 
 Modified sections:
-  - Principle III. Test-First Development — added "Mobile mocking
-    conventions" sub-section between the Test co-location rule and the
-    Phase completion validation gate.
+  - Principle X. Component Architecture (Mobile) — added "State
+    locality rule" sub-section between the Hook return-value
+    memoisation rule and the `useEffect` usage discipline sub-section.
 
 Removed sections:
   (none)
 
 Templates reviewed:
-  ✅ .specify/templates/plan-template.md  — UPDATED: added a one-line note
-     under "Test files to create or update" pointing at the Mobile mocking
-     conventions sub-section so any new mobile test file lands its module
-     mocks in `jest.setup.ts` rather than in the test file itself.
-  ✅ .specify/templates/spec-template.md  — No change required (specs are
-     technology-agnostic).
-  ✅ .specify/templates/tasks-template.md — No change required (mocking
-     rules apply at test-write time; tasks already cite the test file they
-     touch).
-  ⚠ CLAUDE.md — No change required. The "Active Technologies" list already
-     names `jest-expo` and `@testing-library/react-native`; the new
-     sub-section codifies how those tools are wired together rather than
-     adding new ones.
+  ✅ .specify/templates/plan-template.md  — No change required. The
+     Constitution Check section is principle-agnostic; new mobile
+     features pull Principle X (including the new sub-section)
+     automatically. State-management decisions surface in the existing
+     "Project Structure" / "Source Code" sections of each plan.
+  ✅ .specify/templates/spec-template.md  — No change required (specs
+     are technology-agnostic).
+  ✅ .specify/templates/tasks-template.md — No change required (state
+     placement is a code-author decision, not a task category).
+  ⚠ CLAUDE.md — Stale references to `binderStore` remain at line 50
+     (folder structure tree) and line 200 (Active Technologies list).
+     The store has been deleted; CLAUDE.md MUST be updated to remove
+     the `binderStore` mentions and to note that `currentPage` now
+     lives in `useBinderHome.ts`. Out of scope for this amendment;
+     tracked as a follow-up.
 
-Carry-over from 1.18.0 (unchanged):
-  ⚠ apps/mobile/src/services/auth/googleAuth.ts — uses
-     `expo-auth-session/providers/google`, which the Expo docs flag as
-     deprecated. Migration is tracked in
-     `todo/migrate-google-auth-to-google-signin.md`. Per Principle XI,
-     either the migration completes or the deprecated dependency MUST be
-     justified in the spec 002 Complexity Tracking table. Note: the
-     `googleAuth.test.ts` reviewed for this amendment already targets the
-     replacement (`@react-native-google-signin/google-signin`), so the
-     migration is mid-flight at the time of writing.
-
-Known violations to remediate (⚠ pending):
+Carry-over from 1.19.0 (unchanged):
   ⚠ apps/mobile/src/services/auth/googleAuth.ts — uses
      `expo-auth-session/providers/google`, which the Expo docs flag as
      deprecated. Migration is tracked in
@@ -86,7 +84,10 @@ Carry-over from 1.14.0 (unchanged):
   ⚠ specs/004-card-data-provider/plan.md — JSDoc → TypeScript migration.
 
 Deferred TODOs:
-  (none)
+  - Update CLAUDE.md to remove `binderStore` references at lines 50
+    and 200, reflecting that `currentPage` now lives in
+    `useBinderHome.ts` (single-consumer hook-local state per the new
+    State locality rule).
 -->
 
 # my-binder Constitution

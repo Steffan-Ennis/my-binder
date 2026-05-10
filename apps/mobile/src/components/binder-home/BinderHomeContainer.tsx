@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 
-import { BinderHomeView } from './BinderHomeView';
-import { useBinderHome } from './useBinderHome';
+import BinderHomeView from './BinderHomeView';
+import useBinderHome from './useBinderHome';
 
 const BinderHomeContainer: FC = () => {
   const {
@@ -18,11 +18,10 @@ const BinderHomeContainer: FC = () => {
     onSearchOpen,
     onSearchChange,
     onSearchClear,
-    onNextPage,
-    onPrevPage,
-    onPageChange,
     onProfilePress,
     onRetryPress,
+    handlePagerSelected,
+    hasActiveQuery,
   } = useBinderHome();
 
   return (
@@ -40,9 +39,8 @@ const BinderHomeContainer: FC = () => {
       onSearchOpen={onSearchOpen}
       onSearchChange={onSearchChange}
       onSearchClear={onSearchClear}
-      onNextPage={onNextPage}
-      onPrevPage={onPrevPage}
-      onPageChange={onPageChange}
+      handlePagerSelected={handlePagerSelected}
+      hasActiveQuery={hasActiveQuery}
       onProfilePress={onProfilePress}
       onRetryPress={onRetryPress}
     />
@@ -50,4 +48,3 @@ const BinderHomeContainer: FC = () => {
 };
 
 export default BinderHomeContainer;
-export { BinderHomeContainer };

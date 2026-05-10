@@ -1,13 +1,34 @@
 import type { Card } from '@my-binder/core';
 import { useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useReducer } from 'react';
 
 import { useCardsInfiniteQuery } from '@src/hooks/useCardsInfiniteQuery';
-import { useBinderStore } from '@src/stores/binderStore';
 import { binderSearch } from '@src/utils/binderSearch';
 import { pageCount } from '@src/utils/pageMath';
+import {BinderHomeViewProps} from "@src/components/binder-home/BinderHomeView";
 
 const DASHED_CAPTION = '— CARDS · — PAGE';
+const INITIAL_PAGE = 1;
+
+type BinderHomeState = {
+  currentPage: number;
+  isSearchActive: boolean;
+  searchQuery: string;
+  preSearchPage: number;
+};
+
+type BinderHomeAction =
+  | { type: 'PAGE_SELECTED'; position: number; totalPages: number }
+  | { type: 'SEARCH_OPENED' }
+  | { type: 'SEARCH_CHANGED'; text: string }
+  | { type: 'SEARCH_CLEARED'; totalPagesUnfiltered: number };
+
+const INITIAL_STATE: BinderHomeState = {
+  currentPage: INITIAL_PAGE,
+  isSearchActive: false,
+  searchQuery: '',
+  preSearchPage: INITIAL_PAGE,
+};
 
 const formatSummaryCaption = (cardCount: number, pages: number): string => {
   const cardNoun = cardCount === 1 ? 'CARD' : 'CARDS';
@@ -15,54 +36,88 @@ const formatSummaryCaption = (cardCount: number, pages: number): string => {
   return `${cardCount} ${cardNoun} · ${pages} ${pageNoun}`;
 };
 
-export type UseBinderHomeResult = {
-  cards: ReadonlyArray<Card>;
-  matchedCards: ReadonlyArray<Card>;
-  currentPage: number;
-  totalPages: number;
-  summaryCaption: string;
-  noMatches: boolean;
-  isLoading: boolean;
-  isError: boolean;
-  isSearchActive: boolean;
-  searchQuery: string;
-  onSearchOpen: () => void;
-  onSearchChange: (text: string) => void;
-  onSearchClear: () => void;
-  onNextPage: () => void;
-  onPrevPage: () => void;
-  onPageChange: (oneBasedPage: number) => void;
-  onProfilePress: () => void;
-  onRetryPress: () => void;
+const clampPage = (page: number, totalPages: number): number => {
+  if (page < 1) return 1;
+  const ceiling = Math.max(1, totalPages);
+  return page > ceiling ? ceiling : page;
 };
 
+const binderHomeReducer = (
+  state: BinderHomeState,
+  action: BinderHomeAction,
+): BinderHomeState => {
+  switch (action.type) {
+    case 'PAGE_SELECTED':
+      return {
+        ...state,
+        currentPage: clampPage(action.position + 1, action.totalPages),
+      };
+    case 'SEARCH_OPENED':
+      return {
+        ...state,
+        isSearchActive: true,
+        searchQuery: '',
+        preSearchPage: state.currentPage,
+        currentPage: INITIAL_PAGE,
+      };
+    case 'SEARCH_CHANGED':
+      return {
+        ...state,
+        searchQuery: action.text,
+        currentPage: INITIAL_PAGE,
+      };
+    case 'SEARCH_CLEARED':
+      return {
+        ...state,
+        isSearchActive: false,
+        searchQuery: '',
+        currentPage: clampPage(state.preSearchPage, action.totalPagesUnfiltered),
+      };
+  }
+};
+
+export type UseBinderHomeResult = Pick<
+  BinderHomeViewProps,
+  'handlePagerSelected' |
+  'hasActiveQuery' |
+  'cards' |
+  'currentPage' |
+  'isLoading' |
+  'matchedCards' |
+  'totalPages' |
+  'summaryCaption' |
+  'noMatches' |
+  'isError' |
+  'isSearchActive' |
+  'searchQuery' |
+  'onSearchOpen' |
+  'onSearchChange' |
+  'onSearchClear' |
+  'onProfilePress' |
+  'onRetryPress'
+>;
+
 /**
- * Feature hook for the binder-home screen. Owns the cards query, the pagination
- * pointer, and the inline binder-search state (`isSearchActive`, `searchQuery`,
- * the captured `preSearchPage` to restore on close). Returns a memoised result
- * object whose function and array references are stable per Principle X v1.16.0
- * so downstream `BinderHomeContainer` / `BinderHomeView` only re-render on
- * actual value changes.
+ * Feature hook for the binder-home screen. Owns the cards query and a single
+ * `useReducer` driving the pagination pointer (`currentPage`) and the inline
+ * binder-search state (`isSearchActive`, `searchQuery`, `preSearchPage`).
+ * Returns a memoised result object whose function and array references are
+ * stable per Principle X v1.16.0 so downstream `BinderHomeContainer` /
+ * `BinderHomeView` only re-render on actual value changes.
  *
- * The hook integrates three sources:
+ * Reducer state survives only as long as the screen — it does not need to
+ * persist across app restarts, and the only consumer is this screen.
+ *
+ * The hook integrates two sources:
  * 1. `useCardsInfiniteQuery` — fetches the user's collection from `/cards`.
- * 2. `useBinderStore` — Zustand state for the current page (1-based).
- * 3. `binderSearch` — pure token-AND filter over the cards by name/set/type.
+ * 2. `binderSearch` — pure token-AND filter over the cards by name/set/type.
  *
  * Loading and error states surface the dashed caption (`— CARDS · — PAGE`)
  * and an `isError` flag the view uses to render an inline retry affordance.
  *
  * @returns the documented `UseBinderHomeResult`
- *
- * @example
- *   const {
- *     matchedCards, currentPage, totalPages, summaryCaption, noMatches,
- *     onSearchOpen, onSearchChange, onSearchClear,
- *     onNextPage, onPrevPage, onPageChange,
- *     onProfilePress, onRetryPress,
- *   } = useBinderHome();
  */
-export const useBinderHome = (): UseBinderHomeResult => {
+const useBinderHome = (): UseBinderHomeResult => {
   const router = useRouter();
   const cardsQuery = useCardsInfiniteQuery();
 
@@ -71,14 +126,8 @@ export const useBinderHome = (): UseBinderHomeResult => {
     [cardsQuery.data],
   );
 
-  const currentPage = useBinderStore((s) => s.currentPage);
-  const storeNextPage = useBinderStore((s) => s.nextPage);
-  const storePrevPage = useBinderStore((s) => s.prevPage);
-  const storeSetPage = useBinderStore((s) => s.setPage);
-
-  const [isSearchActive, setIsSearchActive] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const preSearchPageRef = useRef(1);
+  const [state, dispatch] = useReducer(binderHomeReducer, INITIAL_STATE);
+  const { currentPage, isSearchActive, searchQuery } = state;
 
   const matchedCards = useMemo(
     () => binderSearch(cards, searchQuery),
@@ -106,42 +155,26 @@ export const useBinderHome = (): UseBinderHomeResult => {
     void cardsQuery.refetch();
   }, [cardsQuery]);
 
-  const onNextPage = useCallback(() => {
-    storeNextPage(totalPages);
-  }, [storeNextPage, totalPages]);
-  const onPrevPage = useCallback(() => {
-    storePrevPage();
-  }, [storePrevPage]);
-  const onPageChange = useCallback(
-    (oneBasedPage: number) => {
-      storeSetPage(oneBasedPage, totalPages);
-    },
-    [storeSetPage, totalPages],
-  );
-
   const onSearchOpen = useCallback(() => {
-    preSearchPageRef.current = useBinderStore.getState().currentPage;
-    setIsSearchActive(true);
-    setSearchQuery('');
-    useBinderStore.getState().setPage(1, pageCount(cards.length));
-  }, [cards.length]);
+    dispatch({ type: 'SEARCH_OPENED' });
+  }, []);
 
-  const onSearchChange = useCallback(
-    (text: string) => {
-      setSearchQuery(text);
-      const filteredPages = pageCount(binderSearch(cards, text).length);
-      useBinderStore.getState().setPage(1, filteredPages);
-    },
-    [cards],
-  );
+  const onSearchChange = useCallback((text: string) => {
+    dispatch({ type: 'SEARCH_CHANGED', text });
+  }, []);
 
   const onSearchClear = useCallback(() => {
-    setIsSearchActive(false);
-    setSearchQuery('');
-    useBinderStore
-      .getState()
-      .setPage(preSearchPageRef.current, pageCount(cards.length));
+    dispatch({ type: 'SEARCH_CLEARED', totalPagesUnfiltered: pageCount(cards.length) });
   }, [cards.length]);
+
+  const hasActiveQuery = useMemo(() => {
+    return isSearchActive && searchQuery.trim().length > 0;
+  }, [isSearchActive, searchQuery])
+
+  const handlePagerSelected = useCallback<BinderHomeViewProps['handlePagerSelected']>((event) => {
+    dispatch({ type: 'PAGE_SELECTED', position: event.nativeEvent.position, totalPages });
+  }, [totalPages]);
+
 
   return useMemo<UseBinderHomeResult>(
     () => ({
@@ -156,13 +189,12 @@ export const useBinderHome = (): UseBinderHomeResult => {
       isSearchActive,
       searchQuery,
       onSearchOpen,
+      hasActiveQuery,
       onSearchChange,
       onSearchClear,
-      onNextPage,
-      onPrevPage,
-      onPageChange,
       onProfilePress,
       onRetryPress,
+      handlePagerSelected
     }),
     [
       cards,
@@ -178,11 +210,13 @@ export const useBinderHome = (): UseBinderHomeResult => {
       onSearchOpen,
       onSearchChange,
       onSearchClear,
-      onNextPage,
-      onPrevPage,
-      onPageChange,
       onProfilePress,
       onRetryPress,
+      handlePagerSelected,
+      hasActiveQuery
     ],
   );
 };
+
+export default useBinderHome
+export { useBinderHome }

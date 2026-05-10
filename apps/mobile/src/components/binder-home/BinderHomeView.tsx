@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import PagerView from 'react-native-pager-view';
+import PagerView, {PagerViewProps} from 'react-native-pager-view';
 
 import { Colors, Radius, Spacing, Touch, Type } from '@src/constants/theme';
 import { SLOTS_PER_BINDER_PAGE } from '@src/utils/pageMath';
@@ -31,11 +31,10 @@ export type BinderHomeViewProps = {
   onSearchOpen: () => void;
   onSearchChange: (text: string) => void;
   onSearchClear: () => void;
-  onNextPage: () => void;
-  onPrevPage: () => void;
-  onPageChange: (oneBasedPage: number) => void;
   onProfilePress: () => void;
   onRetryPress: () => void;
+  hasActiveQuery: boolean;
+  handlePagerSelected: Required<PagerViewProps>['onPageSelected']
 };
 
 const renderPocket = (card: Card | undefined, slotIndex: number, isLoading: boolean) => {
@@ -74,18 +73,9 @@ const BinderHomeView: FC<BinderHomeViewProps> = ({
   onSearchClear,
   onProfilePress,
   onRetryPress,
-  onNextPage,
-  onPrevPage,
-  onPageChange,
+  hasActiveQuery,
+  handlePagerSelected
 }) => {
-  const isFirstPage = currentPage <= 1;
-  const isLastPage = currentPage >= totalPages;
-  const hasActiveQuery = isSearchActive && searchQuery.trim().length > 0;
-
-  const handlePagerSelected = (event: { nativeEvent: { position: number } }) => {
-    onPageChange(event.nativeEvent.position + 1);
-  };
-
   return (
     <View style={styles.root} testID="binder-home-root">
       <View style={styles.headerBar}>
@@ -225,38 +215,9 @@ const BinderHomeView: FC<BinderHomeViewProps> = ({
         </View>
 
         <View style={styles.pageNavigator}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Previous page"
-            accessibilityState={{ disabled: isFirstPage }}
-            disabled={isFirstPage}
-            onPress={onPrevPage}
-            style={[styles.pillButton, isFirstPage && styles.pillButtonDisabled]}
-          >
-            <Ionicons
-              name="chevron-back"
-              size={24}
-              color={isFirstPage ? Colors.dark.textMuted : Colors.dark.accentSoft}
-            />
-          </Pressable>
-          <View style={styles.pageIndicator}>
-            <Text style={styles.pageNumber}>Page {currentPage}</Text>
-            <Text style={styles.pageOf}>OF {totalPages}</Text>
+          <View>
+            <Text style={styles.pageOf}>{currentPage} of {totalPages}</Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Next page"
-            accessibilityState={{ disabled: isLastPage }}
-            disabled={isLastPage}
-            onPress={onNextPage}
-            style={[styles.pillButton, isLastPage && styles.pillButtonDisabled]}
-          >
-            <Ionicons
-              name="chevron-forward"
-              size={24}
-              color={isLastPage ? Colors.dark.textMuted : Colors.dark.accentSoft}
-            />
-          </Pressable>
         </View>
       </View>
 
@@ -410,7 +371,7 @@ const styles = StyleSheet.create({
   pageNavigator: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingTop: Spacing.md,
   },
   pillButton: {
@@ -426,9 +387,6 @@ const styles = StyleSheet.create({
   },
   pager: {
     flex: 1,
-  },
-  pageIndicator: {
-    alignItems: 'center',
   },
   pageNumber: {
     fontFamily: Type.subtitleItalic.font,
@@ -468,5 +426,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export { BinderHomeView };
 export default BinderHomeView;

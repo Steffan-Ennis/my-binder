@@ -5,7 +5,6 @@ import { apiClient } from '@src/services/api/apiClient';
 import type { ApiError } from '@src/services/api/ApiError';
 import { revokeGoogleGrant } from '@src/services/auth/googleAuth';
 import { clearSession as clearStoredSession } from '@src/services/auth/sessionStorage';
-import { useBinderStore } from '@src/stores/binderStore';
 import { useSessionStore } from '@src/stores/sessionStore';
 
 export type SignOutVariables = {
@@ -56,7 +55,6 @@ export const useSignOutMutation = (): UseMutationResult<
       }
 
       useSessionStore.getState().clearSession();
-      useBinderStore.getState().reset();
       queryClient.clear();
       router.replace('/login');
     },

@@ -2,7 +2,6 @@ import type { Card } from '@my-binder/core';
 import { act, renderHook } from '@testing-library/react-native';
 
 import * as cardsHookModule from '@src/hooks/useCardsInfiniteQuery';
-import { useBinderStore } from '@src/stores/binderStore';
 
 import { useBinderHome } from './useBinderHome';
 
@@ -46,9 +45,13 @@ const setQueryMock = ({ cards, isLoading = false, isError = false, refetch }: Mo
   return refetchFn;
 };
 
+const pagerEvent = (zeroBasedPosition: number) =>
+  ({ nativeEvent: { position: zeroBasedPosition } }) as Parameters<
+    ReturnType<typeof useBinderHome>['handlePagerSelected']
+  >[0];
+
 beforeEach(() => {
   mockNavigate.mockReset();
-  useBinderStore.setState({ currentPage: 1 });
   jest.spyOn(cardsHookModule, 'useCardsInfiniteQuery').mockReset();
 });
 
@@ -73,9 +76,7 @@ describe('useBinderHome — US1 surface', () => {
         onSearchOpen: expect.any(Function),
         onSearchChange: expect.any(Function),
         onSearchClear: expect.any(Function),
-        onNextPage: expect.any(Function),
-        onPrevPage: expect.any(Function),
-        onPageChange: expect.any(Function),
+        handlePagerSelected: expect.any(Function),
         onProfilePress: expect.any(Function),
         onRetryPress: expect.any(Function),
       }),
@@ -86,9 +87,7 @@ describe('useBinderHome — US1 surface', () => {
     // Functions and arrays must be reference-stable per Principle X v1.16.0
     expect(second.onProfilePress).toBe(first.onProfilePress);
     expect(second.onRetryPress).toBe(first.onRetryPress);
-    expect(second.onNextPage).toBe(first.onNextPage);
-    expect(second.onPrevPage).toBe(first.onPrevPage);
-    expect(second.onPageChange).toBe(first.onPageChange);
+    expect(second.handlePagerSelected).toBe(first.handlePagerSelected);
     expect(second.onSearchOpen).toBe(first.onSearchOpen);
     expect(second.onSearchChange).toBe(first.onSearchChange);
     expect(second.onSearchClear).toBe(first.onSearchClear);
@@ -150,11 +149,10 @@ describe('useBinderHome — US1 surface', () => {
 });
 
 describe('useBinderHome — US2 paging surface', () => {
-  it('mirrors binderStore.currentPage', () => {
+  it('starts on page 1', () => {
     setQueryMock({ cards: Array.from({ length: 11 }, (_, i) => makeCard(`${i}`, `c${i}`)) });
-    useBinderStore.setState({ currentPage: 2 });
     const { result } = renderHook(() => useBinderHome());
-    expect(result.current.currentPage).toBe(2);
+    expect(result.current.currentPage).toBe(1);
   });
 
   it('totalPages is ceil(cards.length/9) against the unfiltered set', () => {
@@ -163,36 +161,31 @@ describe('useBinderHome — US2 paging surface', () => {
     expect(result.current.totalPages).toBe(2);
   });
 
-  it('onNextPage delegates to binderStore.nextPage and clamps at totalPages', () => {
-    setQueryMock({ cards: Array.from({ length: 11 }, (_, i) => makeCard(`${i}`, `c${i}`)) });
-    const { result } = renderHook(() => useBinderHome());
-    act(() => result.current.onNextPage());
-    expect(useBinderStore.getState().currentPage).toBe(2);
-    act(() => result.current.onNextPage());
-    expect(useBinderStore.getState().currentPage).toBe(2);
-  });
-
-  it('onPrevPage delegates to binderStore.prevPage and clamps at 1', () => {
-    setQueryMock({ cards: Array.from({ length: 11 }, (_, i) => makeCard(`${i}`, `c${i}`)) });
-    useBinderStore.setState({ currentPage: 2 });
-    const { result } = renderHook(() => useBinderHome());
-    act(() => result.current.onPrevPage());
-    expect(useBinderStore.getState().currentPage).toBe(1);
-    act(() => result.current.onPrevPage());
-    expect(useBinderStore.getState().currentPage).toBe(1);
-  });
-
-  it('onPageChange calls binderStore.setPage with the supplied 1-based page', () => {
+  it('handlePagerSelected updates currentPage to position+1', () => {
     setQueryMock({ cards: Array.from({ length: 30 }, (_, i) => makeCard(`${i}`, `c${i}`)) });
     const { result } = renderHook(() => useBinderHome());
-    act(() => result.current.onPageChange(3));
-    expect(useBinderStore.getState().currentPage).toBe(3);
+    act(() => result.current.handlePagerSelected(pagerEvent(2)));
+    expect(result.current.currentPage).toBe(3);
+  });
+
+  it('handlePagerSelected clamps to totalPages', () => {
+    setQueryMock({ cards: Array.from({ length: 11 }, (_, i) => makeCard(`${i}`, `c${i}`)) });
+    const { result } = renderHook(() => useBinderHome());
+    act(() => result.current.handlePagerSelected(pagerEvent(99)));
+    expect(result.current.currentPage).toBe(2);
+  });
+
+  it('handlePagerSelected clamps to 1 on negative position', () => {
+    setQueryMock({ cards: Array.from({ length: 30 }, (_, i) => makeCard(`${i}`, `c${i}`)) });
+    const { result } = renderHook(() => useBinderHome());
+    act(() => result.current.handlePagerSelected(pagerEvent(-5)));
+    expect(result.current.currentPage).toBe(1);
   });
 
   it('currentPage retains its value across re-renders (background-survival proxy)', () => {
-    setQueryMock({ cards: Array.from({ length: 11 }, (_, i) => makeCard(`${i}`, `c${i}`)) });
-    useBinderStore.setState({ currentPage: 2 });
+    setQueryMock({ cards: Array.from({ length: 30 }, (_, i) => makeCard(`${i}`, `c${i}`)) });
     const { result, rerender } = renderHook(() => useBinderHome());
+    act(() => result.current.handlePagerSelected(pagerEvent(1)));
     expect(result.current.currentPage).toBe(2);
     rerender({});
     expect(result.current.currentPage).toBe(2);
@@ -206,16 +199,15 @@ describe('useBinderHome — US3 search surface', () => {
     makeCard('3', 'Shivan Dragon', { setName: 'M10', setCode: 'M10', typeLine: 'Creature' }),
   ];
 
-  it('onSearchOpen sets isSearchActive=true with empty query and captures preSearchPage', () => {
+  it('onSearchOpen sets isSearchActive=true with empty query and snaps currentPage to 1', () => {
     setQueryMock({ cards: corpus });
-    useBinderStore.setState({ currentPage: 1 });
     const { result } = renderHook(() => useBinderHome());
 
     act(() => result.current.onSearchOpen());
 
     expect(result.current.isSearchActive).toBe(true);
     expect(result.current.searchQuery).toBe('');
-    expect(useBinderStore.getState().currentPage).toBe(1);
+    expect(result.current.currentPage).toBe(1);
   });
 
   it('onSearchChange recomputes matchedCards via the binderSearch filter (FR-005a/e)', () => {
@@ -253,17 +245,21 @@ describe('useBinderHome — US3 search surface', () => {
     expect(result.current.noMatches).toBe(false);
   });
 
-  it('onSearchClear restores currentPage to preSearchPage and resets the search state (FR-005c/f)', () => {
+  it('onSearchClear restores currentPage to the page captured on open (FR-005c/f)', () => {
     setQueryMock({ cards: Array.from({ length: 30 }, (_, i) => makeCard(`${i}`, `c${i}`)) });
-    useBinderStore.setState({ currentPage: 3 });
     const { result } = renderHook(() => useBinderHome());
 
+    act(() => result.current.handlePagerSelected(pagerEvent(2))); // page 3
+    expect(result.current.currentPage).toBe(3);
+
     act(() => result.current.onSearchOpen());
+    expect(result.current.currentPage).toBe(1);
+
     act(() => result.current.onSearchChange('something'));
     act(() => result.current.onSearchClear());
 
     expect(result.current.isSearchActive).toBe(false);
     expect(result.current.searchQuery).toBe('');
-    expect(useBinderStore.getState().currentPage).toBe(3);
+    expect(result.current.currentPage).toBe(3);
   });
 });
