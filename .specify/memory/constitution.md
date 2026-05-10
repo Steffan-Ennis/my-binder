@@ -1,54 +1,53 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.19.0 → 1.20.0
-Bump type: MINOR — adds a new "Style co-location rule" sub-section to
-  Principle X (Component Architecture — Mobile). The rule pins three
-  behaviours for every view component in `apps/mobile`:
+Version change: 1.20.0 → 1.21.0
+Bump type: MINOR — lands the previously-deferred "State locality rule"
+  sub-section in the body of Principle X (Component Architecture —
+  Mobile). The rule was drafted in the superseded 1.19.0 → 1.20.0 SIR
+  but never inserted; v1.20.0 carried it forward as a deferred TODO;
+  this amendment fulfils that TODO. The rule pins a strict hierarchy
+  for every state field introduced in `apps/mobile`:
 
-    1. Styles MUST live in a sibling `<Component>.theme.ts` file and
-       MUST be consumed through a `useStyles` hook that is the file's
-       single `export default`.
-    2. The theme file MUST declare a strongly-typed
-       `<Component>ViewStyles` type where each entry is
-       `Required<Pick<ViewStyle | TextStyle | ImageStyle, ...exact-keys>>`
-       over only the keys actually present in that style — bare
-       `ViewStyle` / `TextStyle` per entry is prohibited.
-    3. Theme files MUST belong to exactly one component (Single
-       Responsibility, Principle IV). Importing one component's
-       `*.theme.ts` from another component is prohibited; cross-
-       component visual primitives live in
-       `apps/mobile/constants/theme.ts`.
+    1. Single-consumer state — read or written by exactly one
+       component — MUST live inside that component's `use<Feature>.ts`
+       hook via `useState` (simple values) or `useReducer` (non-trivial
+       transitions). Lifting single-consumer state into a Zustand
+       store under `apps/mobile/src/stores/` is prohibited.
+    2. Multi-component state shared across unrelated consumers —
+       components that do not sit in a parent → descendant relationship
+       — MUST live in a Zustand store under `apps/mobile/src/stores/`.
+       The active session is the canonical example.
+    3. Parent → descendant shared state MUST stay in the parent's hook
+       and flow downward through props (or a feature-scoped React
+       context when prop-drilling exceeds three levels). Promotion to a
+       Zustand store is permitted only when an additional unrelated
+       consumer appears.
 
-  The trigger was the binder-home refactor (spec 016) extracting
-  `BinderHomeView`'s inline `StyleSheet.create` block into
-  `BinderHomeView.theme.ts`. The refactor surfaced an unwritten
-  convention this amendment now codifies: styles belong next to the
-  component, not embedded in it. The canonical reference for the new
-  rule is `apps/mobile/src/components/binder-home/BinderHomeView.theme.ts`.
+  The trigger was the binder-home refactor (spec 016) moving
+  `currentPage` and search state out of `binderStore` and into
+  `useBinderHome.ts` after the page indicator was collocated inside the
+  binder view, leaving the store with a single consumer. The deletion
+  of `apps/mobile/src/stores/binderStore.ts` exposed the unwritten
+  convention this amendment now codifies: Zustand is reserved for
+  genuinely shared state, never for hook-local state lifted "in case"
+  another component needs it later.
 
-  No principle is removed or redefined. The Style co-location rule sits
-  immediately after the Container prop-passing rule and before the Hook
-  return-value memoisation rule because it concerns the View layer's
-  presentation contract — keeping View-layer guidance contiguous before
-  the section transitions into Hook-layer guidance.
+  No principle is removed or redefined. The State locality rule sits
+  immediately after the Hook return-value memoisation rule and before
+  the `useEffect` usage discipline sub-section because all three govern
+  hook-implementation patterns. The rule applies only to `apps/mobile`;
+  `apps/server` and `packages/core` have no React state surface.
 
-  Note: the previously-drafted "State locality rule" (described in the
-  superseded 1.19.0 → 1.20.0 SYNC IMPACT REPORT but never actually
-  inserted into the body of Principle X) remains valid guidance and is
-  carried forward as a deferred TODO; see the block below. This
-  amendment supersedes that prior 1.20.0 attempt with the Style co-
-  location rule as the substantive 1.20.0 change.
-
-Last amended: 2026-05-10
+Last amended: 2026-05-11
 
 Added principles:
   (none — Principle X expanded, not added)
 
 Modified sections:
-  - Principle X. Component Architecture (Mobile) — added "Style co-
-    location rule" sub-section between the Container prop-passing rule
-    and the Hook return-value memoisation rule.
+  - Principle X. Component Architecture (Mobile) — added "State
+    locality rule" sub-section between the Hook return-value
+    memoisation rule and the `useEffect` usage discipline sub-section.
 
 Removed sections:
   (none)
@@ -57,28 +56,25 @@ Templates reviewed:
   ✅ .specify/templates/plan-template.md  — No change required. The
      Constitution Check section is principle-agnostic; new mobile
      features pull Principle X (including the new sub-section)
-     automatically. Style-file placement surfaces in the existing
+     automatically. State-management decisions surface in the existing
      "Project Structure / Source Code" sections of each plan.
   ✅ .specify/templates/spec-template.md  — No change required (specs
      are technology-agnostic).
-  ✅ .specify/templates/tasks-template.md — No change required (style-
-     file placement is a code-author decision, not a task category).
-  ⚠ CLAUDE.md — Existing carry-forward; `binderStore` references at
-     lines 50 and 200 still need cleanup. No new updates required for
-     the Style co-location rule itself.
+  ✅ .specify/templates/tasks-template.md — No change required (state
+     placement is a code-author decision, not a task category).
+  ⚠ CLAUDE.md — Stale references to `binderStore` remain at line 50
+     (folder structure tree) and line 200 (Active Technologies list).
+     The store has been deleted; CLAUDE.md MUST be updated to remove
+     the `binderStore` mentions and to note that `currentPage` plus
+     search state now live in `useBinderHome.ts`. Carried forward as a
+     deferred TODO.
 
-Deferred carry-over from the superseded 1.20.0 attempt:
-  ⚠ Principle X "State locality rule" — drafted in the prior SIR but
-     never inserted into the body. The intended content (single-
-     component state lives in `use<Feature>.ts` via `useState` /
-     `useReducer`; state shared between unrelated components lives in a
-     Zustand store under `apps/mobile/src/stores/`; state shared along
-     a parent → descendant chain stays in the parent's hook and flows
-     downward through props) remains accurate guidance and SHOULD land
-     in a follow-up amendment. The trigger remains the binder-home
-     refactor moving `currentPage` from `binderStore` into
-     `useBinderHome.ts` after the page indicator was collocated inside
-     the binder view, leaving the store with a single consumer.
+Carry-over from 1.20.0 (unchanged):
+  ⚠ apps/mobile theme files — the Style co-location rule landed in
+     v1.20.0 with `BinderHomeView.theme.ts` as the canonical
+     reference. Other view components (LoginView, AccessDeniedView,
+     ComingSoonView) MUST migrate inline `StyleSheet.create` blocks
+     into sibling `<Component>.theme.ts` files in a follow-up pass.
 
 Carry-over from 1.19.0 (unchanged):
   ⚠ apps/mobile/src/services/auth/googleAuth.ts — uses
@@ -104,11 +100,9 @@ Carry-over from 1.14.0 (unchanged):
   ⚠ specs/004-card-data-provider/plan.md — JSDoc → TypeScript migration.
 
 Deferred TODOs:
-  - Insert the State locality rule sub-section into Principle X (drafted
-    in the superseded 1.20.0 SIR but never landed in the body).
   - Update CLAUDE.md to remove `binderStore` references at lines 50
-    and 200, reflecting that `currentPage` now lives in
-    `useBinderHome.ts`.
+    and 200, reflecting that `currentPage` plus search state now live
+    in `useBinderHome.ts` per the new State locality rule.
 -->
 
 # my-binder Constitution
@@ -991,6 +985,105 @@ declared. This rule pairs with the **Container prop-passing rule** above —
 named props plus stable references give the view a contract the type system
 *and* the React reconciler can both rely on.
 
+**State locality rule.** State MUST live as close to the component that
+consumes it as possible. The placement decision follows a strict hierarchy
+and MUST be applied at the moment a state field is introduced:
+
+1. **Single-component state.** If exactly one component reads or writes a
+   field, the field MUST live inside that component's `use<Feature>.ts`
+   hook. Express it with `useState` for simple values and `useReducer` when
+   transitions become non-trivial (multiple actions, derived transitions,
+   or invariants between fields). Lifting single-consumer state into a
+   Zustand store under `apps/mobile/src/stores/` is prohibited.
+
+2. **Multi-component state across unrelated consumers.** If two or more
+   *unrelated* components read or write a field — i.e., consumers that do
+   not sit in a parent → descendant relationship that would make
+   prop-passing or context viable — the field MUST live in a Zustand
+   store under `apps/mobile/src/stores/`. The active session is the
+   canonical example: the auth-gate layout
+   (`app/(authenticated)/_layout.tsx`), `LoginContainer`, and
+   `ProfileContainer` each consume it independently, so `sessionStore` is
+   the correct home.
+
+3. **Parent → descendant shared state.** If a field is shared between a
+   parent and components rendered inside its tree, the field MUST stay in
+   the parent's `use<Feature>.ts` hook and flow downward through props
+   (or via a feature-scoped React context when prop-drilling exceeds
+   three levels). Promoting such state to a Zustand store is permitted
+   ONLY when an additional unrelated consumer (outside the parent →
+   descendant chain) starts reading or writing it.
+
+The progression is: start with `useState` in the hook → switch to
+`useReducer` in the same hook when state transitions become non-trivial →
+promote to a Zustand store ONLY when a second, unrelated consumer
+appears. State MUST NOT be added to a Zustand store speculatively, "in
+case" another component needs it later. A speculative store entry is a
+constitution breach the moment it lands; the entry MUST be removed and
+the state MUST be moved into the consuming hook until a second unrelated
+consumer actually exists.
+
+A consequence of this rule: when a previously-shared field collapses
+back to a single consumer (a screen is removed, two consumers are
+merged, an indicator is collocated into its pager), the corresponding
+Zustand store MUST be deleted and the state MUST be moved back into the
+remaining consumer's hook. Stores do not earn the right to persist by
+prior usage — they earn it by current multi-consumer demand.
+
+The compliant patterns are:
+
+```ts
+// REQUIRED — single-consumer state in the feature hook.
+//            `currentPage` is read and written only by the binder
+//            feature, so it lives in `useBinderHome.ts` as `useReducer`
+//            state alongside the search fields it interacts with.
+const useBinderHome = () => {
+  const [state, dispatch] = useReducer(binderReducer, initialState);
+  // currentPage flows down to BinderHomeView via the container.
+  return { currentPage: state.currentPage /* ... */ };
+};
+
+// REQUIRED — multi-consumer shared state in a Zustand store.
+//            `session` is consumed by the auth-gate layout, the login
+//            container, and the profile container — three unrelated
+//            consumers. `sessionStore` is the correct home.
+const useSession = () => useSessionStore((s) => s.session);
+```
+
+The prohibited patterns are:
+
+```ts
+// PROHIBITED — single-consumer state lifted into a Zustand store.
+//              `searchTerm` is read only inside the binder feature; it
+//              MUST live in `useBinderHome.ts`, not in a store.
+const useBinderSearchStore = create<BinderSearchState>((set) => ({
+  searchTerm: '',
+  setSearchTerm: (term) => set({ searchTerm: term }),
+}));
+
+// PROHIBITED — speculative store ("in case another screen needs it
+//              later"). The second consumer does not exist; the store
+//              MUST NOT be created until it does.
+const useDraftBinderEntryStore = create<DraftBinderEntryState>(/* ... */);
+```
+
+Rationale: state in a Zustand store is global by construction — every
+component can subscribe to every slice, every test must arrange and
+reset every store, and every refactor must trace usage across the
+workspace. State scoped to a hook is local by construction — its
+lifecycle ends at unmount, no test setup is required outside
+`renderHook`, and its blast radius is one file. The most common
+state-management failure mode in React applications is gradual
+globalisation: a store grows, accumulates fields read by exactly one
+component each, and slowly couples every screen to a shared mutable
+surface no engineer fully understands. Forcing every Zustand entry to
+justify itself with at least two unrelated consumers keeps the global
+surface tiny by construction and lets the four-layer Principle X split
+do its job. This rule pairs with the **Hook return-value memoisation
+rule** above — when state lives next to the hook that consumes it, the
+hook's return value is the single contract surface a memoisation pass
+needs to police.
+
 **`useEffect` usage discipline.** `useEffect` is an escape hatch for synchronising
 React state with **external systems** (browser/native APIs, subscriptions, network
 resources, third-party widgets). It MUST NOT be used for any of the following
@@ -1276,4 +1369,4 @@ Each feature plan MUST include a Constitution Check (as defined in
 before implementation begins. Violations MUST be justified in the plan's Complexity
 Tracking table.
 
-**Version**: 1.20.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-10
+**Version**: 1.21.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-11
