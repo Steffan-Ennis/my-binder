@@ -29,7 +29,7 @@ export class CardRepository {
   }
 
   async create(body: CreateCardBody, userId: string): Promise<Card> {
-    const entity = await this.repo.save({ name: body.name, userId });
+    const entity = await this.repo.save({ id: body.id, name: body.name, userId });
     return toCard(entity);
   }
 

@@ -57,6 +57,19 @@ export type CardNotFoundResult = {
   name: string;
 };
 
+// Provider-supplied enrichment for a single printing identified by its
+// MTGJSON UUID — used to decorate a stored Card with display metadata
+// (set name, type line) and the Scryfall id needed to construct an image URL.
+export type CardDetails = {
+  uuid: string;
+  name: string;
+  setCode: string;
+  setName: string | null;
+  cardNumber: string;
+  typeLine: string;
+  scryfallId: string | null;
+};
+
 export type ProviderNotFoundError = {
   type: 'PROVIDER_NOT_FOUND';
   message: string;

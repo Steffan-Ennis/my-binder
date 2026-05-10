@@ -33,6 +33,7 @@ function makeSdk(overrides: Partial<MtgjsonSDK> = {}): MtgjsonSDK {
     cards: {
       search: jest.fn().mockResolvedValue([]),
       getByName: jest.fn().mockResolvedValue([]),
+      getByUuid: jest.fn().mockResolvedValue(null),
       getPrintings: jest.fn().mockResolvedValue([]),
     },
     identifiers: {
@@ -40,6 +41,9 @@ function makeSdk(overrides: Partial<MtgjsonSDK> = {}): MtgjsonSDK {
     },
     legalities: {
       isLegal: jest.fn().mockResolvedValue(true),
+    },
+    sets: {
+      get: jest.fn().mockResolvedValue({ name: 'Magic 2011' }),
     },
     close: jest.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -155,5 +159,64 @@ describe('MtgjsonProvider.search — sequential enrichment', () => {
     expect(sdk.legalities.isLegal).toHaveBeenCalledTimes(2);
     expect(sdk.legalities.isLegal).toHaveBeenCalledWith('uuid-001', 'commander');
     expect(sdk.legalities.isLegal).toHaveBeenCalledWith('uuid-002', 'commander');
+  });
+});
+
+describe('MtgjsonProvider.getByUuid', () => {
+  test('returns CardDetails populated from sdk.cards + identifiers + sets', async () => {
+    const sdk = makeSdk();
+    (sdk.cards.getByUuid as jest.Mock).mockResolvedValue(
+      makeCard({ uuid: 'uuid-bolt', name: 'Lightning Bolt', setCode: 'M11', number: '149', type: 'Instant' }),
+    );
+    (sdk.identifiers.getIdentifiers as jest.Mock).mockResolvedValue({ scryfallId: 'sf-bolt' });
+    (sdk.sets.get as jest.Mock).mockResolvedValue({ name: 'Magic 2011' });
+
+    const provider = new MtgjsonProvider(sdk);
+    const details = await provider.getByUuid('uuid-bolt');
+
+    expect(details).toEqual({
+      uuid: 'uuid-bolt',
+      name: 'Lightning Bolt',
+      setCode: 'M11',
+      setName: 'Magic 2011',
+      cardNumber: '149',
+      typeLine: 'Instant',
+      scryfallId: 'sf-bolt',
+    });
+  });
+
+  test('returns null when sdk.cards.getByUuid returns null', async () => {
+    const sdk = makeSdk();
+    (sdk.cards.getByUuid as jest.Mock).mockResolvedValue(null);
+
+    const provider = new MtgjsonProvider(sdk);
+    const details = await provider.getByUuid('unknown-uuid');
+
+    expect(details).toBeNull();
+    expect(sdk.identifiers.getIdentifiers).not.toHaveBeenCalled();
+    expect(sdk.sets.get).not.toHaveBeenCalled();
+  });
+
+  test('scryfallId is null when identifiers omit it', async () => {
+    const sdk = makeSdk();
+    (sdk.cards.getByUuid as jest.Mock).mockResolvedValue(makeCard({ uuid: 'uuid-001' }));
+    (sdk.identifiers.getIdentifiers as jest.Mock).mockResolvedValue(undefined);
+
+    const provider = new MtgjsonProvider(sdk);
+    const details = await provider.getByUuid('uuid-001');
+
+    expect(details?.scryfallId).toBeNull();
+  });
+
+  test('setName is null when sdk.sets.get returns null', async () => {
+    const sdk = makeSdk();
+    (sdk.cards.getByUuid as jest.Mock).mockResolvedValue(makeCard({ uuid: 'uuid-001', setCode: 'XYZ' }));
+    (sdk.sets.get as jest.Mock).mockResolvedValue(null);
+
+    const provider = new MtgjsonProvider(sdk);
+    const details = await provider.getByUuid('uuid-001');
+
+    expect(details?.setName).toBeNull();
+    expect(details?.setCode).toBe('XYZ');
   });
 });

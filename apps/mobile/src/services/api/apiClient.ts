@@ -13,7 +13,17 @@ import {
   type GoogleSignInResponse,
 } from './schemas';
 
-const ajv = new Ajv({ allErrors: true, coerceTypes: false, useDefaults: false });
+const ajv = new Ajv({
+  allErrors: true,
+  coerceTypes: false,
+  useDefaults: false,
+  // Register `format: 'uuid'` and `format: 'date-time'` from the canonical
+  // `@my-binder/core` card schema as no-op string checks. Ajv-core does not
+  // ship these formats; the mobile client accepts any string for them and
+  // relies on the server-side Ajv (with ajv-formats registered) to enforce
+  // structural correctness at the source of truth.
+  formats: { uuid: true, 'date-time': true },
+});
 
 const validateGoogleSignInResponse = ajv.compile(GOOGLE_SIGN_IN_RESPONSE_SCHEMA);
 const validateAuthMeResponse = ajv.compile(AUTH_ME_RESPONSE_SCHEMA);

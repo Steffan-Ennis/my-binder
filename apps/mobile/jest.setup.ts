@@ -42,6 +42,38 @@ jest.mock('expo-constants', () => ({
   },
 }));
 
+jest.mock('expo-image', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { View } = require('react-native');
+  return { Image: View };
+});
+
+jest.mock('react-native-pager-view', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { View } = require('react-native');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const React = require('react');
+  // Render only the page at `initialPage` (default 0). Real PagerView mounts
+  // its neighbours via `offscreenPageLimit`; for unit tests we keep the tree
+  // tight so test queries reflect the visible page only.
+  const PagerView = ({
+    children,
+    initialPage = 0,
+    testID,
+    style,
+  }: {
+    children?: React.ReactNode;
+    initialPage?: number;
+    testID?: string;
+    style?: unknown;
+  }) => {
+    const pages = React.Children.toArray(children);
+    const visible = pages[initialPage] ?? null;
+    return React.createElement(View, { testID, style }, visible);
+  };
+  return { __esModule: true, default: PagerView };
+});
+
 jest.mock('expo-router', () => {
   const Redirect = ({ href }: { href: string }) => `Redirect(${href})`;
 

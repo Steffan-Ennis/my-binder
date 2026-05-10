@@ -120,7 +120,16 @@ describe('apiClient.signOut', () => {
 describe('apiClient.getCards', () => {
   it('returns the validated card list', async () => {
     const body = {
-      cards: [{ id: 'c1', name: 'Lightning Bolt', frontFaceImageUrl: 'https://img/1' }],
+      cards: [
+        {
+          id: '11111111-1111-1111-1111-111111111111',
+          name: 'Lightning Bolt',
+          createdAt: '2026-05-01T00:00:00Z',
+          updatedAt: '2026-05-01T00:00:00Z',
+          frontFaceImageUrl: 'https://img/1',
+        },
+      ],
+      total: 1,
       nextCursor: null,
     };
     fetchMock.mockResolvedValue(ok(body));
@@ -129,7 +138,7 @@ describe('apiClient.getCards', () => {
   });
 
   it('appends the cursor query string when supplied', async () => {
-    fetchMock.mockResolvedValue(ok({ cards: [], nextCursor: null }));
+    fetchMock.mockResolvedValue(ok({ cards: [], total: 0, nextCursor: null }));
     await apiClient.getCards('opaque-token');
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/cards?cursor=opaque-token'),

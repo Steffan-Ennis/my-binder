@@ -8,15 +8,17 @@ const TabsLayout: FC = () => (
   <Tabs
     initialRouteName="binder"
     screenOptions={{
-      headerShown: false,
+      headerShown: true,
       tabBarActiveTintColor: Colors.dark.tabIconSelected,
       tabBarInactiveTintColor: Colors.dark.tabIconDefault,
-      tabBarStyle: { backgroundColor: Colors.dark.tabBarBackground },
+      headerStyle: { backgroundColor: Colors.dark.tabBarBackground },
+      tabBarStyle: { backgroundColor: Colors.dark.tabBarBackground }
     }}
   >
     <Tabs.Screen
       name="binder"
       options={{
+        headerShown: false,
         tabBarLabel: 'Binder',
         tabBarIcon: ({ color, size }) => <Ionicons name="albums" size={size} color={color} />,
       }}

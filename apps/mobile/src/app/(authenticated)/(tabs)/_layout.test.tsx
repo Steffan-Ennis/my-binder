@@ -30,4 +30,25 @@ describe('(tabs) layout', () => {
       (Tabs as unknown as { Screen: typeof original }).Screen = original;
     }
   });
+
+  it('opts the binder tab out of the default header but leaves other tabs unchanged', () => {
+    type ScreenOptions = NonNullable<ComponentProps<typeof Tabs.Screen>['options']>;
+    const captured: Record<string, ScreenOptions> = {};
+    const spy = jest.fn((props: ComponentProps<typeof Tabs.Screen>) => {
+      captured[props.name as string] = (props.options ?? {}) as ScreenOptions;
+      return null;
+    });
+    const original = Tabs.Screen;
+    (Tabs as unknown as { Screen: typeof spy }).Screen = spy;
+
+    try {
+      render(<TabsLayout />);
+      expect((captured.binder as { headerShown?: boolean }).headerShown).toBe(false);
+      expect((captured.search as { headerShown?: boolean }).headerShown).toBeUndefined();
+      expect((captured.scan as { headerShown?: boolean }).headerShown).toBeUndefined();
+      expect((captured.profile as { headerShown?: boolean }).headerShown).toBeUndefined();
+    } finally {
+      (Tabs as unknown as { Screen: typeof original }).Screen = original;
+    }
+  });
 });

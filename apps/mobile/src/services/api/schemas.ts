@@ -1,10 +1,17 @@
 // Mobile-specific Ajv schemas. The mobile app validates inbound API responses
 // against these inside the TanStack queryFn before resolving (Principle VII).
 //
-// Per `specs/002-mobile-binder-app/contracts/api-client.md`, the mobile contract
-// is forward-looking — `frontFaceImageUrl` and the cursor-paginated list shape
-// haven't yet landed in `@my-binder/core/schemas/`. When they do, swap the
-// schemas here for the core re-exports and delete this file.
+// Schema-of-record rule (spec 016): `Card` and `CardList` are defined ONCE in
+// `@my-binder/core` and consumed by both `apps/server` and `apps/mobile`. The
+// previously-local mobile declarations have been replaced with re-exports from
+// core. Only auth-related schemas remain local to the mobile app pending a
+// follow-up migration.
+
+export {
+  CARD_RESPONSE_SCHEMA as CARD_SCHEMA,
+  CARD_LIST_RESPONSE_SCHEMA,
+} from '@my-binder/core';
+export type { Card, CardList as CardListResponse } from '@my-binder/core';
 
 export const AUTH_USER_SCHEMA = {
   type: 'object',
@@ -44,38 +51,6 @@ export const AUTH_ME_RESPONSE_SCHEMA = {
     user: AUTH_USER_SCHEMA,
   },
 } as const;
-
-export const CARD_SCHEMA = {
-  type: 'object',
-  additionalProperties: true,
-  required: ['id', 'name', 'frontFaceImageUrl'],
-  properties: {
-    id: { type: 'string', minLength: 1 },
-    name: { type: 'string', minLength: 1 },
-    frontFaceImageUrl: { type: 'string', minLength: 1 },
-  },
-} as const;
-
-export const CARD_LIST_RESPONSE_SCHEMA = {
-  type: 'object',
-  additionalProperties: true,
-  required: ['cards'],
-  properties: {
-    cards: { type: 'array', items: CARD_SCHEMA },
-    nextCursor: { type: ['string', 'null'] },
-  },
-} as const;
-
-export type Card = {
-  id: string;
-  name: string;
-  frontFaceImageUrl: string;
-};
-
-export type CardListResponse = {
-  cards: Card[];
-  nextCursor: string | null;
-};
 
 export type AuthUser = {
   id: string;

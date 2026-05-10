@@ -7,6 +7,42 @@ import { getRepositories } from '@src/db/repositories';
 import { registry } from '@src/providers/registry';
 import { CardProvider } from "@src/providers/interface";
 
+// Scryfall image CDN convention: paths shard by the first two characters of
+// the Scryfall id. Exposed only for tests; not part of the public surface.
+function scryfallNormalImageUrl(scryfallId: string): string | undefined {
+  if (scryfallId.length < 2) return undefined;
+  return `https://cards.scryfall.io/normal/front/${scryfallId[0]}/${scryfallId[1]}/${scryfallId}.jpg`;
+}
+
+async function enrichCard(card: Card, provider: CardProvider | null): Promise<Card> {
+  if (provider === null) return card;
+  try {
+    const details = await provider.getByUuid(card.id);
+    if (details === null) return card;
+    const frontFaceImageUrl = details.scryfallId
+      ? scryfallNormalImageUrl(details.scryfallId)
+      : undefined;
+    return {
+      ...card,
+      setCode: details.setCode,
+      ...(details.setName !== null && { setName: details.setName }),
+      typeLine: details.typeLine,
+      ...(frontFaceImageUrl !== undefined && { frontFaceImageUrl }),
+    };
+  } catch (err) {
+    console.error(`[cardService] enrichment failed for card id=${card.id}`, err);
+    return card;
+  }
+}
+
+function getProviderOrNull(): CardProvider | null {
+  try {
+    return registry.getActive();
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Thrown by user-collection CRUD when no row matches the supplied id+userId.
  * The HTTP layer maps this to 404.
@@ -42,7 +78,14 @@ export class NotFoundError extends Error {
  * ```
  */
 export async function getCards(userId: string): Promise<CardList> {
-  const cards = await getRepositories().card.findAll(userId);
+  const rows = await getRepositories().card.findAll(userId);
+  const provider = getProviderOrNull();
+  // Sequential enrichment: the MTGJSON SDK shares a DuckDB connection and
+  // concurrent access produces "Failed to execute prepared statement" errors.
+  const cards: Card[] = [];
+  for (const row of rows) {
+    cards.push(await enrichCard(row, provider));
+  }
   return { cards, total: cards.length };
 }
 
@@ -63,7 +106,7 @@ export async function getCards(userId: string): Promise<CardList> {
 export async function getCard(id: string, userId: string): Promise<Card> {
   const card = await getRepositories().card.findById(id, userId);
   if (card === null) throw new NotFoundError(id);
-  return card;
+  return enrichCard(card, getProviderOrNull());
 }
 
 /**

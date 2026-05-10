@@ -38,15 +38,16 @@ const mockCardRepo = {
   findAll: async (userId: string) => mockCardStore.filter((c) => c.userId === userId),
   findById: async (id: string, userId: string) =>
     mockCardStore.find((c) => c.id === id && c.userId === userId) ?? null,
-  create: async (body: { name: string }, userId: string) => {
+  create: async (body: { id: string; name: string }, userId: string) => {
     const row: CardRow = {
-      id: `card-${nextId++}`,
+      id: body.id,
       name: body.name,
       userId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     mockCardStore.push(row);
+    nextId++;
     return row;
   },
   update: async (id: string, body: { name: string }, userId: string) => {
@@ -74,6 +75,7 @@ function makeProvider(overrides: Partial<CardProvider> = {}): CardProvider {
     lookup: async () => [LIGHTNING_BOLT],
     checkLegality: async (name) => ({ cardName: name, legal: true, reason: null, colorIdentity: [] }),
     search: async () => [LIGHTNING_BOLT, SOL_RING],
+    getByUuid: async () => null,
     isReachable: async () => true,
     ...overrides,
   };
@@ -105,7 +107,9 @@ describe('cardService — collection functions', () => {
 
   test('createCard creates and returns card', async () => {
     mockCardStore = [];
-    const card = await createCard({ name: 'Black Lotus' }, USER_A);
+    const mtgjsonId = '55555555-5555-4555-8555-555555555555';
+    const card = await createCard({ id: mtgjsonId, name: 'Black Lotus' }, USER_A);
+    expect(card.id).toBe(mtgjsonId);
     expect(card.name).toBe('Black Lotus');
     expect(card.id).toBeTruthy();
   });
@@ -113,6 +117,71 @@ describe('cardService — collection functions', () => {
   test('deleteCard throws NotFoundError when card not found', async () => {
     mockCardStore = [];
     await expect(() => deleteCard('missing', USER_A)).rejects.toThrow(NotFoundError);
+  });
+});
+
+// ─── MTGJSON-decorated collection reads ───────────────────────────────────────
+
+describe('cardService — getCards/getCard MTGJSON enrichment', () => {
+  const UUID_BOLT = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const UUID_SOL = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
+  beforeAll(async () => {
+    mockCardStore = [
+      { id: UUID_BOLT, name: 'Lightning Bolt', userId: USER_A, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+      { id: UUID_SOL, name: 'Sol Ring', userId: USER_A, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+    ];
+    registry.register('enrich-ok', makeProvider({
+      getByUuid: async (uuid) => uuid === UUID_BOLT
+        ? { uuid, name: 'Lightning Bolt', setCode: 'M11', setName: 'Magic 2011', cardNumber: '149', typeLine: 'Instant', scryfallId: 'e3285fd6-aaaa-bbbb-cccc-ddddddddeeee' }
+        : { uuid, name: 'Sol Ring', setCode: 'C11', setName: 'Commander 2011', cardNumber: '58', typeLine: 'Artifact', scryfallId: null },
+    }));
+    await registry.setActive('enrich-ok');
+  });
+
+  test('getCards decorates each row with frontFaceImageUrl, setName, setCode, typeLine', async () => {
+    const result = await getCards(USER_A);
+    expect(result.total).toBe(2);
+    const bolt = result.cards.find((c) => c.id === UUID_BOLT)!;
+    expect(bolt.setCode).toBe('M11');
+    expect(bolt.setName).toBe('Magic 2011');
+    expect(bolt.typeLine).toBe('Instant');
+    expect(bolt.frontFaceImageUrl).toBe(
+      'https://cards.scryfall.io/normal/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg',
+    );
+  });
+
+  test('getCards omits frontFaceImageUrl when scryfallId is null', async () => {
+    const result = await getCards(USER_A);
+    const sol = result.cards.find((c) => c.id === UUID_SOL)!;
+    expect(sol.setCode).toBe('C11');
+    expect(sol.setName).toBe('Commander 2011');
+    expect(sol.frontFaceImageUrl).toBeUndefined();
+  });
+
+  test('getCard decorates a single row', async () => {
+    const card = await getCard(UUID_BOLT, USER_A);
+    expect(card.setCode).toBe('M11');
+    expect(card.frontFaceImageUrl).toBe(
+      'https://cards.scryfall.io/normal/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg',
+    );
+  });
+
+  test('getCards returns rows unenriched when provider.getByUuid returns null', async () => {
+    registry.register('enrich-null', makeProvider({ getByUuid: async () => null }));
+    await registry.setActive('enrich-null');
+    const result = await getCards(USER_A);
+    expect(result.cards.every((c) => c.frontFaceImageUrl === undefined)).toBe(true);
+    expect(result.cards.every((c) => c.setCode === undefined)).toBe(true);
+  });
+
+  test('getCards returns rows unenriched when provider.getByUuid throws', async () => {
+    registry.register('enrich-throw', makeProvider({
+      getByUuid: async () => { throw new Error('parquet read failed'); },
+    }));
+    await registry.setActive('enrich-throw');
+    const result = await getCards(USER_A);
+    expect(result.cards.every((c) => c.frontFaceImageUrl === undefined)).toBe(true);
   });
 });
 

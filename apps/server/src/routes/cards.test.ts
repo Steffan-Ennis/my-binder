@@ -40,8 +40,9 @@ jest.mock('@src/db/repositories', () => ({
         const card = cardStore.find((c) => c.id === id && c.userId === userId);
         return card ? toCardJson(card) : null;
       },
-      create: async (body: { name: string }, userId: string) => {
+      create: async (body: { id: string; name: string }, userId: string) => {
         const row = makeCardRow(body.name, userId);
+        row.id = body.id;
         cardStore.push(row);
         return toCardJson(row);
       },
@@ -74,6 +75,7 @@ function makeProvider(overrides: Partial<CardProvider> = {}): CardProvider {
     lookup: async () => [BOLT],
     checkLegality: async (name) => ({ cardName: name, legal: true, reason: null, colorIdentity: [] }),
     search: async () => [BOLT],
+    getByUuid: async () => null,
     isReachable: async () => true,
     ...overrides,
   };
@@ -119,16 +121,17 @@ describe('Cards API — collection CRUD (authenticated)', () => {
   });
 
   test('POST /cards creates a card and returns 201', async () => {
+    const mtgjsonId = '22222222-2222-4222-8222-222222222222';
     const response = await fastify.inject({
-      method: 'POST', url: '/cards', payload: { name: 'Black Lotus' },
+      method: 'POST', url: '/cards', payload: { id: mtgjsonId, name: 'Black Lotus' },
     });
     expect(response.statusCode).toBe(201);
     const card = response.json<{ id: string; name: string }>();
     expect(card.name).toBe('Black Lotus');
-    expect(card.id).toBeTruthy();
+    expect(card.id).toBe(mtgjsonId);
   });
 
-  test('POST /cards returns 400 for missing name', async () => {
+  test('POST /cards returns 400 for missing required fields', async () => {
     const response = await fastify.inject({
       method: 'POST', url: '/cards', payload: {},
     });
@@ -146,7 +149,7 @@ describe('Cards API — collection CRUD (authenticated)', () => {
     cardStore = [];
 
     const created = await fastify.inject({
-      method: 'POST', url: '/cards', payload: { name: 'Mox Ruby' },
+      method: 'POST', url: '/cards', payload: { id: '33333333-3333-4333-8333-333333333333', name: 'Mox Ruby' },
     });
     expect(created.statusCode).toBe(201);
     const { id } = created.json<{ id: string }>();
@@ -190,13 +193,73 @@ describe('Cards API — collection routes require authentication', () => {
   });
 
   test('POST /cards returns 401 without auth', async () => {
-    const response = await fastify.inject({ method: 'POST', url: '/cards', payload: { name: 'Test' } });
+    const response = await fastify.inject({
+      method: 'POST', url: '/cards',
+      payload: { id: '44444444-4444-4444-8444-444444444444', name: 'Test' },
+    });
     expect(response.statusCode).toBe(401);
   });
 
   test('GET /cards/:id returns 401 without auth', async () => {
     const response = await fastify.inject({ method: 'GET', url: '/cards/00000000-0000-0000-0000-000000000099' });
     expect(response.statusCode).toBe(401);
+  });
+});
+
+// ─── GET /cards MTGJSON enrichment ───────────────────────────────────────────
+
+describe('Cards API — GET /cards MTGJSON-enriched response', () => {
+  const fastify = Fastify();
+  const UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+  beforeAll(async () => {
+    process.env['SESSION_JWT_SECRET'] = TEST_SECRET;
+    cardStore = [{ id: UUID, name: 'Lightning Bolt', userId: TEST_USER_ID, createdAt: new Date(), updatedAt: new Date() }];
+    registry.register('enrich-route-test', makeProvider({
+      getByUuid: async (uuid) => ({
+        uuid,
+        name: 'Lightning Bolt',
+        setCode: 'M11',
+        setName: 'Magic 2011',
+        cardNumber: '149',
+        typeLine: 'Instant',
+        scryfallId: 'e3285fd6-aaaa-bbbb-cccc-ddddddddeeee',
+      }),
+    }));
+    await registry.setActive('enrich-route-test');
+    fastify.decorate('authenticate', async () => {});
+    fastify.addHook('onRequest', async (req) => {
+      (req as unknown as { identity: unknown }).identity = { kind: 'authenticated', user: MOCK_USER };
+    });
+    await fastify.register(cardRoutes);
+    await fastify.ready();
+  });
+
+  afterAll(async () => {
+    await fastify.close();
+  });
+
+  test('GET /cards returns cards with frontFaceImageUrl, setName, setCode, typeLine', async () => {
+    const r = await fastify.inject({ method: 'GET', url: '/cards' });
+    expect(r.statusCode).toBe(200);
+    const body = r.json<{ cards: Array<{ id: string; setCode?: string; setName?: string; typeLine?: string; frontFaceImageUrl?: string }>; total: number }>();
+    expect(body.total).toBe(1);
+    expect(body.cards[0]?.setCode).toBe('M11');
+    expect(body.cards[0]?.setName).toBe('Magic 2011');
+    expect(body.cards[0]?.typeLine).toBe('Instant');
+    expect(body.cards[0]?.frontFaceImageUrl).toBe(
+      'https://cards.scryfall.io/normal/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg',
+    );
+  });
+
+  test('GET /cards/:id returns single enriched card', async () => {
+    const r = await fastify.inject({ method: 'GET', url: `/cards/${UUID}` });
+    expect(r.statusCode).toBe(200);
+    const body = r.json<{ frontFaceImageUrl?: string; setCode?: string }>();
+    expect(body.setCode).toBe('M11');
+    expect(body.frontFaceImageUrl).toBe(
+      'https://cards.scryfall.io/normal/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg',
+    );
   });
 });
 

@@ -27,8 +27,8 @@ const mockFind = jest.fn(async (opts: { where: { userId: string }; order?: unkno
 const mockFindOne = jest.fn(async (opts: { where: { id: string; userId: string } }) =>
   store.find((c) => c.id === opts.where.id && c.userId === opts.where.userId) ?? null,
 );
-const mockSave = jest.fn(async (entity: { name: string; userId: string }) => ({
-  id: 'new-card-uuid',
+const mockSave = jest.fn(async (entity: { id: string; name: string; userId: string }) => ({
+  id: entity.id,
   name: entity.name,
   userId: entity.userId,
   createdAt: new Date(),
@@ -75,11 +75,13 @@ describe('cardRepository', () => {
 
   test('create saves card with userId and returns it', async () => {
     mockSave.mockClear();
-    const card = await repo.create({ name: 'Black Lotus' }, USER_A);
+    const mtgjsonId = '11111111-1111-4111-8111-111111111111';
+    const card = await repo.create({ id: mtgjsonId, name: 'Black Lotus' }, USER_A);
     expect(mockSave.mock.calls.length).toBe(1);
-    const saveArg = mockSave.mock.calls[0]![0] as { name: string; userId: string };
+    const saveArg = mockSave.mock.calls[0]![0] as { id: string; name: string; userId: string };
+    expect(saveArg.id).toBe(mtgjsonId);
     expect(saveArg.userId).toBe(USER_A);
-    expect(card.id).toBe('new-card-uuid');
+    expect(card.id).toBe(mtgjsonId);
   });
 
   test('remove calls delete with id+userId criteria', async () => {

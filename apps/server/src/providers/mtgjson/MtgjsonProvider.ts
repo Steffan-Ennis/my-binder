@@ -1,5 +1,5 @@
 import type {MtgjsonSDK, CardSet} from 'mtgjson-sdk';
-import type { CardRecord, CardNotFoundResult, LegalityResult, SearchQuery } from '@my-binder/core';
+import type { CardDetails, CardRecord, CardNotFoundResult, LegalityResult, SearchQuery } from '@my-binder/core';
 import type { CardProvider, LookupOptions } from '@src/providers/interface';
 import { mapCardSetToCardRecord } from '@src/providers/mtgjson/mapper';
 
@@ -205,6 +205,44 @@ export class MtgjsonProvider implements CardProvider {
     });
 
     return this.collectCards(cards);
+  }
+
+  /**
+   * Resolve a single printing by its MTGJSON UUID and return display-ready
+   * details (name, set, type line, scryfall id) used to decorate stored
+   * `Card` rows.
+   *
+   * Performs three sequential SDK calls (cards, identifiers, sets) — concurrent
+   * access to the SDK's underlying DuckDB connection produces a "Failed to
+   * execute prepared statement" race condition (see `enrichCard`).
+   *
+   * @param uuid - MTGJSON printing UUID.
+   * @returns A `CardDetails` record, or `null` if the UUID is unknown.
+   *
+   * @example
+   * ```ts
+   * const details = await provider.getByUuid('e3285fd6-0000-0000-0000-example00001');
+   * // { uuid, name: 'Lightning Bolt', setCode: 'M11', setName: 'Magic 2011', ... }
+   * ```
+   */
+  async getByUuid(uuid: string): Promise<CardDetails | null> {
+    const card = await this.sdk.cards.getByUuid(uuid);
+    if (!card) return null;
+
+    const ids = await this.sdk.identifiers.getIdentifiers(uuid);
+    const scryfallId = typeof ids?.scryfallId === 'string' ? ids.scryfallId : null;
+
+    const setInfo = await this.sdk.sets.get(card.setCode);
+
+    return {
+      uuid,
+      name: card.name,
+      setCode: card.setCode,
+      setName: setInfo?.name ?? null,
+      cardNumber: card.number,
+      typeLine: card.type,
+      scryfallId,
+    };
   }
 
   /**

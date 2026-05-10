@@ -29,6 +29,9 @@ const palette = {
   /** Soft coral — error states, disabled gold ghosting. */
   coral400: '#ff8a80',
 
+  /** Soft Grey for tabs */
+  tabBackground : 'rgb(251, 247, 240)',
+
   /** Primary brand accent — warm dusty gold for masthead glyph + title. */
   gold500: '#c9a86b',
   /** Pressed/active gold — used for the underline rule under the masthead. */
@@ -61,6 +64,12 @@ const palette = {
  */
 export const Colors = {
   dark: {
+
+    // Primary palette
+    primary : {
+      gradient: `linear-gradient(${palette.crimson700} 0%, ${palette.crimson500} 100%)`
+    },
+
     // Surfaces
     background: palette.crimson700,
     backgroundElevated: palette.crimson500,
@@ -80,7 +89,7 @@ export const Colors = {
     accentSoft: palette.gold300,
 
     // Tab bar
-    tabBarBackground: palette.crimson900,
+    tabBarBackground: palette.tabBackground,
     tabIconDefault: palette.rose400,
     tabIconSelected: palette.gold500,
 

@@ -1,10 +1,6 @@
 import type { FC } from 'react';
-import { Text, View } from 'react-native';
 
-const Binder: FC = () => (
-  <View>
-    <Text>Binder</Text>
-  </View>
-);
+import { BinderHomeContainer } from '@src/components/binder-home/BinderHomeContainer';
 
+const Binder: FC = () => <BinderHomeContainer />;
 export default Binder;

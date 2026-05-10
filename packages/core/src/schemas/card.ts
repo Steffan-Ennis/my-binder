@@ -10,6 +10,11 @@ export const CARD_RESPONSE_SCHEMA = {
     name: { type: 'string', minLength: 1, maxLength: 255 },
     createdAt: { type: 'string', format: 'date-time' },
     updatedAt: { type: 'string', format: 'date-time' },
+    // Optional binder-home fields (spec 016) — not yet returned by the server.
+    frontFaceImageUrl: { type: 'string', minLength: 1 },
+    setName: { type: 'string' },
+    setCode: { type: 'string' },
+    typeLine: { type: 'string' },
   },
 } as const;
 
@@ -23,14 +28,16 @@ export const CARD_LIST_RESPONSE_SCHEMA = {
       items: CARD_RESPONSE_SCHEMA,
     },
     total: { type: 'integer', minimum: 0 },
+    nextCursor: { type: ['string', 'null'] },
   },
 } as const;
 
 export const CREATE_CARD_BODY_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['name'],
+  required: ['id', 'name'],
   properties: {
+    id: { type: 'string', format: 'uuid' },
     name: { type: 'string', minLength: 1, maxLength: 255 },
   },
 } as const;

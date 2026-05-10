@@ -9,6 +9,7 @@
     "migration:revert": "node --env-file=.env.local --import tsx ./node_modules/typeorm/cli.js migration:revert -d src/db/datasource-cli.ts",
     "dev": "node --env-file=.env.local --import tsx --watch index.ts",
     "start": "node --env-file=.env.local dist/index.js",
+    "seed:cards": "node --env-file=.env.local --import tsx scripts/seed-cards-for-user.ts",
     "test": "jest",
     "typecheck": "tsc --noEmit"
   },

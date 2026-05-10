@@ -86,6 +86,38 @@ describe('useSignOutMutation', () => {
     expect(replaceSpy).toHaveBeenCalledWith('/login');
   });
 
+  it('resets useBinderStore BEFORE clearing the query cache (research §8, contracts §6)', async () => {
+    mockedSignOut.mockResolvedValue(undefined);
+
+    const order: string[] = [];
+    const resetSpy = jest
+      .spyOn(useBinderStore.getState(), 'reset')
+      .mockImplementation(() => {
+        order.push('binderStore.reset');
+        useBinderStore.setState({ currentPage: 1 });
+      });
+    const clearSpy = jest.spyOn(client, 'clear').mockImplementation(() => {
+      order.push('queryClient.clear');
+    });
+
+    try {
+      const { result } = renderHook(() => useSignOutMutation(), { wrapper });
+      await act(async () => {
+        await result.current.mutateAsync({ googleAccessToken: 'gat' });
+      });
+
+      expect(resetSpy).toHaveBeenCalled();
+      expect(clearSpy).toHaveBeenCalled();
+      const resetIdx = order.indexOf('binderStore.reset');
+      const clearIdx = order.indexOf('queryClient.clear');
+      expect(resetIdx).toBeGreaterThanOrEqual(0);
+      expect(clearIdx).toBeGreaterThan(resetIdx);
+    } finally {
+      resetSpy.mockRestore();
+      clearSpy.mockRestore();
+    }
+  });
+
   it('still runs cleanup chain when the server signOut fails', async () => {
     mockedSignOut.mockRejectedValue(
       new ApiError({ message: 'boom', status: 500, kind: 'UNKNOWN' }),
