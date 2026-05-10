@@ -14,6 +14,7 @@ import { Colors } from '@src/constants/theme';
 import { SLOTS_PER_BINDER_PAGE } from '@src/utils/pageMath';
 
 import useStyles from './BinderHomeView.theme';
+import IconSmall from "@src/components/icons/IconSmall";
 
 const RING_COUNT = 3;
 
@@ -122,15 +123,10 @@ const BinderHomeView: FC<BinderHomeViewProps> = ({
         ) : (
           <>
             <View style={styles.mastheadGroup}>
-              <Ionicons
-                name="albums"
-                size={28}
-                color={Colors.dark.accent}
-                style={styles.mastheadIcon}
-              />
+              <IconSmall />
               <View style={styles.mastheadText}>
                 <Text style={styles.overline}>MY-BINDER</Text>
-                <Text style={styles.title}>My Binder</Text>
+                <Text style={styles.title}>Binder</Text>
               </View>
             </View>
             <View style={styles.headerActions}>
