@@ -137,7 +137,6 @@ describe('BinderHomeView — US2 grid + pager', () => {
       matchedCards: elevenCards,
       currentPage: 1,
       totalPages: 2,
-      onPrevPage,
     });
     const prev = screen.getByLabelText('Previous page');
     expect(prev.props.accessibilityState?.disabled).toBe(true);
@@ -152,7 +151,6 @@ describe('BinderHomeView — US2 grid + pager', () => {
       matchedCards: elevenCards,
       currentPage: 2,
       totalPages: 2,
-      onNextPage,
     });
     const next = screen.getByLabelText('Next page');
     expect(next.props.accessibilityState?.disabled).toBe(true);
@@ -167,7 +165,6 @@ describe('BinderHomeView — US2 grid + pager', () => {
       matchedCards: elevenCards,
       currentPage: 1,
       totalPages: 2,
-      onNextPage,
     });
     fireEvent.press(screen.getByLabelText('Next page'));
     expect(onNextPage).toHaveBeenCalled();
@@ -180,7 +177,6 @@ describe('BinderHomeView — US2 grid + pager', () => {
       matchedCards: elevenCards,
       currentPage: 2,
       totalPages: 2,
-      onPrevPage,
     });
     fireEvent.press(screen.getByLabelText('Previous page'));
     expect(onPrevPage).toHaveBeenCalled();
@@ -193,7 +189,6 @@ describe('BinderHomeView — US2 grid + pager', () => {
       matchedCards: elevenCards,
       currentPage: 1,
       totalPages: 2,
-      onPageChange,
     });
     const pager = screen.getByTestId('binder-pager');
     fireEvent(pager, 'pageSelected', { nativeEvent: { position: 1 } });

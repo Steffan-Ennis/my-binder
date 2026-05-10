@@ -2,33 +2,43 @@
 SYNC IMPACT REPORT
 ==================
 Version change: 1.19.0 → 1.20.0
-Bump type: MINOR — materially expands Principle X (Component Architecture
-  — Mobile) with a new "State locality rule" sub-section codifying where
-  React state MUST live in `apps/mobile`. The rule pins a strict
-  hierarchy:
-    1. Single-component state lives inside the component's
-       `use<Feature>.ts` hook (`useState` / `useReducer`).
-    2. State shared between two or more *unrelated* components (no
-       parent → descendant relationship between consumers) lives in a
-       Zustand store under `apps/mobile/src/stores/`.
-    3. State shared along a parent → descendant chain stays in the
-       parent's hook and flows downward through props; promotion to a
-       Zustand store requires an additional unrelated consumer.
+Bump type: MINOR — adds a new "Style co-location rule" sub-section to
+  Principle X (Component Architecture — Mobile). The rule pins three
+  behaviours for every view component in `apps/mobile`:
 
-  The trigger was the binder-home refactor (spec 016) that moved
-  `currentPage` out of `binderStore` and into `useBinderHome.ts` after
-  the page indicator was collocated inside the binder view, leaving the
-  store with a single consumer. The deletion of
-  `apps/mobile/src/stores/binderStore.ts` exposed an unwritten convention
-  that this amendment now codifies: Zustand is reserved for genuinely
-  shared state, never for hook-local state lifted "in case" another
-  component needs it later.
+    1. Styles MUST live in a sibling `<Component>.theme.ts` file and
+       MUST be consumed through a `useStyles` hook that is the file's
+       single `export default`.
+    2. The theme file MUST declare a strongly-typed
+       `<Component>ViewStyles` type where each entry is
+       `Required<Pick<ViewStyle | TextStyle | ImageStyle, ...exact-keys>>`
+       over only the keys actually present in that style — bare
+       `ViewStyle` / `TextStyle` per entry is prohibited.
+    3. Theme files MUST belong to exactly one component (Single
+       Responsibility, Principle IV). Importing one component's
+       `*.theme.ts` from another component is prohibited; cross-
+       component visual primitives live in
+       `apps/mobile/constants/theme.ts`.
 
-  No existing principle is removed or redefined. The state-locality
-  rule sits between the Hook return-value memoisation rule and the
-  `useEffect` usage discipline sub-section because all three govern
-  hook implementation patterns. The rule applies only to `apps/mobile`;
-  `apps/server` and `packages/core` have no React state surface.
+  The trigger was the binder-home refactor (spec 016) extracting
+  `BinderHomeView`'s inline `StyleSheet.create` block into
+  `BinderHomeView.theme.ts`. The refactor surfaced an unwritten
+  convention this amendment now codifies: styles belong next to the
+  component, not embedded in it. The canonical reference for the new
+  rule is `apps/mobile/src/components/binder-home/BinderHomeView.theme.ts`.
+
+  No principle is removed or redefined. The Style co-location rule sits
+  immediately after the Container prop-passing rule and before the Hook
+  return-value memoisation rule because it concerns the View layer's
+  presentation contract — keeping View-layer guidance contiguous before
+  the section transitions into Hook-layer guidance.
+
+  Note: the previously-drafted "State locality rule" (described in the
+  superseded 1.19.0 → 1.20.0 SYNC IMPACT REPORT but never actually
+  inserted into the body of Principle X) remains valid guidance and is
+  carried forward as a deferred TODO; see the block below. This
+  amendment supersedes that prior 1.20.0 attempt with the Style co-
+  location rule as the substantive 1.20.0 change.
 
 Last amended: 2026-05-10
 
@@ -36,9 +46,9 @@ Added principles:
   (none — Principle X expanded, not added)
 
 Modified sections:
-  - Principle X. Component Architecture (Mobile) — added "State
-    locality rule" sub-section between the Hook return-value
-    memoisation rule and the `useEffect` usage discipline sub-section.
+  - Principle X. Component Architecture (Mobile) — added "Style co-
+    location rule" sub-section between the Container prop-passing rule
+    and the Hook return-value memoisation rule.
 
 Removed sections:
   (none)
@@ -47,18 +57,28 @@ Templates reviewed:
   ✅ .specify/templates/plan-template.md  — No change required. The
      Constitution Check section is principle-agnostic; new mobile
      features pull Principle X (including the new sub-section)
-     automatically. State-management decisions surface in the existing
-     "Project Structure" / "Source Code" sections of each plan.
+     automatically. Style-file placement surfaces in the existing
+     "Project Structure / Source Code" sections of each plan.
   ✅ .specify/templates/spec-template.md  — No change required (specs
      are technology-agnostic).
-  ✅ .specify/templates/tasks-template.md — No change required (state
-     placement is a code-author decision, not a task category).
-  ⚠ CLAUDE.md — Stale references to `binderStore` remain at line 50
-     (folder structure tree) and line 200 (Active Technologies list).
-     The store has been deleted; CLAUDE.md MUST be updated to remove
-     the `binderStore` mentions and to note that `currentPage` now
-     lives in `useBinderHome.ts`. Out of scope for this amendment;
-     tracked as a follow-up.
+  ✅ .specify/templates/tasks-template.md — No change required (style-
+     file placement is a code-author decision, not a task category).
+  ⚠ CLAUDE.md — Existing carry-forward; `binderStore` references at
+     lines 50 and 200 still need cleanup. No new updates required for
+     the Style co-location rule itself.
+
+Deferred carry-over from the superseded 1.20.0 attempt:
+  ⚠ Principle X "State locality rule" — drafted in the prior SIR but
+     never inserted into the body. The intended content (single-
+     component state lives in `use<Feature>.ts` via `useState` /
+     `useReducer`; state shared between unrelated components lives in a
+     Zustand store under `apps/mobile/src/stores/`; state shared along
+     a parent → descendant chain stays in the parent's hook and flows
+     downward through props) remains accurate guidance and SHOULD land
+     in a follow-up amendment. The trigger remains the binder-home
+     refactor moving `currentPage` from `binderStore` into
+     `useBinderHome.ts` after the page indicator was collocated inside
+     the binder view, leaving the store with a single consumer.
 
 Carry-over from 1.19.0 (unchanged):
   ⚠ apps/mobile/src/services/auth/googleAuth.ts — uses
@@ -84,10 +104,11 @@ Carry-over from 1.14.0 (unchanged):
   ⚠ specs/004-card-data-provider/plan.md — JSDoc → TypeScript migration.
 
 Deferred TODOs:
+  - Insert the State locality rule sub-section into Principle X (drafted
+    in the superseded 1.20.0 SIR but never landed in the body).
   - Update CLAUDE.md to remove `binderStore` references at lines 50
     and 200, reflecting that `currentPage` now lives in
-    `useBinderHome.ts` (single-consumer hook-local state per the new
-    State locality rule).
+    `useBinderHome.ts`.
 -->
 
 # my-binder Constitution
@@ -736,6 +757,159 @@ field, a spread silently passes it through; when the hook removes a field, the v
 breaks at runtime instead of at `tsc` time. Named props make the data flow visible
 at the call site and let TypeScript catch every drift.
 
+**Style co-location rule.** Every view component in `apps/mobile` MUST
+consume its `StyleSheet` through a sibling `<Component>.theme.ts` file
+via a `useStyles` hook. Inline `StyleSheet.create({ ... })` blocks at
+the bottom of a view file are prohibited.
+
+Each feature directory MUST follow this shape:
+
+```
+apps/mobile/src/components/<feature>/
+├── <Feature>View.tsx          ← pure JSX; calls `useStyles()` at top of body
+└── <Feature>View.theme.ts     ← StyleSheet + typed shape + `useStyles` hook
+```
+
+The theme file MUST satisfy all of the following:
+
+1. **Strongly-typed style shape**: a `<Feature>ViewStyles` type whose
+   entries are each `Required<Pick<ViewStyle | TextStyle | ImageStyle,
+   ...exact-keys>>` over only the keys actually present in that style.
+   Bare `ViewStyle` / `TextStyle` per entry is prohibited — the precise
+   `Pick` keeps the type self-documenting and turns "removed a key from
+   the sheet without removing it from the type" (and vice-versa) into a
+   `tsc` error.
+2. **Single typed StyleSheet**: a module-level
+   `StyleSheet.create<<Feature>ViewStyles>({ ... })` call. The generic
+   argument MUST be supplied so the `create` call validates the literal
+   against the shape.
+3. **`useStyles` default export**: a hook that returns the typed
+   stylesheet. The hook MUST be the file's only `export default`, MUST
+   take no arguments, and MUST be named `useStyles`. Named exports are
+   limited to the `<Feature>ViewStyles` type for downstream consumers
+   (e.g., test helpers); no other named exports are permitted.
+
+The view consumes the hook by calling `const styles = useStyles();` at
+the top of the function body and applies entries via
+`style={styles.<entry>}`. Calling the local `useStyles()` does **not**
+count against the View row's "Forbidden" column in the Layer rules
+table — the hook is a pure module-level cache accessor, not a stateful
+or effect-bearing primitive. No other hook calls (`useState`,
+`useEffect`, `useReducer`, store hooks, query hooks) are permitted in
+the view.
+
+**Single Responsibility — no shared theme files.** A `<Component>.theme.ts`
+file MUST belong to exactly one component. Reusable design tokens
+(colour palette, spacing scale, type roles, radii, motion, touch
+targets) live in `apps/mobile/constants/theme.ts` and are imported by
+every component-level theme file; the component-level `*.theme.ts`
+files themselves MUST NOT be re-imported across component boundaries.
+If two components need identical visual treatment, either (a) extract
+the shared element into its own component with its own theme file, or
+(b) extend `apps/mobile/constants/theme.ts` with a new design token —
+not by importing one component's `*.theme.ts` from another.
+
+The compliant pattern (canonical reference:
+`apps/mobile/src/components/binder-home/BinderHomeView.theme.ts`):
+
+```ts
+// BinderHomeView.theme.ts
+import type { ImageStyle, TextStyle, ViewStyle } from 'react-native';
+import { StyleSheet } from 'react-native';
+
+import { Colors, Radius, Spacing, Touch, Type } from '@src/constants/theme';
+
+export type BinderHomeViewStyles = {
+  root: Required<Pick<ViewStyle, 'flex' | 'backgroundColor'>>;
+  title: Required<
+    Pick<TextStyle, 'fontFamily' | 'fontSize' | 'lineHeight' | 'color' | 'fontWeight'>
+  >;
+  pocketImage: Required<Pick<ImageStyle, 'width' | 'height'>>;
+  // …one entry per style, each scoped to the keys it actually uses
+};
+
+const styles = StyleSheet.create<BinderHomeViewStyles>({
+  root: { flex: 1, backgroundColor: Colors.dark.background },
+  title: {
+    fontFamily: Type.subtitleItalic.font,
+    fontSize: Type.subtitleItalic.size,
+    lineHeight: Type.subtitleItalic.lineHeight,
+    color: Colors.dark.text,
+    fontWeight: Type.subtitleItalic.weight,
+  },
+  pocketImage: { width: '100%', height: '100%' },
+  // …
+});
+
+const useStyles = (): BinderHomeViewStyles => styles;
+
+export default useStyles;
+```
+
+```tsx
+// BinderHomeView.tsx
+import type { FC } from 'react';
+import { View, Text } from 'react-native';
+
+import useStyles from './BinderHomeView.theme';
+
+const BinderHomeView: FC<BinderHomeViewProps> = (props) => {
+  const styles = useStyles();
+  return (
+    <View style={styles.root}>
+      <Text style={styles.title}>{props.title}</Text>
+    </View>
+  );
+};
+```
+
+The prohibited patterns are:
+
+```tsx
+// PROHIBITED — inline StyleSheet at the bottom of the view file.
+//              Splits the view's responsibility (JSX) with styling
+//              and forces every reader to scroll past markup to find
+//              the style definitions.
+const FooView: FC = () => <View style={styles.root} />;
+const styles = StyleSheet.create({ root: { flex: 1 } });
+
+// PROHIBITED — sharing one component's theme file with another.
+//              Violates Single Responsibility (Principle IV); changes
+//              to FooView's visuals silently propagate to BarView.
+// BarView.tsx:
+import useStyles from '../foo/FooView.theme';
+
+// PROHIBITED — bare ViewStyle/TextStyle per entry.
+//              Every property is optional, so removing a key from the
+//              sheet does not error and the type stops describing the
+//              actual contract.
+export type FooViewStyles = {
+  root: ViewStyle;
+};
+
+// PROHIBITED — non-`useStyles` default export, or sheet exported directly.
+//              Breaks the codebase's single shape for style consumption
+//              and lets a view skip the hook call entirely.
+export default styles;          // sheet, not the hook
+export { useStyles as default }; // renamed default
+```
+
+Rationale: pulling styles into a sibling theme file keeps the view
+file focused on JSX (the View layer's only responsibility per
+Principle X's Layer rules table) and lets the styles file stay legible
+at any size without the reader scrolling past unrelated markup. Typing
+each entry as `Required<Pick<...>>` over its exact keys turns the
+`<Feature>ViewStyles` type into a precise contract — adding a key
+without listing it in the type fails at `tsc`, removing a key in the
+sheet without removing it from the type does the same, and the type
+itself documents which CSS-like properties each style sets without
+forcing the reader into the full `ViewStyle` declaration. Forbidding
+shared `*.theme.ts` files preserves Principle IV (Single
+Responsibility) at the styling layer — when one component's visual
+contract drifts, only that component's theme file moves, and the
+blast radius of a tweak is proportional to the component being
+changed.
+
 **Hook return-value memoisation rule.** Every non-primitive value produced inside
 an `apps/mobile` hook (any file under `apps/mobile/src/components/<feature>/
 use<Feature>.ts` or `apps/mobile/src/hooks/`) MUST be memoised before it is
@@ -1102,4 +1276,4 @@ Each feature plan MUST include a Constitution Check (as defined in
 before implementation begins. Violations MUST be justified in the plan's Complexity
 Tracking table.
 
-**Version**: 1.19.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-09
+**Version**: 1.20.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-10
