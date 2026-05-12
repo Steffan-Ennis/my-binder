@@ -12,6 +12,7 @@ export type CardEnrichment = {
 // SDK field reference: research.md § 4 — Response Mapping.
 export function mapCardSetToCardRecord(card: CardSet, enrichment?: CardEnrichment): CardRecord {
   return {
+    id: card.uuid,
     name: card.name,
     set: card.setCode,
     cardNumber: card.number,

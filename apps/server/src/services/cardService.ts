@@ -78,14 +78,12 @@ export class NotFoundError extends Error {
  * ```
  */
 export async function getCards(userId: string): Promise<CardList> {
-  const rows = await getRepositories().card.findAll(userId);
+  const entities = await getRepositories().card.findAll(userId);
   const provider = getProviderOrNull();
+
   // Sequential enrichment: the MTGJSON SDK shares a DuckDB connection and
   // concurrent access produces "Failed to execute prepared statement" errors.
-  const cards: Card[] = [];
-  for (const row of rows) {
-    cards.push(await enrichCard(row, provider));
-  }
+  const cards = await provider?.getByUuids(entities.map(card => card.id))!
   return { cards, total: cards.length };
 }
 

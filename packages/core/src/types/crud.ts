@@ -1,3 +1,5 @@
+import {CardRecord} from "@root/src";
+
 export interface Card {
   id: string;
   name: string;
@@ -13,7 +15,7 @@ export interface Card {
 }
 
 export interface CardList {
-  cards: Card[];
+  cards: CardRecord[];
   total: number;
   // Optional cursor for forward-compatible cursor pagination consumed by
   // useCardsInfiniteQuery on mobile. Undefined / null today; populated when

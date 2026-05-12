@@ -16,5 +16,6 @@ export type CardProvider = {
   // does not resolve to a card. Used by the user-collection layer to enrich
   // stored Card rows with display metadata (set name, type line, image).
   getByUuid(uuid: string): Promise<CardDetails | null>;
+  getByUuids(uuid: string[]): Promise<CardRecord[]>
   isReachable(): Promise<boolean>;
 };

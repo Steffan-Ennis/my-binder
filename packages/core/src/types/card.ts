@@ -2,6 +2,7 @@
 // Consumed by both apps/server and apps/mobile — no provider-specific or SDK details here.
 
 export type CardRecord = {
+  id: string;
   name: string;
   set: string;
   cardNumber: string;

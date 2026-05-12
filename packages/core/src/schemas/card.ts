@@ -3,8 +3,8 @@
 
 export const CARD_RESPONSE_SCHEMA = {
   type: 'object',
-  additionalProperties: false,
-  required: ['id', 'name', 'createdAt', 'updatedAt'],
+  additionalProperties: true,
+  required: ['id', 'name'],
   properties: {
     id: { type: 'string', format: 'uuid' },
     name: { type: 'string', minLength: 1, maxLength: 255 },

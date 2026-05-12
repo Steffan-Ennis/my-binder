@@ -25,6 +25,11 @@ export class MtgjsonProvider implements CardProvider {
     this.sdk = sdk;
   }
 
+  async getByUuids (uuids: string[]): Promise<CardRecord[]> {
+    const cards = await this.sdk.cards.getByUuids(uuids)
+    return cards.map<CardRecord>((card) => mapCardSetToCardRecord(card))
+  }
+
   /**
    * Release SDK resources (open DuckDB connections, parquet readers).
    * Call once on server shutdown.
@@ -206,7 +211,6 @@ export class MtgjsonProvider implements CardProvider {
 
     return this.collectCards(cards);
   }
-
   /**
    * Resolve a single printing by its MTGJSON UUID and return display-ready
    * details (name, set, type line, scryfall id) used to decorate stored
