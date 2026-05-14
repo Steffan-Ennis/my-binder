@@ -8,6 +8,15 @@ export type CardEnrichment = {
   scryfallId?: string | null;
 };
 
+
+// Scryfall image CDN convention: paths shard by the first two characters of
+// the Scryfall id. Exposed only for tests; not part of the public surface.
+function scryfallNormalImageUrl(scryfallId: string): string | undefined {
+  if (scryfallId.length < 2) return undefined;
+  return `https://cards.scryfall.io/normal/front/${scryfallId[0]}/${scryfallId[1]}/${scryfallId}.jpg`;
+}
+
+
 // Maps an SDK CardSet (a single printing) to our normalised CardRecord.
 // SDK field reference: research.md § 4 — Response Mapping.
 export function mapCardSetToCardRecord(card: CardSet, enrichment?: CardEnrichment): CardRecord {
@@ -19,6 +28,6 @@ export function mapCardSetToCardRecord(card: CardSet, enrichment?: CardEnrichmen
     manaCost: card.manaCost ?? null,
     colorIdentity: card.colorIdentity,
     commanderLegal: enrichment?.commanderLegal,
-    imageRef: enrichment?.scryfallId ?? null,
+    imageRef: enrichment?.scryfallId ? scryfallNormalImageUrl(enrichment?.scryfallId!) : '',
   };
 }
