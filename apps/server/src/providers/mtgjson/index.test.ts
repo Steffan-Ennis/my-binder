@@ -220,3 +220,52 @@ describe('MtgjsonProvider.getByUuid', () => {
     expect(details?.setCode).toBe('XYZ');
   });
 });
+
+describe('MtgjsonProvider.getCardImages', () => {
+  test('returns small/medium/large URLs for a known uuid with a scryfall id', async () => {
+    const sdk = makeSdk();
+    (sdk.identifiers.getIdentifiers as jest.Mock).mockResolvedValue({
+      scryfallId: 'e3285fd6-aaaa-bbbb-cccc-ddddddddeeee',
+    });
+
+    const provider = new MtgjsonProvider(sdk);
+    const images = await provider.getCardImages('uuid-bolt');
+
+    expect(images).toEqual({
+      small: 'https://cards.scryfall.io/small/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg',
+      medium: 'https://cards.scryfall.io/normal/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg',
+      large: 'https://cards.scryfall.io/large/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg',
+    });
+    expect(sdk.identifiers.getIdentifiers).toHaveBeenCalledWith('uuid-bolt');
+  });
+
+  test('returns null when identifiers SDK returns undefined', async () => {
+    const sdk = makeSdk();
+    (sdk.identifiers.getIdentifiers as jest.Mock).mockResolvedValue(undefined);
+
+    const provider = new MtgjsonProvider(sdk);
+    const images = await provider.getCardImages('unknown-uuid');
+
+    expect(images).toBeNull();
+  });
+
+  test('returns null when identifiers omit scryfallId', async () => {
+    const sdk = makeSdk();
+    (sdk.identifiers.getIdentifiers as jest.Mock).mockResolvedValue({});
+
+    const provider = new MtgjsonProvider(sdk);
+    const images = await provider.getCardImages('uuid-no-scryfall');
+
+    expect(images).toBeNull();
+  });
+
+  test('returns null when scryfallId is not a string', async () => {
+    const sdk = makeSdk();
+    (sdk.identifiers.getIdentifiers as jest.Mock).mockResolvedValue({ scryfallId: 42 });
+
+    const provider = new MtgjsonProvider(sdk);
+    const images = await provider.getCardImages('uuid-bad');
+
+    expect(images).toBeNull();
+  });
+});

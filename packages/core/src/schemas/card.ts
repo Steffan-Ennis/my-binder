@@ -59,6 +59,17 @@ export const CARD_ID_PARAMS_SCHEMA = {
   },
 } as const;
 
+export const CARD_IMAGES_RESPONSE_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['small', 'medium', 'large'],
+  properties: {
+    small: { type: 'string', minLength: 1 },
+    medium: { type: 'string', minLength: 1 },
+    large: { type: 'string', minLength: 1 },
+  },
+} as const;
+
 export const HEALTH_RESPONSE_SCHEMA = {
   type: 'object',
   additionalProperties: false,

@@ -8,19 +8,22 @@ import {
   getCard,
   createCard,
   deleteCard,
+  getCardImagesById,
   NotFoundError,
   CardNotFoundError,
   ProviderUnavailableError,
 } from './cardService';
-import type { CardRecord } from '@my-binder/core';
+import type { CardImages, CardRecord } from '@my-binder/core';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const LIGHTNING_BOLT: CardRecord = {
+  id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   name: 'Lightning Bolt', set: 'M11', cardNumber: '149',
   manaCost: '{R}', colorIdentity: ['R'], commanderLegal: true, imageRef: null,
 };
 const SOL_RING: CardRecord = {
+  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
   name: 'Sol Ring', set: 'C11', cardNumber: '58',
   manaCost: '{1}', colorIdentity: [], commanderLegal: true, imageRef: null,
 };
@@ -76,6 +79,8 @@ function makeProvider(overrides: Partial<CardProvider> = {}): CardProvider {
     checkLegality: async (name) => ({ cardName: name, legal: true, reason: null, colorIdentity: [] }),
     search: async () => [LIGHTNING_BOLT, SOL_RING],
     getByUuid: async () => null,
+    getByUuids: async () => [],
+    getCardImages: async () => null,
     isReachable: async () => true,
     ...overrides,
   };
@@ -335,6 +340,35 @@ describe('cardService — provider-backed functions', () => {
       registry.register('search-broken', makeProvider({ search: async () => { throw error; } }));
       await registry.setActive('search-broken');
       await expect(() => searchCards({ name: 'x' })).rejects.toThrow(error);
+    });
+  });
+
+  describe('getCardImagesById', () => {
+    const TEST_IMAGES: CardImages = {
+      small: 'https://cards.scryfall.io/small/front/e/3/e3-uuid.jpg',
+      medium: 'https://cards.scryfall.io/normal/front/e/3/e3-uuid.jpg',
+      large: 'https://cards.scryfall.io/large/front/e/3/e3-uuid.jpg',
+    };
+
+    test('returns CardImages from the active provider on happy path', async () => {
+      registry.register('images-ok', makeProvider({ getCardImages: async () => TEST_IMAGES }));
+      await registry.setActive('images-ok');
+      const result = await getCardImagesById('any-uuid');
+      expect(result).toEqual(TEST_IMAGES);
+    });
+
+    test('throws CardNotFoundError when provider returns null', async () => {
+      registry.register('images-null', makeProvider({ getCardImages: async () => null }));
+      await registry.setActive('images-null');
+      await expect(() => getCardImagesById('missing-uuid')).rejects.toThrow(CardNotFoundError);
+    });
+
+    test('throws ProviderUnavailableError when provider throws', async () => {
+      registry.register('images-broken', makeProvider({
+        getCardImages: async () => { throw new Error('parquet read failed'); },
+      }));
+      await registry.setActive('images-broken');
+      await expect(() => getCardImagesById('any-uuid')).rejects.toThrow(ProviderUnavailableError);
     });
   });
 });

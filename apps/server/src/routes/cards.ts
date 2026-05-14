@@ -5,6 +5,7 @@ import {
   CREATE_CARD_BODY_SCHEMA,
   UPDATE_CARD_BODY_SCHEMA,
   CARD_ID_PARAMS_SCHEMA,
+  CARD_IMAGES_RESPONSE_SCHEMA,
   LOOKUP_QUERYSTRING_SCHEMA,
   LOOKUP_RESPONSE_SCHEMA,
   LEGALITY_QUERYSTRING_SCHEMA,
@@ -25,6 +26,7 @@ import {
   lookupCard,
   checkCommanderLegality,
   searchCards,
+  getCardImagesById,
   NotFoundError,
   CardNotFoundError,
   ProviderUnavailableError,
@@ -83,6 +85,23 @@ export async function cardRoutes(fastify: FastifyInstance): Promise<void> {
     const { id: userId } = (request.identity as { kind: 'authenticated'; user: { id: string } }).user;
     const list = await getCards(userId);
     return reply.code(200).send(list);
+  });
+
+  // Registered before `/cards/:id` so Fastify matches the literal `images`
+  // segment first instead of capturing it as the `:id` param of the CRUD route.
+  fastify.get<{ Params: CardIdParams }>('/cards/images/:id', {
+    preHandler: [fastify.authenticate],
+    schema: {
+      params: CARD_ID_PARAMS_SCHEMA,
+      response: {
+        200: CARD_IMAGES_RESPONSE_SCHEMA,
+        404: ERROR_RESPONSE_SCHEMA,
+        503: ERROR_RESPONSE_SCHEMA,
+      },
+    },
+  }, async (request, reply) => {
+    const images = await getCardImagesById(request.params.id);
+    return reply.code(HTTP_STATUS.OK).send(images);
   });
 
   fastify.get<{ Params: CardIdParams }>('/cards/:id', {

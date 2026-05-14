@@ -1,7 +1,7 @@
 import type {
   Card, CardList, CreateCardBody, UpdateCardBody,
   CardRecord, CardNotFoundResult, LegalityResult,
-  SearchQuery, SearchResult,
+  SearchQuery, SearchResult, CardImages,
 } from '@my-binder/core';
 import { getRepositories } from '@src/db/repositories';
 import { registry } from '@src/providers/registry';
@@ -310,6 +310,49 @@ export async function checkCommanderLegality(
  * // { cards: [...], total: 42, page: 1, limit: 20, totalPages: 3 }
  * ```
  */
+/**
+ * Resolve the Scryfall image URLs (`small`, `medium`, `large`) for a single
+ * printing by its MTGJSON UUID.
+ *
+ * Delegates to `provider.getCardImages`. A `null` return is treated as a
+ * stable "no such card" signal and mapped to `CardNotFoundError` so the HTTP
+ * layer can return 404. Any thrown provider error becomes
+ * `ProviderUnavailableError` (503) — including the case where no provider is
+ * active (`registry.getActive()` itself throws).
+ *
+ * @param id - MTGJSON printing UUID.
+ * @returns A `CardImages` record with three CDN URLs.
+ * @throws CardNotFoundError when the provider has no Scryfall id for the UUID.
+ * @throws ProviderUnavailableError on any other provider failure or when no
+ *   provider is active.
+ *
+ * @example
+ * ```ts
+ * const images = await getCardImagesById('e3285fd6-0000-0000-0000-example00001');
+ * // { small: 'https://...', medium: 'https://...', large: 'https://...' }
+ * ```
+ */
+export async function getCardImagesById(id: string): Promise<CardImages> {
+  let provider: CardProvider;
+  try {
+    provider = registry.getActive();
+  } catch (error) {
+    console.error(error);
+    throw new ProviderUnavailableError();
+  }
+
+  let images: CardImages | null;
+  try {
+    images = await provider.getCardImages(id);
+  } catch (error) {
+    console.error(error);
+    throw new ProviderUnavailableError();
+  }
+
+  if (images === null) throw new CardNotFoundError(id);
+  return images;
+}
+
 export async function searchCards(query: SearchQuery): Promise<SearchResult> {
   const page = Math.max(1, query.page ?? 1);
   const limit = Math.min(100, Math.max(1, query.limit ?? 20));

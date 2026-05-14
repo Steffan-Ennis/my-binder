@@ -9,6 +9,8 @@ function makeProvider(overrides: Partial<CardProvider> = {}): CardProvider {
     checkLegality: async (name) => ({ cardName: name, legal: true, reason: null, colorIdentity: [] }),
     search: async () => [],
     getByUuid: async () => null,
+    getByUuids: async () => [],
+    getCardImages: async () => null,
     isReachable: async () => true,
     ...overrides,
   };

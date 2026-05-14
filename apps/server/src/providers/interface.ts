@@ -1,4 +1,4 @@
-import type { CardDetails, CardRecord, CardNotFoundResult, LegalityResult, SearchQuery } from '@my-binder/core';
+import type { CardDetails, CardImages, CardRecord, CardNotFoundResult, LegalityResult, SearchQuery } from '@my-binder/core';
 
 // The contract every card data provider must satisfy.
 // Add a new provider by implementing this type and registering it in the registry.
@@ -17,5 +17,9 @@ export type CardProvider = {
   // stored Card rows with display metadata (set name, type line, image).
   getByUuid(uuid: string): Promise<CardDetails | null>;
   getByUuids(uuid: string[]): Promise<CardRecord[]>
+  // Resolve a single printing's Scryfall image URLs (small/medium/large) by
+  // its MTGJSON UUID. Returns null when the UUID is unknown OR the printing
+  // has no Scryfall identifier on file. The HTTP layer maps null → 404.
+  getCardImages(uuid: string): Promise<CardImages | null>;
   isReachable(): Promise<boolean>;
 };

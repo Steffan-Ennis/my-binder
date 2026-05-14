@@ -66,6 +66,7 @@ jest.mock('@src/db/repositories', () => ({
 // ─── Provider stubs ───────────────────────────────────────────────────────────
 
 const BOLT: CardRecord = {
+  id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   name: 'Lightning Bolt', set: 'M11', cardNumber: '149',
   manaCost: '{R}', colorIdentity: ['R'], commanderLegal: true, imageRef: null,
 };
@@ -76,6 +77,8 @@ function makeProvider(overrides: Partial<CardProvider> = {}): CardProvider {
     checkLegality: async (name) => ({ cardName: name, legal: true, reason: null, colorIdentity: [] }),
     search: async () => [BOLT],
     getByUuid: async () => null,
+    getByUuids: async () => [],
+    getCardImages: async () => null,
     isReachable: async () => true,
     ...overrides,
   };
@@ -202,6 +205,11 @@ describe('Cards API — collection routes require authentication', () => {
 
   test('GET /cards/:id returns 401 without auth', async () => {
     const response = await fastify.inject({ method: 'GET', url: '/cards/00000000-0000-0000-0000-000000000099' });
+    expect(response.statusCode).toBe(401);
+  });
+
+  test('GET /cards/images/:id returns 401 without auth', async () => {
+    const response = await fastify.inject({ method: 'GET', url: '/cards/images/00000000-0000-0000-0000-000000000099' });
     expect(response.statusCode).toBe(401);
   });
 });
@@ -391,5 +399,79 @@ describe('Cards API — provider routes', () => {
       expect(r.statusCode).toBe(400);
       expect(r.json<{ error: string }>().error).toBe('MISSING_FILTER');
     });
+  });
+});
+
+// ─── GET /cards/images/:id ───────────────────────────────────────────────────
+
+describe('Cards API — GET /cards/images/:id', () => {
+  const fastify = Fastify();
+  const UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+  beforeAll(async () => {
+    process.env['SESSION_JWT_SECRET'] = TEST_SECRET;
+    registry.register('images-route-ok', makeProvider({
+      getCardImages: async (uuid) => uuid === UUID
+        ? {
+            small: 'https://cards.scryfall.io/small/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg',
+            medium: 'https://cards.scryfall.io/normal/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg',
+            large: 'https://cards.scryfall.io/large/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg',
+          }
+        : null,
+    }));
+    await registry.setActive('images-route-ok');
+    fastify.decorate('authenticate', async () => {});
+    fastify.addHook('onRequest', async (req) => {
+      (req as unknown as { identity: unknown }).identity = { kind: 'authenticated', user: MOCK_USER };
+    });
+    await fastify.register(cardRoutes);
+    await fastify.ready();
+  });
+
+  afterAll(async () => {
+    await fastify.close();
+  });
+
+  test('returns 200 with small/medium/large URLs for a known uuid', async () => {
+    const r = await fastify.inject({ method: 'GET', url: `/cards/images/${UUID}` });
+    expect(r.statusCode).toBe(200);
+    const body = r.json<{ small: string; medium: string; large: string }>();
+    expect(body.small).toBe('https://cards.scryfall.io/small/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg');
+    expect(body.medium).toBe('https://cards.scryfall.io/normal/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg');
+    expect(body.large).toBe('https://cards.scryfall.io/large/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg');
+  });
+
+  test('returns 404 CARD_NOT_FOUND when provider yields no scryfall id', async () => {
+    const r = await fastify.inject({
+      method: 'GET',
+      url: '/cards/images/99999999-9999-4999-8999-999999999999',
+    });
+    expect(r.statusCode).toBe(404);
+    expect(r.json<{ error: string }>().error).toBe('CARD_NOT_FOUND');
+  });
+
+  test('returns 400 VALIDATION_ERROR when :id is not a uuid', async () => {
+    const r = await fastify.inject({ method: 'GET', url: '/cards/images/not-a-uuid' });
+    expect(r.statusCode).toBe(400);
+    expect(r.json<{ error: string }>().error).toBe('VALIDATION_ERROR');
+  });
+
+  test('returns 503 PROVIDER_UNAVAILABLE when provider throws', async () => {
+    registry.register('images-route-down', makeProvider({
+      getCardImages: async () => { throw new Error('parquet down'); },
+    }));
+    await registry.setActive('images-route-down');
+    const r = await fastify.inject({ method: 'GET', url: `/cards/images/${UUID}` });
+    expect(r.statusCode).toBe(503);
+    expect(r.json<{ error: string }>().error).toBe('PROVIDER_UNAVAILABLE');
+    await registry.setActive('images-route-ok');
+  });
+
+  test('does NOT collide with /cards/:id user-CRUD route', async () => {
+    // Sanity check: literal `images` must route to the images handler, not be
+    // captured as a CRUD :id. If misordered, Fastify would try to look up a
+    // user-owned card with id `images` and 401/400/404 differently.
+    const r = await fastify.inject({ method: 'GET', url: `/cards/images/${UUID}` });
+    expect(r.statusCode).toBe(200);
   });
 });

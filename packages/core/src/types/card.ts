@@ -71,6 +71,14 @@ export type CardDetails = {
   scryfallId: string | null;
 };
 
+// Scryfall CDN image URLs for a single printing at three sizes.
+// `medium` maps to Scryfall's `normal` (488×680 JPG) at the URL-builder seam.
+export type CardImages = {
+  small: string;
+  medium: string;
+  large: string;
+};
+
 export type ProviderNotFoundError = {
   type: 'PROVIDER_NOT_FOUND';
   message: string;

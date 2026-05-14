@@ -1,7 +1,8 @@
 import type {MtgjsonSDK, CardSet} from 'mtgjson-sdk';
-import type { CardDetails, CardRecord, CardNotFoundResult, LegalityResult, SearchQuery } from '@my-binder/core';
+import type { CardDetails, CardImages, CardRecord, CardNotFoundResult, LegalityResult, SearchQuery } from '@my-binder/core';
 import type { CardProvider, LookupOptions } from '@src/providers/interface';
 import { mapCardSetToCardRecord } from '@src/providers/mtgjson/mapper';
+import { buildScryfallImageUrls } from '@src/providers/mtgjson/scryfallImages';
 
 export class MtgjsonProvider implements CardProvider {
   private readonly sdk: MtgjsonSDK;
@@ -247,6 +248,31 @@ export class MtgjsonProvider implements CardProvider {
       typeLine: card.type,
       scryfallId,
     };
+  }
+
+  /**
+   * Resolve the Scryfall image URLs (`small`, `medium`, `large`) for a single
+   * printing by its MTGJSON UUID.
+   *
+   * Reads only the identifiers Parquet — significantly cheaper than `getByUuid`,
+   * which additionally reads the cards and sets Parquets to populate display
+   * metadata.
+   *
+   * @param uuid - MTGJSON printing UUID.
+   * @returns A `CardImages` record, or `null` when the UUID is unknown OR the
+   *   printing has no Scryfall identifier on file.
+   *
+   * @example
+   * ```ts
+   * const images = await provider.getCardImages('e3285fd6-0000-0000-0000-example00001');
+   * // { small: 'https://...', medium: 'https://...', large: 'https://...' }
+   * ```
+   */
+  async getCardImages(uuid: string): Promise<CardImages | null> {
+    const ids = await this.sdk.identifiers.getIdentifiers(uuid);
+    const scryfallId = typeof ids?.scryfallId === 'string' ? ids.scryfallId : null;
+    if (scryfallId === null) return null;
+    return buildScryfallImageUrls(scryfallId);
   }
 
   /**
