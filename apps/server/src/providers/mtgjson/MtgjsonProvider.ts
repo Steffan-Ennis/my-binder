@@ -85,9 +85,10 @@ class MtgjsonProvider implements CardProvider {
 
     const card = paperCards[0]!;
     const cardColorIdentity = card.colorIdentity;
-    const commanderStatus = card.legalities.commander;
 
-    if (commanderStatus === 'Banned') {
+    const commanderStatus = await this.sdk.legalities.isLegal(card.uuid, 'commander')
+
+    if (!commanderStatus) {
       return {
         cardName: name,
         legal: false,
@@ -109,7 +110,7 @@ class MtgjsonProvider implements CardProvider {
       }
     }
 
-    if (commanderStatus !== 'Legal') {
+    if (commanderStatus) {
       return {
         cardName: name,
         legal: false,
