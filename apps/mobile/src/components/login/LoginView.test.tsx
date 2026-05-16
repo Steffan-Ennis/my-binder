@@ -11,9 +11,8 @@ describe('LoginView', () => {
 
   it('renders the masthead, title, and Sign in with Google CTA', () => {
     render(<LoginView {...baseProps} />);
-    expect(screen.getByText(/ULTRA · ESTABLISHED · 1972/i)).toBeTruthy();
-    expect(screen.getByText(/Collectors Album/i)).toBeTruthy();
-    expect(screen.getByText(/digital edition/i)).toBeTruthy();
+    expect(screen.getByText(/My-Binder/i)).toBeTruthy();
+    expect(screen.getByText(/Digital Card Assistant/i)).toBeTruthy();
     expect(screen.getByText(/Sign in with Google/i)).toBeTruthy();
   });
 
