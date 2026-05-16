@@ -45,25 +45,20 @@ describe('mapCardSetToCardRecord', () => {
     expect(record.manaCost).toBe('{R}');
     expect(record.colorIdentity).toEqual(['R']);
     expect(record.commanderLegal).toBe(true);
-    expect(record.imageRef).toBe('e3285fd6-0000-0000-0000-example00001');
+    expect(record.imageRef).toBe('https://cards.scryfall.io/normal/front/e/3/e3285fd6-0000-0000-0000-example00001.jpg');
   });
 
   test('commanderLegal and imageRef are undefined when no enrichment is passed', () => {
     const card = makeCard();
     const record = mapCardSetToCardRecord(card);
     expect(record.commanderLegal).toBeUndefined();
-    expect(record.imageRef).toBeNull();
+    expect(record.imageRef).toEqual('');
   });
 
   test('manaCost is null when card has no mana cost (land)', () => {
     const card = makeCard({ manaCost: undefined });
     const record = mapCardSetToCardRecord(card);
     expect(record.manaCost).toBeNull();
-  });
-
-  test('imageRef is null when scryfallId is absent in enrichment', () => {
-    const record = mapCardSetToCardRecord(makeCard(), { scryfallId: null });
-    expect(record.imageRef).toBeNull();
   });
 
   test('commanderLegal is false when enrichment says banned', () => {

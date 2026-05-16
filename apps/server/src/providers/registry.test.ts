@@ -7,7 +7,6 @@ import {
 
 function makeProvider(overrides: Partial<CardProvider> = {}): CardProvider {
   return {
-    lookup: async () => ({ found: false, name: 'test' }),
     checkLegality: async (name) => ({ cardName: name, legal: true, reason: null, colorIdentity: [] }),
     search: async () => [],
     getByUuid: async () => null,

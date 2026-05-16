@@ -9,6 +9,8 @@ const config: Config = {
     '^@src/(.*)$': '<rootDir>/src/$1',
     '^@root/(.*)$': '<rootDir>/$1',
   },
+  globalTeardown: '<rootDir>/jest.teardown.ts',
+  globalSetup: '<rootDir>/jest.setup.ts'
 };
 
 export default config;

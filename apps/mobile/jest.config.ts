@@ -14,6 +14,7 @@ import type { Config } from 'jest';
 const config: Config = {
   preset: 'jest-expo',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+  globalTeardown: "<rootDir>/jest.teardown.ts",
   testMatch: ['**/?(*.)+(spec|test).[jt]s?(x)'],
   testPathIgnorePatterns: ['/node_modules/', '/.expo/', '/dist/'],
   moduleNameMapper: {

@@ -39,9 +39,5 @@ export async function disconnectTestDatabase(
   _entities = entities,
 ): Promise<void> {
   const dataSource = getDataSource()
-  for (const entity of _entities){
-    await dataSource.getRepository(entity).deleteAll()
-  }
-
   await dataSource.destroy();
 }
