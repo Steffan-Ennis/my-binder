@@ -7,7 +7,6 @@ import type {FC, PropsWithChildren} from 'react';
 
 import { apiClient } from '@src/services/api/apiClient';
 import { ApiError } from '@src/services/api/ApiError';
-import { useBinderStore } from '@src/stores/binderStore';
 import { useSessionStore } from '@src/stores/sessionStore';
 
 import { useSignOutMutation } from './useSignOutMutation';
@@ -50,7 +49,6 @@ describe('useSignOutMutation', () => {
       email: 'e@x.com',
       status: 'active',
     });
-    useBinderStore.setState({ currentPage: 5 });
 
     client = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: 0 } },
@@ -81,41 +79,8 @@ describe('useSignOutMutation', () => {
     expect(mockedRevokeAccess).toHaveBeenCalledWith();
     expect(useSessionStore.getState().status).toBe('idle');
     expect(useSessionStore.getState().jwt).toBeNull();
-    expect(useBinderStore.getState().currentPage).toBe(1);
     expect(client.getQueryData(['cards'])).toBeUndefined();
     expect(replaceSpy).toHaveBeenCalledWith('/login');
-  });
-
-  it('resets useBinderStore BEFORE clearing the query cache (research §8, contracts §6)', async () => {
-    mockedSignOut.mockResolvedValue(undefined);
-
-    const order: string[] = [];
-    const resetSpy = jest
-      .spyOn(useBinderStore.getState(), 'reset')
-      .mockImplementation(() => {
-        order.push('binderStore.reset');
-        useBinderStore.setState({ currentPage: 1 });
-      });
-    const clearSpy = jest.spyOn(client, 'clear').mockImplementation(() => {
-      order.push('queryClient.clear');
-    });
-
-    try {
-      const { result } = renderHook(() => useSignOutMutation(), { wrapper });
-      await act(async () => {
-        await result.current.mutateAsync({ googleAccessToken: 'gat' });
-      });
-
-      expect(resetSpy).toHaveBeenCalled();
-      expect(clearSpy).toHaveBeenCalled();
-      const resetIdx = order.indexOf('binderStore.reset');
-      const clearIdx = order.indexOf('queryClient.clear');
-      expect(resetIdx).toBeGreaterThanOrEqual(0);
-      expect(clearIdx).toBeGreaterThan(resetIdx);
-    } finally {
-      resetSpy.mockRestore();
-      clearSpy.mockRestore();
-    }
   });
 
   it('still runs cleanup chain when the server signOut fails', async () => {

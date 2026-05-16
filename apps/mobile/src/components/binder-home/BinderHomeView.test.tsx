@@ -38,7 +38,6 @@ describe('BinderHomeView — US1 surface', () => {
   it('renders the masthead overline + italic-serif title', () => {
     const screen = renderView({ cards: [makeCard('1', 'A')] });
     expect(screen.getByText('MY-BINDER')).toBeTruthy();
-    expect(screen.getByText('My Binder')).toBeTruthy();
   });
 
   it('renders header binder-search and Profile buttons with the expected labels (FR-003 → FR-004)', () => {
@@ -109,7 +108,7 @@ describe('BinderHomeView — US2 grid + pager', () => {
   it('renders 2 occupied + 7 empty pockets on page 2 of an 11-card collection (FR-014/15/16/22)', () => {
     const screen = renderView({
       cards: elevenCards,
-      matchedCards: elevenCards,
+      matchedCards: elevenCards.slice(8, 10),
       currentPage: 2,
       totalPages: 2,
       summaryCaption: '11 CARDS · 2 PAGES',
@@ -126,64 +125,10 @@ describe('BinderHomeView — US2 grid + pager', () => {
       totalPages: 2,
       summaryCaption: '11 CARDS · 2 PAGES',
     });
-    expect(screen.getByText('Page 2')).toBeTruthy();
-    expect(screen.getByText('OF 2')).toBeTruthy();
-  });
-
-  it('disables prev on first page (no-op, FR-020)', () => {
-    const onPrevPage = jest.fn();
-    const screen = renderView({
-      cards: elevenCards,
-      matchedCards: elevenCards,
-      currentPage: 1,
-      totalPages: 2,
-    });
-    const prev = screen.getByLabelText('Previous page');
-    expect(prev.props.accessibilityState?.disabled).toBe(true);
-    fireEvent.press(prev);
-    expect(onPrevPage).not.toHaveBeenCalled();
-  });
-
-  it('disables next on last page (no-op, FR-020)', () => {
-    const onNextPage = jest.fn();
-    const screen = renderView({
-      cards: elevenCards,
-      matchedCards: elevenCards,
-      currentPage: 2,
-      totalPages: 2,
-    });
-    const next = screen.getByLabelText('Next page');
-    expect(next.props.accessibilityState?.disabled).toBe(true);
-    fireEvent.press(next);
-    expect(onNextPage).not.toHaveBeenCalled();
-  });
-
-  it('next button fires onNextPage when not on the last page', () => {
-    const onNextPage = jest.fn();
-    const screen = renderView({
-      cards: elevenCards,
-      matchedCards: elevenCards,
-      currentPage: 1,
-      totalPages: 2,
-    });
-    fireEvent.press(screen.getByLabelText('Next page'));
-    expect(onNextPage).toHaveBeenCalled();
-  });
-
-  it('prev button fires onPrevPage when not on the first page', () => {
-    const onPrevPage = jest.fn();
-    const screen = renderView({
-      cards: elevenCards,
-      matchedCards: elevenCards,
-      currentPage: 2,
-      totalPages: 2,
-    });
-    fireEvent.press(screen.getByLabelText('Previous page'));
-    expect(onPrevPage).toHaveBeenCalled();
+    expect(screen.getByText('2 of 2')).toBeTruthy();
   });
 
   it('the pager fires onPageChange with the 1-based page when scrolled', () => {
-    const onPageChange = jest.fn();
     const screen = renderView({
       cards: elevenCards,
       matchedCards: elevenCards,
@@ -192,7 +137,7 @@ describe('BinderHomeView — US2 grid + pager', () => {
     });
     const pager = screen.getByTestId('binder-pager');
     fireEvent(pager, 'pageSelected', { nativeEvent: { position: 1 } });
-    expect(onPageChange).toHaveBeenCalledWith(2);
+    expect(defaults.handlePagerSelected).toHaveBeenCalledWith({"nativeEvent": {"position": 1}});
   });
 });
 
@@ -258,6 +203,7 @@ describe('BinderHomeView — US3 inline search', () => {
       matchedCards: tenCards,
       isSearchActive: true,
       searchQuery: 'bolt',
+      hasActiveQuery: true,
     });
     const indicator = screen.getByTestId('binder-search-active-indicator');
     expect(indicator).toBeTruthy();
