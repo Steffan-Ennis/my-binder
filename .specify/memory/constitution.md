@@ -1,6 +1,169 @@
 <!--
 SYNC IMPACT REPORT
 ==================
+Version change: 1.23.0 → 1.24.0
+Bump type: MINOR — adds a new "Mobile view test conventions" sub-
+  section to Principle III (Test-First Development), placed
+  immediately after "Mobile mocking conventions" and before "Server
+  route test conventions". The sub-section codifies two new
+  non-negotiable rules for `apps/mobile` view tests:
+
+    1. `render(...)` from `@testing-library/react-native` MUST be
+       called inside an `it(...)` block — never at module scope,
+       never inside a `describe`, never inside `beforeAll` /
+       `beforeEach` / `afterEach`, and never inside a top-of-file
+       helper function such as a `renderView({...overrides})` wrapper
+       that the suite calls from every test. The render call is the
+       observable starting point of each test and MUST sit at the
+       top of the `it` block so the reader sees what was rendered
+       without chasing through a helper.
+    2. When a view's props need a default baseline that individual
+       tests vary, the test file MUST declare a `<ComponentName>WithDefaults`
+       function component at module scope (after the props-defaults
+       object) typed as `FC<Partial<<ComponentName>Props>>`. The
+       component spreads the defaults over the production view and
+       then spreads its incoming `overrides` on top. Tests render
+       this component directly — `render(<<ComponentName>WithDefaults
+       cards={[...]} isLoading />)` — never via an indirection helper.
+
+  The canonical reference is
+  `apps/mobile/src/components/binder-home/BinderHomeView.test.tsx`
+  (spec 016), where `BinderViewWithDefaults: FC<Partial<BinderHomeViewProps>>`
+  wraps `BinderHomeView` with the suite's prop defaults and every
+  `it` block invokes `render(<BinderViewWithDefaults ... />)`
+  inline. The pattern replaces the older "helper render function"
+  shape (`const renderView = (overrides) => render(<View
+  {...defaults} {...overrides} />)`) that hides the rendered JSX
+  behind a function call, decouples test intent from the component
+  shape, and makes it impossible to grep for the actual JSX the
+  view receives.
+
+  The trigger was the spec 016 binder-home test cleanup. The first
+  pass replaced an outdated `renderView` helper with the
+  `BinderViewWithDefaults` component but the wider convention
+  remained unwritten — leaving every future view test free to
+  reintroduce the helper pattern. Codifying the rule now turns the
+  helper-style render into a constitution breach catchable at
+  review and pins the `ComponentWithDefaults` shape as the only
+  permitted way to share prop defaults across a view test file.
+
+  No principle is removed or redefined; no version-pin language is
+  altered. The rule applies only to `apps/mobile` view tests
+  (`render` from `@testing-library/react-native`); hook tests via
+  `renderHook` are unaffected and may continue to call `renderHook`
+  from `beforeEach` or test helpers as needed (the call signature
+  there is `() => useHook(args)`, not JSX, and the equivalent
+  defaults pattern does not apply).
+
+Last amended: 2026-05-16
+
+Added principles:
+  (none — Principle III expanded, not added)
+
+Modified sections:
+  - Principle III. Test-First Development — added "Mobile view test
+    conventions" sub-section between "Mobile mocking conventions"
+    and "Server route test conventions".
+
+Removed sections:
+  (none)
+
+Templates reviewed:
+  ✅ .specify/templates/plan-template.md  — Unit Testing Phase
+     "Mobile mocks" callout extended with a sibling "Mobile view
+     tests" callout requiring that every new or updated
+     `apps/mobile/src/components/**/*View.test.tsx` file (a) call
+     `render(...)` only inside `it(...)` blocks and (b) declare a
+     `<ComponentName>WithDefaults: FC<Partial<<ComponentName>Props>>`
+     at module scope when prop defaults need to be shared across
+     the suite.
+  ✅ .specify/templates/spec-template.md  — No change required
+     (specs are technology-agnostic).
+  ✅ .specify/templates/tasks-template.md — No change required
+     (the `ComponentWithDefaults` pattern is a code-author
+     decision; it surfaces as ordinary test-file work in the
+     existing task categorisation).
+
+Deferred TODOs:
+  - Audit existing `apps/mobile/src/**/*View.test.tsx` files for
+    helper-style `renderView` / `renderComponent` functions and
+    migrate each to a sibling `<ComponentName>WithDefaults` FC. At
+    time of amendment, `BinderHomeView.test.tsx` is the only view
+    test in the workspace and already complies; future view tests
+    landing in `apps/mobile/src/components/login/`,
+    `apps/mobile/src/components/access-denied/`, and
+    `apps/mobile/src/components/coming-soon/` MUST follow the new
+    convention from the first commit.
+
+Carry-over from 1.23.0 (unchanged):
+  ⚠ apps/server/src/routes/cards.test.ts — currently seeds the test
+     user inline via `dataSource.getRepository(UserEntity).upsert(...)`
+     in `beforeAll`. Violates the rule #5 added in v1.23.0. Carried
+     forward: extract the seed into
+     `apps/server/testing/userFactory.ts` exporting
+     `createTestUser(dataSource, overrides)` and consume it from the
+     test.
+  ⚠ apps/server/src/routes/auth.test.ts — currently seeds the
+     allowlist row and the test user inline via
+     `dataSource.getRepository(AllowedUserEntity).save({ email })`
+     and `dataSource.getRepository(UserEntity).upsert(...)`. Violates
+     the rule #5 added in v1.23.0. Carried forward: extract into
+     `apps/server/testing/allowedUserFactory.ts` exporting
+     `createTestAllowedUser(dataSource, overrides)`, reuse
+     `createTestUser` from the user factory, and consume both from
+     the test.
+
+Carry-over from 1.22.0 (unchanged):
+  ⚠ apps/server/src/routes/docs.test.ts — still uses `jest.mock(...)`
+     against modules under `apps/server/src/services/` and
+     `apps/server/src/db/`. Violates the Server route test
+     conventions sub-section's rules #1-#4 (no service/repository
+     mocks; real DataSource; offline-mode SDK; real-data isolation).
+     MUST be rewritten as an E2E test against the real services, real
+     repositories, the real TypeORM `DataSource`, and the offline-mode
+     MTGJSON SDK, AND its data setup MUST go through the factories
+     added by rule #5.
+
+Carry-over from 1.21.0 (unchanged):
+  ⚠ CLAUDE.md — Stale references to `binderStore` remain at line 50
+     (folder structure tree) and line 200 (Active Technologies list).
+     The store has been deleted; CLAUDE.md MUST be updated to remove
+     the `binderStore` mentions and to note that `currentPage` plus
+     search state now live in `useBinderHome.ts`.
+
+Carry-over from 1.20.0 (unchanged):
+  ⚠ apps/mobile theme files — the Style co-location rule landed in
+     v1.20.0 with `BinderHomeView.theme.ts` as the canonical
+     reference. Other view components (LoginView, AccessDeniedView,
+     ComingSoonView) MUST migrate inline `StyleSheet.create` blocks
+     into sibling `<Component>.theme.ts` files in a follow-up pass.
+
+Carry-over from 1.19.0 (unchanged):
+  ⚠ apps/mobile/src/services/auth/googleAuth.ts — uses
+     `expo-auth-session/providers/google`, which the Expo docs flag as
+     deprecated. Migration is tracked in
+     `todo/migrate-google-auth-to-google-signin.md`. Per Principle XI,
+     either the migration completes or the deprecated dependency MUST be
+     justified in the spec 002 Complexity Tracking table.
+
+Carry-over from 1.17.0 (unchanged):
+  ⚠ apps/mobile/package-lock.json — npm lockfile from the create-expo-app
+     bootstrap. MUST be deleted and the workspace re-resolved via
+     `pnpm install` before merge.
+  ⚠ apps/mobile/tsconfig.json — currently declares `paths: { "@/*": ["./*"] }`;
+     Principle VII requires `@root/*` and `@src/*` aliases.
+  ⚠ apps/mobile/hooks/{use-color-scheme.ts,use-color-scheme.web.ts,
+     use-theme-color.ts}, apps/mobile/scripts/reset-project.js,
+     apps/mobile/app/modal.tsx — leftover create-expo-app template files
+     outside the Principle X four-layer structure.
+
+Carry-over from 1.14.0 (unchanged):
+  ⚠ specs/001-server-architecture/plan.md — JSDoc → TypeScript migration.
+  ⚠ specs/004-card-data-provider/plan.md — JSDoc → TypeScript migration.
+-->
+
+<!-- PREVIOUS SYNC IMPACT REPORT (v1.22.0 → v1.23.0) follows for archival reference.
+==================
 Version change: 1.22.0 → 1.23.0
 Bump type: MINOR — extends the "Server route test conventions" sub-
   section of Principle III (Test-First Development) with a new rule
@@ -463,6 +626,174 @@ contract so a renamed method or changed signature is caught at `tsc` time. Forbi
 in-file `jest.mock(...)` keeps the global mock surface auditable from a single file —
 when a future engineer asks "what does Jest think `expo-secure-store` is?" the answer
 is always "look at `jest.setup.ts`," never "grep every `*.test.ts`."
+
+**Mobile view test conventions** (`apps/mobile/src/components/**/*View.test.tsx`).
+A view test in `apps/mobile` exercises a single presentational React component
+(per Principle X's four-layer structure, the View layer). Every such test MUST
+follow the two rules below. They are non-negotiable and apply to every existing
+and new view test file under `apps/mobile/src/components/**/*View.test.tsx`.
+
+1. **`render(...)` MUST be called inside an `it(...)` block — never elsewhere.**
+   The `render` export from `@testing-library/react-native` is the observable
+   starting point of each view test and MUST sit at the top of the `it`
+   block whose behaviour it underpins. Calling `render(...)` at module scope,
+   inside a `describe`, inside `beforeAll` / `beforeEach` / `afterEach`, or
+   inside a top-of-file helper function (the typical
+   `const renderView = (overrides) => render(<View {...defaults} {...overrides} />)`
+   shape) is prohibited. A reader scanning an `it` block MUST be able to see
+   exactly what JSX was rendered without chasing through a helper or a
+   per-suite fixture. `renderHook` from the same package is unaffected by
+   this rule — its argument is a callback, not JSX, and the equivalent
+   defaults pattern below does not apply to it.
+
+2. **Shared prop defaults MUST live in a `<ComponentName>WithDefaults` FC
+   declared at module scope.** When a view's props need a baseline that
+   individual tests vary (the common case for `apps/mobile/src/components/<feature>/<Feature>View.tsx`
+   components), the test file MUST:
+
+   - Declare a `defaults: <ComponentName>Props` object at module scope
+     holding the baseline prop values for the suite. `jest.fn()` placeholders
+     for callbacks live here.
+   - Declare a `<ComponentName>WithDefaults: FC<Partial<<ComponentName>Props>>`
+     component, also at module scope, defined as
+     `(overrides) => <<ComponentName> {...defaults} {...overrides} />`. It
+     MUST be typed with React's `FC` generic from `react` (per Principle X's
+     FC declaration rule) and MUST accept a `Partial<<ComponentName>Props>`
+     argument so each test pins only the props it asserts on.
+   - In every `it(...)` block, render the wrapper directly:
+     `const screen = render(<<ComponentName>WithDefaults cards={[...]} isLoading />)`.
+     Passing overrides as ordinary JSX props (not a single `overrides`
+     object) keeps the test readable as a snapshot of how the production
+     component is actually instantiated and lets `tsc` enforce the prop
+     contract at the call site.
+
+   Wrapper helpers that are *functions* rather than components
+   (`const renderView = (overrides) => render(...)`,
+   `const makeView = (props) => render(...)`, or any factory that returns
+   the `render` result) are prohibited under rule #1. The wrapper is a
+   real React component — not a wrapper around `render`.
+
+The compliant pattern (canonical reference:
+`apps/mobile/src/components/binder-home/BinderHomeView.test.tsx`):
+
+```tsx
+import type { FC } from 'react';
+import { fireEvent, render } from '@testing-library/react-native';
+
+import BinderHomeView, { type BinderHomeViewProps } from './BinderHomeView';
+
+const defaults: BinderHomeViewProps = {
+  cards: [],
+  matchedCards: [],
+  currentPage: 1,
+  totalPages: 1,
+  summaryCaption: '0 CARDS · 1 PAGE',
+  isLoading: false,
+  isError: false,
+  // ...the rest of the props…
+  onProfilePress: jest.fn(),
+  onSearchOpen: jest.fn(),
+  // …callbacks default to jest.fn()…
+};
+
+const BinderViewWithDefaults: FC<Partial<BinderHomeViewProps>> = (overrides) => (
+  <BinderHomeView {...defaults} {...overrides} />
+);
+
+describe('BinderHomeView — US1 surface', () => {
+  it('tapping Profile fires onProfilePress', () => {
+    const onProfilePress = jest.fn();
+    const screen = render(
+      <BinderViewWithDefaults onProfilePress={onProfilePress} />,
+    );
+    fireEvent.press(screen.getByLabelText('Open profile'));
+    expect(onProfilePress).toHaveBeenCalled();
+  });
+
+  it('renders the loading state with 9 empty pockets', () => {
+    const screen = render(<BinderViewWithDefaults isLoading />);
+    expect(screen.getAllByTestId('pocket-empty').length).toBe(9);
+  });
+});
+```
+
+The prohibited patterns are:
+
+```tsx
+// PROHIBITED — helper function that wraps render. Hides the rendered JSX
+//              behind a function call, decouples test intent from the
+//              component shape, and makes it impossible to grep for what
+//              the view actually receives.
+const renderView = (overrides: Partial<BinderHomeViewProps> = {}) =>
+  render(<BinderHomeView {...defaults} {...overrides} />);
+
+it('renders the masthead', () => {
+  const screen = renderView({ cards: [makeCard('1', 'A')] });
+  expect(screen.getByText('MY-BINDER')).toBeTruthy();
+});
+
+// PROHIBITED — render called at module / describe scope. The component
+//              tree is built once and shared across tests, so state
+//              bleeds between `it` blocks and a single test failure
+//              cascades through the suite.
+const sharedScreen = render(<BinderHomeView {...defaults} />);
+describe('BinderHomeView', () => {
+  it('renders the masthead', () => {
+    expect(sharedScreen.getByText('MY-BINDER')).toBeTruthy();
+  });
+});
+
+// PROHIBITED — render called from beforeEach. The render result lands in
+//              a `let` outside any `it`, hiding the rendered JSX from the
+//              test body and tying assertions to setup ordering.
+let screen: ReturnType<typeof render>;
+beforeEach(() => {
+  screen = render(<BinderHomeView {...defaults} />);
+});
+it('renders the masthead', () => {
+  expect(screen.getByText('MY-BINDER')).toBeTruthy();
+});
+
+// PROHIBITED — untyped wrapper without the `FC<Partial<Props>>` signature.
+//              Overrides drift away from the production prop contract;
+//              renaming a prop on the production view compiles cleanly
+//              and surfaces only at test runtime.
+const BinderViewWithDefaults = (overrides: any) => (
+  <BinderHomeView {...defaults} {...overrides} />
+);
+
+// PROHIBITED — passing overrides as a single object rather than JSX props.
+//              Defeats the type contract at the call site and makes the
+//              test read like an opaque payload instead of a component
+//              instantiation.
+const BinderViewWithDefaults: FC<{ overrides: Partial<BinderHomeViewProps> }> =
+  ({ overrides }) => <BinderHomeView {...defaults} {...overrides} />;
+
+it('renders the masthead', () => {
+  const screen = render(
+    <BinderViewWithDefaults overrides={{ cards: [makeCard('1', 'A')] }} />,
+  );
+  // …
+});
+```
+
+Rationale: a view test's job is to prove the *production component* renders
+the expected output for a given set of props. The closer the test reads to
+the way the component is actually instantiated in `apps/mobile/src/components/<feature>/<Feature>Container.tsx`,
+the easier it is to (a) confirm the test is asserting what it claims, (b)
+spot when a prop was renamed or removed, and (c) refactor the component
+without rewriting every test. A `renderView` helper inverts that property —
+it forces the reader to alt-tab between the `it` body and the helper to
+understand what JSX was actually rendered, and it lets the helper drift out
+of sync with the production prop contract because the helper's `overrides`
+parameter is usually untyped or weakly typed. A `<ComponentName>WithDefaults`
+component, by contrast, *is* a React component — `tsc` enforces the prop
+shape at every render call, the JSX `<MyViewWithDefaults isLoading />`
+reads the same as production code, and adding a new required prop to the
+production view immediately surfaces as a compile error in `defaults` and
+every consumer at once. Pinning the `render` call inside each `it` block
+completes the picture: a future engineer reading any single test can see
+the entire setup-act-assert flow without scrolling.
 
 **Server route test conventions** (`apps/server/src/routes/**/*.test.ts`). Fastify
 route tests are **end-to-end tests** of the full request pipeline. Each route test
