@@ -1,7 +1,8 @@
+import type { DataSource } from 'typeorm';
+
 import type { CardProvider } from '@src/providers/interface';
 import { registry } from '@src/providers/registry';
 import {
-  lookupCard,
   checkCommanderLegality,
   searchCards,
   getCards,
@@ -15,67 +16,32 @@ import {
 } from './cardService';
 import type { CardImages, CardRecord } from '@my-binder/core';
 
+import { connectTestDatabase, disconnectTestDatabase } from '@root/testing/testDatabase';
+import { aUser } from '@root/testing/userEntityBuilder';
+import { aCard } from '@root/testing/cardEntityBuilder';
+import { CardEntity } from '@src/entities/CardEntity';
+import type { UserEntity } from '@src/entities/UserEntity';
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+const UUID_BOLT = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const UUID_SOL = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+
 const LIGHTNING_BOLT: CardRecord = {
-  id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  id: UUID_BOLT,
   name: 'Lightning Bolt', set: 'M11', cardNumber: '149',
   manaCost: '{R}', colorIdentity: ['R'], commanderLegal: true, imageRef: null,
 };
 const SOL_RING: CardRecord = {
-  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  id: UUID_SOL,
   name: 'Sol Ring', set: 'C11', cardNumber: '58',
   manaCost: '{1}', colorIdentity: [], commanderLegal: true, imageRef: null,
 };
-
-// ─── Mock repositories via @src/db/repositories ──────────────────────────────
-
-const USER_A = 'user-a-uuid';
-const USER_B = 'user-b-uuid';
-
-type CardRow = { id: string; name: string; userId: string; createdAt: string; updatedAt: string };
-let mockCardStore: CardRow[] = [];
-let nextId = 1;
-
-const mockCardRepo = {
-  findAll: async (userId: string) => mockCardStore.filter((c) => c.userId === userId),
-  findById: async (id: string, userId: string) =>
-    mockCardStore.find((c) => c.id === id && c.userId === userId) ?? null,
-  create: async (body: { id: string; name: string }, userId: string) => {
-    const row: CardRow = {
-      id: body.id,
-      name: body.name,
-      userId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    mockCardStore.push(row);
-    nextId++;
-    return row;
-  },
-  update: async (id: string, body: { name: string }, userId: string) => {
-    const row = mockCardStore.find((c) => c.id === id && c.userId === userId);
-    if (!row) return null;
-    row.name = body.name;
-    return row;
-  },
-  remove: async (id: string, userId: string) => {
-    const idx = mockCardStore.findIndex((c) => c.id === id && c.userId === userId);
-    if (idx === -1) return false;
-    mockCardStore.splice(idx, 1);
-    return true;
-  },
-};
-
-jest.mock('@src/db/repositories', () => ({
-  getRepositories: () => ({ card: mockCardRepo }),
-}));
 
 // ─── Provider helpers ─────────────────────────────────────────────────────────
 
 function makeProvider(overrides: Partial<CardProvider> = {}): CardProvider {
   return {
-    lookup: async () => [LIGHTNING_BOLT],
     checkLegality: async (name) => ({ cardName: name, legal: true, reason: null, colorIdentity: [] }),
     search: async () => [LIGHTNING_BOLT, SOL_RING],
     getByUuid: async () => null,
@@ -86,107 +52,141 @@ function makeProvider(overrides: Partial<CardProvider> = {}): CardProvider {
   };
 }
 
+// ─── Shared real test database ───────────────────────────────────────────────
+
+let dataSource: DataSource;
+let userA: UserEntity;
+let userB: UserEntity;
+
+beforeAll(async () => {
+  dataSource = await connectTestDatabase();
+  userA = await aUser().persist(dataSource);
+  userB = await aUser().persist(dataSource);
+});
+
+afterAll(async () => {
+  await disconnectTestDatabase();
+});
+
+beforeEach(async () => {
+  await dataSource.getRepository(CardEntity).deleteAll();
+});
+
 // ─── Collection functions ─────────────────────────────────────────────────────
 
 describe('cardService — collection functions', () => {
-  beforeAll(() => {
-    mockCardStore = [];
-    nextId = 1;
+  beforeAll(async () => {
+    // Echo back exactly the UUIDs the service passes in, so getCards surfaces
+    // one CardRecord per row the repository returned.
+    registry.register('collection', makeProvider({
+      getByUuids: async (uuids) =>
+        uuids.map((id) => ({ ...LIGHTNING_BOLT, id, name: 'Lightning Bolt' })),
+    }));
+    await registry.setActive('collection');
   });
 
   test('getCards returns only cards for the calling user', async () => {
-    mockCardStore = [
-      { id: 'c1', name: 'Lightning Bolt', userId: USER_A, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-      { id: 'c2', name: 'Sol Ring', userId: USER_B, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-    ];
-    const result = await getCards(USER_A);
+    await aCard().forUser(userA).withId(UUID_BOLT).withName('Lightning Bolt').persist(dataSource);
+    await aCard().forUser(userB).withId(UUID_SOL).withName('Sol Ring').persist(dataSource);
+
+    const result = await getCards(userA.id);
     expect(result.cards.length).toBe(1);
-    expect(result.cards[0]?.name).toBe('Lightning Bolt');
+    expect(result.cards[0]?.id).toBe(UUID_BOLT);
     expect(result.total).toBe(1);
   });
 
   test('getCard throws NotFoundError for unknown id', async () => {
-    mockCardStore = [];
-    await expect(() => getCard('unknown-id', USER_A)).rejects.toThrow(NotFoundError);
+    await expect(() => getCard(UUID_BOLT, userA.id)).rejects.toThrow(NotFoundError);
   });
 
   test('createCard creates and returns card', async () => {
-    mockCardStore = [];
     const mtgjsonId = '55555555-5555-4555-8555-555555555555';
-    const card = await createCard({ id: mtgjsonId, name: 'Black Lotus' }, USER_A);
+    const card = await createCard({ id: mtgjsonId, name: 'Black Lotus' }, userA.id);
     expect(card.id).toBe(mtgjsonId);
     expect(card.name).toBe('Black Lotus');
-    expect(card.id).toBeTruthy();
   });
 
   test('deleteCard throws NotFoundError when card not found', async () => {
-    mockCardStore = [];
-    await expect(() => deleteCard('missing', USER_A)).rejects.toThrow(NotFoundError);
+    await expect(() => deleteCard(UUID_BOLT, userA.id)).rejects.toThrow(NotFoundError);
   });
 });
 
 // ─── MTGJSON-decorated collection reads ───────────────────────────────────────
 
 describe('cardService — getCards/getCard MTGJSON enrichment', () => {
-  const UUID_BOLT = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-  const UUID_SOL = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const SCRYFALL_BOLT = 'e3285fd6-aaaa-bbbb-cccc-ddddddddeeee';
+  const BOLT_IMAGE = `https://cards.scryfall.io/normal/front/e/3/${SCRYFALL_BOLT}.jpg`;
 
-  beforeAll(async () => {
-    mockCardStore = [
-      { id: UUID_BOLT, name: 'Lightning Bolt', userId: USER_A, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-      { id: UUID_SOL, name: 'Sol Ring', userId: USER_A, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-    ];
+  beforeEach(async () => {
+    await aCard().forUser(userA).withId(UUID_BOLT).withName('Lightning Bolt').persist(dataSource);
+    await aCard().forUser(userA).withId(UUID_SOL).withName('Sol Ring').persist(dataSource);
+  });
+
+  test('getCards returns provider-enriched rows for the user', async () => {
     registry.register('enrich-ok', makeProvider({
-      getByUuid: async (uuid) => uuid === UUID_BOLT
-        ? { uuid, name: 'Lightning Bolt', setCode: 'M11', setName: 'Magic 2011', cardNumber: '149', typeLine: 'Instant', scryfallId: 'e3285fd6-aaaa-bbbb-cccc-ddddddddeeee' }
-        : { uuid, name: 'Sol Ring', setCode: 'C11', setName: 'Commander 2011', cardNumber: '58', typeLine: 'Artifact', scryfallId: null },
+      getByUuids: async (uuids) =>
+        uuids.map((id) => id === UUID_BOLT
+          ? { ...LIGHTNING_BOLT, id }
+          : { ...SOL_RING, id }),
     }));
     await registry.setActive('enrich-ok');
-  });
 
-  test('getCards decorates each row with frontFaceImageUrl, setName, setCode, typeLine', async () => {
-    const result = await getCards(USER_A);
+    const result = await getCards(userA.id);
     expect(result.total).toBe(2);
     const bolt = result.cards.find((c) => c.id === UUID_BOLT)!;
-    expect(bolt.setCode).toBe('M11');
-    expect(bolt.setName).toBe('Magic 2011');
-    expect(bolt.typeLine).toBe('Instant');
-    expect(bolt.frontFaceImageUrl).toBe(
-      'https://cards.scryfall.io/normal/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg',
-    );
-  });
-
-  test('getCards omits frontFaceImageUrl when scryfallId is null', async () => {
-    const result = await getCards(USER_A);
+    expect(bolt.set).toBe('M11');
     const sol = result.cards.find((c) => c.id === UUID_SOL)!;
-    expect(sol.setCode).toBe('C11');
-    expect(sol.setName).toBe('Commander 2011');
-    expect(sol.frontFaceImageUrl).toBeUndefined();
+    expect(sol.set).toBe('C11');
   });
 
-  test('getCard decorates a single row', async () => {
-    const card = await getCard(UUID_BOLT, USER_A);
+  test('getCard decorates a single row with setCode, setName, typeLine, and frontFaceImageUrl', async () => {
+    registry.register('enrich-getcard', makeProvider({
+      getByUuid: async (uuid) => uuid === UUID_BOLT
+        ? { uuid, name: 'Lightning Bolt', setCode: 'M11', setName: 'Magic 2011', cardNumber: '149', typeLine: 'Instant', scryfallId: SCRYFALL_BOLT }
+        : null,
+    }));
+    await registry.setActive('enrich-getcard');
+
+    const card = await getCard(UUID_BOLT, userA.id);
+    expect(card.id).toBe(UUID_BOLT);
     expect(card.setCode).toBe('M11');
-    expect(card.frontFaceImageUrl).toBe(
-      'https://cards.scryfall.io/normal/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg',
-    );
+    expect(card.setName).toBe('Magic 2011');
+    expect(card.typeLine).toBe('Instant');
+    expect(card.frontFaceImageUrl).toBe(BOLT_IMAGE);
   });
 
-  test('getCards returns rows unenriched when provider.getByUuid returns null', async () => {
+  test('getCard omits frontFaceImageUrl when scryfallId is null', async () => {
+    registry.register('enrich-no-scryfall', makeProvider({
+      getByUuid: async (uuid) => ({ uuid, name: 'Sol Ring', setCode: 'C11', setName: 'Commander 2011', cardNumber: '58', typeLine: 'Artifact', scryfallId: null }),
+    }));
+    await registry.setActive('enrich-no-scryfall');
+
+    const card = await getCard(UUID_SOL, userA.id);
+    expect(card.setCode).toBe('C11');
+    expect(card.setName).toBe('Commander 2011');
+    expect(card.frontFaceImageUrl).toBeUndefined();
+  });
+
+  test('getCard returns the row unenriched when provider.getByUuid returns null', async () => {
     registry.register('enrich-null', makeProvider({ getByUuid: async () => null }));
     await registry.setActive('enrich-null');
-    const result = await getCards(USER_A);
-    expect(result.cards.every((c) => c.frontFaceImageUrl === undefined)).toBe(true);
-    expect(result.cards.every((c) => c.setCode === undefined)).toBe(true);
+
+    const card = await getCard(UUID_BOLT, userA.id);
+    expect(card.id).toBe(UUID_BOLT);
+    expect(card.setCode).toBeUndefined();
+    expect(card.frontFaceImageUrl).toBeUndefined();
   });
 
-  test('getCards returns rows unenriched when provider.getByUuid throws', async () => {
+  test('getCard returns the row unenriched when provider.getByUuid throws', async () => {
     registry.register('enrich-throw', makeProvider({
       getByUuid: async () => { throw new Error('parquet read failed'); },
     }));
     await registry.setActive('enrich-throw');
-    const result = await getCards(USER_A);
-    expect(result.cards.every((c) => c.frontFaceImageUrl === undefined)).toBe(true);
+
+    const card = await getCard(UUID_BOLT, userA.id);
+    expect(card.id).toBe(UUID_BOLT);
+    expect(card.setCode).toBeUndefined();
+    expect(card.frontFaceImageUrl).toBeUndefined();
   });
 });
 
@@ -196,53 +196,6 @@ describe('cardService — provider-backed functions', () => {
   beforeAll(async () => {
     registry.register('test', makeProvider());
     await registry.setActive('test');
-  });
-
-  describe('lookupCard', () => {
-    test('returns CardRecord array when cards are found', async () => {
-      const result = await lookupCard('Lightning Bolt');
-      expect(Array.isArray(result)).toBe(true);
-      expect((result as CardRecord[])[0]?.name).toBe('Lightning Bolt');
-    });
-
-    test('returns CardNotFoundResult when no match', async () => {
-      registry.register('notfound', makeProvider({ lookup: async (name) => ({ found: false, name }) }));
-      await registry.setActive('notfound');
-      const result = await lookupCard('ZZZFake');
-      expect(Array.isArray(result)).toBe(false);
-      expect((result as { found: boolean }).found).toBe(false);
-      await registry.setActive('test');
-    });
-
-    test('throws ProviderUnavailableError when provider errors', async () => {
-      registry.register('broken', makeProvider({ lookup: async () => { throw new Error('connection lost'); } }));
-      await registry.setActive('broken');
-      await expect(() => lookupCard('anything')).rejects.toThrow(ProviderUnavailableError);
-      await registry.setActive('test');
-    });
-
-    test('passes set option through to provider', async () => {
-      let capturedOpts: Parameters<CardProvider['lookup']>[1] = {};
-      registry.register('set-test', makeProvider({
-        lookup: async (_name, opts) => { capturedOpts = opts ?? {}; return [LIGHTNING_BOLT]; },
-      }));
-      await registry.setActive('set-test');
-      await lookupCard('Lightning Bolt', { set: 'M11' });
-      expect(capturedOpts.set).toBe('M11');
-      await registry.setActive('test');
-    });
-
-    test('passes number option through to provider', async () => {
-      let capturedOpts: Parameters<CardProvider['lookup']>[1] = {};
-      registry.register('number-test', makeProvider({
-        lookup: async (_name, opts) => { capturedOpts = opts ?? {}; return [LIGHTNING_BOLT]; },
-      }));
-      await registry.setActive('number-test');
-      await lookupCard('Lightning Bolt', { set: 'M11', number: '149' });
-      expect(capturedOpts.set).toBe('M11');
-      expect(capturedOpts.number).toBe('149');
-      await registry.setActive('test');
-    });
   });
 
   describe('checkCommanderLegality', () => {
