@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import { healthRoutes } from '@src/routes/health';
 
-describe('GET /health', () => {
+describe('Health API', () => {
   const fastify = Fastify();
 
   beforeAll(async () => {
@@ -13,12 +13,10 @@ describe('GET /health', () => {
     await fastify.close();
   });
 
-  test('responds with health status (200 ok or 503 degraded depending on DB state)', async () => {
+  test('GET /health responds with status ok or degraded depending on DB state', async () => {
     const response = await fastify.inject({ method: 'GET', url: '/health' });
-    // In tests, DataSource is not initialized → 503. In production → 200.
-    expect(
-      response.statusCode === 200 || response.statusCode === 503,
-    ).toBe(true);
+    // In tests, DataSource is not initialised → 503. In production → 200.
+    expect(response.statusCode === 200 || response.statusCode === 503).toBe(true);
     const body = response.json<{ status: string; database: string }>();
     expect(body.status === 'ok' || body.status === 'degraded').toBe(true);
   });

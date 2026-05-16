@@ -1,4 +1,4 @@
-import { buildScryfallImageUrls } from './scryfallImages';
+import buildScryfallImageUrls from './scryfallImages';
 
 describe('buildScryfallImageUrls', () => {
   test('returns small, medium, large URLs sharded by first two characters', () => {

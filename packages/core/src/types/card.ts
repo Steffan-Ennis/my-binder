@@ -52,12 +52,6 @@ export type ProviderInfo = {
   reachable: boolean;
 };
 
-// Returned by lookup when the card name has no match. This is a clean result, not an error.
-export type CardNotFoundResult = {
-  found: false;
-  name: string;
-};
-
 // Provider-supplied enrichment for a single printing identified by its
 // MTGJSON UUID — used to decorate a stored Card with display metadata
 // (set name, type line) and the Scryfall id needed to construct an image URL.

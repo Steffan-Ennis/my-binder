@@ -1,10 +1,10 @@
-import type {MtgjsonSDK, CardSet} from 'mtgjson-sdk';
-import type { CardDetails, CardImages, CardRecord, CardNotFoundResult, LegalityResult, SearchQuery } from '@my-binder/core';
-import type { CardProvider, LookupOptions } from '@src/providers/interface';
-import { mapCardSetToCardRecord } from '@src/providers/mtgjson/mapper';
-import { buildScryfallImageUrls } from '@src/providers/mtgjson/scryfallImages';
+import type { MtgjsonSDK, CardSet} from 'mtgjson-sdk';
+import type { CardDetails, CardImages, CardRecord, LegalityResult, SearchQuery } from '@my-binder/core';
+import type { CardProvider } from '@src/providers/interface';
+import mapCardSetToCardRecord  from './mapper';
+import buildScryfallImageUrls from './scryfallImages';
 
-export class MtgjsonProvider implements CardProvider {
+class MtgjsonProvider implements CardProvider {
   private readonly sdk: MtgjsonSDK;
 
   /**
@@ -48,62 +48,6 @@ export class MtgjsonProvider implements CardProvider {
 
   // ─── CardProvider ────────────────────────────────────────────────────────────
 
-  /**
-   * Find one or more paper printings of a card by name.
-   *
-   * Returns a `CardNotFoundResult` (`{ found: false, name }`) when no paper
-   * printing matches — callers do not need to catch a thrown error for the
-   * not-found case.
-   *
-   * @param name - The card name to search for. Treated as a fuzzy match by default.
-   * @param opts - Optional refinement.
-   * @param opts.fuzzy - When `false`, name must match exactly. Defaults to `true`.
-   * @param opts.set - Restrict to a specific set code (e.g. `"M11"`).
-   * @param opts.number - Restrict to a specific collector number (string, e.g. `"149"`).
-   * @returns Either an array of enriched `CardRecord`s, or a `CardNotFoundResult`.
-   *
-   * @example
-   * ```ts
-   * const bolts = await provider.lookup('Lightning Bolt');
-   * // bolts: CardRecord[] — every paper printing
-   *
-   * const exact = await provider.lookup('Lightning Bolt', { set: 'M11', number: '149' });
-   * // exact: CardRecord[] — single printing
-   *
-   * const missing = await provider.lookup('Definitely Not A Card');
-   * // missing: { found: false, name: 'Definitely Not A Card' }
-   * ```
-   */
-  async lookup(name: string, opts: LookupOptions = {}): Promise<CardRecord[] | CardNotFoundResult> {
-    const { fuzzy = true, set, number } = opts;
-
-    let cards = set !== undefined
-      ? await this.sdk.cards.getByName(name, { setCode: set })
-      : fuzzy
-        ? await this.sdk.cards.search({ fuzzyName: name, availability: 'paper' })
-        : await this.sdk.cards.getByName(name);
-
-    // For getByName results, filter to paper availability in-process.
-    if (set !== undefined || !fuzzy) {
-      cards = cards.filter((c) => c.availability.includes('paper'));
-    }
-
-    // Exact collector number filter (no native SDK param).
-    if (number !== undefined) {
-      cards = cards.filter((c) => c.number === number);
-    }
-
-    if (cards.length === 0) {
-      return { found: false, name };
-    }
-
-    return cards.map((card) =>
-      mapCardSetToCardRecord(card, {
-        scryfallId: card.identifiers.scryfallId,
-        commanderLegal: card.legalities.commander === 'Legal',
-      }),
-    );
-  }
 
   /**
    * Check whether a card is legal in the Commander format, optionally constrained
@@ -343,3 +287,5 @@ export class MtgjsonProvider implements CardProvider {
     return mapCardSetToCardRecord(card, { commanderLegal, scryfallId });
   }
 }
+
+export default MtgjsonProvider

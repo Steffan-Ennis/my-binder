@@ -107,30 +107,6 @@ export const CARD_RECORD_SCHEMA = {
   },
 } as const;
 
-// Lookup: union response (found=true → cards array; found=false → name string).
-// Uses a permissive union-compatible schema — strict typing is enforced in TypeScript.
-export const LOOKUP_RESPONSE_SCHEMA = {
-  type: 'object',
-  required: ['found'],
-  properties: {
-    found: { type: 'boolean' },
-    cards: { type: 'array', items: CARD_RECORD_SCHEMA },
-    name: { type: 'string' },
-  },
-} as const;
-
-export const LOOKUP_QUERYSTRING_SCHEMA = {
-  type: 'object',
-  required: ['name'],
-  properties: {
-    name: { type: 'string', minLength: 1 },
-    fuzzy: { type: 'boolean', default: true },
-    set: { type: 'string' },
-    number: { type: 'string' },
-  },
-  additionalProperties: false,
-} as const;
-
 export const LEGALITY_QUERYSTRING_SCHEMA = {
   type: 'object',
   required: ['name'],

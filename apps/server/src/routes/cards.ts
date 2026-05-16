@@ -6,8 +6,6 @@ import {
   UPDATE_CARD_BODY_SCHEMA,
   CARD_ID_PARAMS_SCHEMA,
   CARD_IMAGES_RESPONSE_SCHEMA,
-  LOOKUP_QUERYSTRING_SCHEMA,
-  LOOKUP_RESPONSE_SCHEMA,
   LEGALITY_QUERYSTRING_SCHEMA,
   LEGALITY_RESPONSE_SCHEMA,
   SEARCH_QUERYSTRING_SCHEMA,
@@ -23,7 +21,6 @@ import {
   createCard,
   updateCard,
   deleteCard,
-  lookupCard,
   checkCommanderLegality,
   searchCards,
   getCardImagesById,
@@ -32,7 +29,6 @@ import {
   ProviderUnavailableError,
 } from '@src/services/cardService';
 
-type LookupQuerystring = { name: string; fuzzy?: boolean; set?: string; number?: string };
 type LegalityQuerystring = { name: string; commander_colors?: string };
 type SearchQuerystring = {
   name?: string; set?: string; colors?: string;
@@ -164,26 +160,6 @@ export async function cardRoutes(fastify: FastifyInstance): Promise<void> {
     const { id: userId } = (request.identity as { kind: 'authenticated'; user: { id: string } }).user;
     await deleteCard(request.params.id, userId);
     return reply.code(204).send();
-  });
-
-  // ─── Provider-backed card endpoints (spec 004) ─────────────────────────────
-
-  fastify.get<{ Querystring: LookupQuerystring }>('/cards/lookup', {
-    schema: {
-      querystring: LOOKUP_QUERYSTRING_SCHEMA,
-      response: {
-        200: LOOKUP_RESPONSE_SCHEMA,
-        400: ERROR_RESPONSE_SCHEMA,
-        503: ERROR_RESPONSE_SCHEMA,
-      },
-    },
-  }, async (request, reply) => {
-    const { name, fuzzy = true, set, number } = request.query;
-    const result = await lookupCard(name, { fuzzy, set, number });
-    if (!Array.isArray(result)) {
-      return reply.code(HTTP_STATUS.OK).send(result);
-    }
-    return reply.code(HTTP_STATUS.OK).send({ found: true, cards: result });
   });
 
   fastify.get<{ Querystring: LegalityQuerystring }>('/cards/legality', {

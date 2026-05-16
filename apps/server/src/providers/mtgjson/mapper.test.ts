@@ -1,5 +1,5 @@
 import type { CardSet } from 'mtgjson-sdk';
-import { mapCardSetToCardRecord } from './mapper';
+import mapCardSetToCardRecord from './mapper';
 
 // Minimal factory — only sets fields used by the mapper; rest are typed-cast.
 // Note: legalities and identifiers are NOT set here — they live in separate Parquet

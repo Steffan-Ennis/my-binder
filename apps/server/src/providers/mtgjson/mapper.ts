@@ -19,7 +19,7 @@ function scryfallNormalImageUrl(scryfallId: string): string | undefined {
 
 // Maps an SDK CardSet (a single printing) to our normalised CardRecord.
 // SDK field reference: research.md § 4 — Response Mapping.
-export function mapCardSetToCardRecord(card: CardSet, enrichment?: CardEnrichment): CardRecord {
+const mapCardSetToCardRecord = (card: CardSet, enrichment?: CardEnrichment): CardRecord  => {
   return {
     id: card.uuid,
     name: card.name,
@@ -31,3 +31,5 @@ export function mapCardSetToCardRecord(card: CardSet, enrichment?: CardEnrichmen
     imageRef: enrichment?.scryfallId ? scryfallNormalImageUrl(enrichment?.scryfallId!) : '',
   };
 }
+
+export default mapCardSetToCardRecord

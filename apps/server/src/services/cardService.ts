@@ -1,6 +1,6 @@
 import type {
-  Card, CardList, CreateCardBody, UpdateCardBody,
-  CardRecord, CardNotFoundResult, LegalityResult,
+  Card, CardList, CreateCardBody,
+  UpdateCardBody, LegalityResult,
   SearchQuery, SearchResult, CardImages,
 } from '@my-binder/core';
 import { getRepositories } from '@src/db/repositories';
@@ -84,7 +84,7 @@ export async function getCards(userId: string): Promise<CardList> {
   // Sequential enrichment: the MTGJSON SDK shares a DuckDB connection and
   // concurrent access produces "Failed to execute prepared statement" errors.
   const cards = await provider?.getByUuids(entities.map(card => card.id))!
-  return { cards, total: cards.length };
+  return { cards: cards ?? [], total: cards?.length ?? 0 };
 }
 
 /**
@@ -208,43 +208,6 @@ export class ProviderUnavailableError extends Error {
   constructor() {
     super('The card data provider is currently unavailable. Please try again.');
     this.name = 'ProviderUnavailableError';
-  }
-}
-
-/**
- * Look up paper printings of a card by name via the active provider. The
- * provider's own not-found result (`{ found: false, name }`) is returned
- * verbatim — only non-not-found errors are wrapped in
- * `ProviderUnavailableError` so the HTTP layer can distinguish "no card"
- * (200 + sentinel) from "data layer down" (503).
- *
- * @param name - Card name to look up.
- * @param opts - Optional refinement passed straight through to the provider.
- * @param opts.fuzzy - When `false`, name must match exactly. Defaults to `true`.
- * @param opts.set - Restrict to a specific set code.
- * @param opts.number - Restrict to a specific collector number.
- * @returns Either an array of `CardRecord`s or a `CardNotFoundResult`.
- * @throws ProviderUnavailableError when the active provider raises any error other than `CARD_NOT_FOUND`.
- *
- * @example
- * ```ts
- * const result = await lookupCard('Lightning Bolt');
- * if ('found' in result) reply.send({ error: 'CARD_NOT_FOUND' });
- * else reply.send({ cards: result });
- * ```
- */
-export async function lookupCard(
-  name: string,
-  opts: { fuzzy?: boolean; set?: string; number?: string } = {},
-): Promise<CardRecord[] | CardNotFoundResult> {
-  try {
-    return await registry.getActive().lookup(name, opts);
-  } catch (error) {
-    console.error(error)
-    if (error instanceof Error && (error as NodeJS.ErrnoException).code !== 'CARD_NOT_FOUND') {
-      throw new ProviderUnavailableError();
-    }
-    throw error;
   }
 }
 

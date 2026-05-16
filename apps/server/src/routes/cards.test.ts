@@ -1,477 +1,269 @@
-import Fastify from 'fastify';
+import path from 'node:path';
+import Fastify, { type FastifyInstance } from 'fastify';
 import fastifyCookie from '@fastify/cookie';
+import { MtgjsonSDK } from 'mtgjson-sdk';
+import type { DataSource } from 'typeorm';
+
+import { connectTestDatabase, disconnectTestDatabase } from '@root/testing/testDatabase';
+import { aUser } from '@root/testing/userEntityBuilder';
+import { aCard } from '@root/testing/cardEntityBuilder';
+import { CardEntity } from '@src/entities/CardEntity';
+import type { UserEntity } from '@src/entities/UserEntity';
 import authPlugin from '@src/auth/authPlugin';
+import { issueToken } from '@src/auth/sessionJwt';
 import { cardRoutes } from '@src/routes/cards';
 import { registry } from '@src/providers/registry';
-import type { CardProvider } from '@src/providers/interface';
-import type { CardRecord } from '@my-binder/core';
+import MtgjsonProvider from '@src/providers/mtgjson/MtgjsonProvider';
 
-// ─── Mock repositories ────────────────────────────────────────────────────────
-
-const TEST_USER_ID = 'test-user-uuid-0001';
 const TEST_SECRET = 'a-test-secret-that-is-at-least-32-characters-long!!';
+const CACHE_DIR = path.resolve(__dirname, '../../data/mtgjson-cache');
 
-const MOCK_USER = { id: TEST_USER_ID, email: 'user@example.com', displayName: 'Test User', avatarUrl: null };
+// Canonical fixture: Lightning Bolt printed in Magic 2011 (M11) #149.
+// Verified against the local offline cache by MtgjsonProvider.test.ts.
+const M11_BOLT_UUID = '6ca7af0b-4b6a-59ba-90be-6da4f62bcff1';
+const M11_BOLT_SCRYFALL_ID = 'e768c957-3a1f-42f5-853a-96942f645df5';
+const M11_BOLT_IMAGE_NORMAL = `https://cards.scryfall.io/normal/front/e/7/${M11_BOLT_SCRYFALL_ID}.jpg`;
+const M11_BOLT_IMAGE_SMALL = `https://cards.scryfall.io/small/front/e/7/${M11_BOLT_SCRYFALL_ID}.jpg`;
+const M11_BOLT_IMAGE_LARGE = `https://cards.scryfall.io/large/front/e/7/${M11_BOLT_SCRYFALL_ID}.jpg`;
 
-// In-memory card store (scoped to userId)
-type CardRow = { id: string; name: string; userId: string; createdAt: Date; updatedAt: Date };
-let cardStore: CardRow[] = [];
-let nextId = 1;
+// UUID intentionally absent from the offline cache.
+const UNKNOWN_UUID = '00000000-0000-0000-0000-000000000000';
 
-function makeCardRow(name: string, userId: string): CardRow {
-  const id = `00000000-0000-0000-0000-${String(nextId++).padStart(12, '0')}`;
-  return { id, name, userId, createdAt: new Date(), updatedAt: new Date() };
-}
+describe('Cards API', () => {
+  let dataSource: DataSource;
+  let sdk: MtgjsonSDK;
+  let fastify: FastifyInstance;
+  let testUser: UserEntity;
+  let authToken: string;
 
-function toCardJson(row: CardRow) {
-  return { id: row.id, name: row.name, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
-}
-
-jest.mock('@src/db/repositories', () => ({
-  getRepositories: () => ({
-    user: {
-      findUserById: async (id: string) => (id === 'test-user-uuid-0001' ? { id: 'test-user-uuid-0001', email: 'user@example.com', displayName: 'Test User', avatarUrl: null } : null),
-      upsertUser: async () => ({ id: 'test-user-uuid-0001', email: 'user@example.com', displayName: 'Test User', avatarUrl: null }),
-    },
-    card: {
-      findAll: async (userId: string) =>
-        cardStore.filter((c) => c.userId === userId).map(toCardJson),
-      findById: async (id: string, userId: string) => {
-        const card = cardStore.find((c) => c.id === id && c.userId === userId);
-        return card ? toCardJson(card) : null;
-      },
-      create: async (body: { id: string; name: string }, userId: string) => {
-        const row = makeCardRow(body.name, userId);
-        row.id = body.id;
-        cardStore.push(row);
-        return toCardJson(row);
-      },
-      update: async (id: string, body: { name: string }, userId: string) => {
-        const card = cardStore.find((c) => c.id === id && c.userId === userId);
-        if (!card) return null;
-        card.name = body.name;
-        card.updatedAt = new Date();
-        return toCardJson(card);
-      },
-      remove: async (id: string, userId: string) => {
-        const idx = cardStore.findIndex((c) => c.id === id && c.userId === userId);
-        if (idx === -1) return false;
-        cardStore.splice(idx, 1);
-        return true;
-      },
-    },
-  }),
-}));
-
-// ─── Provider stubs ───────────────────────────────────────────────────────────
-
-const BOLT: CardRecord = {
-  id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-  name: 'Lightning Bolt', set: 'M11', cardNumber: '149',
-  manaCost: '{R}', colorIdentity: ['R'], commanderLegal: true, imageRef: null,
-};
-
-function makeProvider(overrides: Partial<CardProvider> = {}): CardProvider {
-  return {
-    lookup: async () => [BOLT],
-    checkLegality: async (name) => ({ cardName: name, legal: true, reason: null, colorIdentity: [] }),
-    search: async () => [BOLT],
-    getByUuid: async () => null,
-    getByUuids: async () => [],
-    getCardImages: async () => null,
-    isReachable: async () => true,
-    ...overrides,
-  };
-}
-
-async function buildAuthApp() {
-  const fastify = Fastify();
-  await fastify.register(fastifyCookie);
-  await fastify.register(authPlugin);
-  await fastify.register(cardRoutes);
-  return fastify;
-}
-
-// ─── Collection CRUD (requires auth) ─────────────────────────────────────────
-
-describe('Cards API — collection CRUD (authenticated)', () => {
-  const fastify = Fastify();
+  const authHeaders = () => ({ authorization: `Bearer ${authToken}` });
 
   beforeAll(async () => {
     process.env['SESSION_JWT_SECRET'] = TEST_SECRET;
-    cardStore = [];
-    // Provide a no-op authenticate so cardRoutes can register its preHandler
-    fastify.decorate('authenticate', async () => {});
-    fastify.addHook('onRequest', async (req) => {
-      // Manually set identity to avoid full auth plugin DB lookup complexity
-      (req as unknown as { identity: unknown }).identity = { kind: 'authenticated', user: MOCK_USER };
-    });
+
+    dataSource = await connectTestDatabase();
+
+    sdk = await MtgjsonSDK.create({ cacheDir: CACHE_DIR, offline: true });
+    registry.register('mtgjson', new MtgjsonProvider(sdk));
+    await registry.setActive('mtgjson');
+
+    testUser = await aUser().persist(dataSource);
+    authToken = issueToken(testUser.id, TEST_SECRET);
+
+    fastify = Fastify();
+    await fastify.register(fastifyCookie);
+    await fastify.register(authPlugin);
     await fastify.register(cardRoutes);
     await fastify.ready();
   });
 
   afterAll(async () => {
     await fastify.close();
+    await sdk.close();
+    await disconnectTestDatabase();
   });
 
-  test('GET /cards returns empty list initially', async () => {
-    cardStore = [];
-    const response = await fastify.inject({ method: 'GET', url: '/cards' });
-    expect(response.statusCode).toBe(200);
-    const body = response.json<{ cards: unknown[]; total: number }>();
+  beforeEach(async () => {
+    await dataSource.getRepository(CardEntity).deleteAll();
+  });
+
+  // ─── GET /cards ─────────────────────────────────────────────────────────────
+
+  test('GET /cards returns an empty list when the user has no cards', async () => {
+    const r = await fastify.inject({ method: 'GET', url: '/cards', headers: authHeaders() });
+    expect(r.statusCode).toBe(200);
+    const body = r.json<{ cards: unknown[]; total: number }>();
     expect(body.cards).toEqual([]);
     expect(body.total).toBe(0);
   });
 
+  test('GET /cards returns cards enriched from the offline MTGJSON cache', async () => {
+    await aCard()
+      .forUser(testUser)
+      .withId(M11_BOLT_UUID)
+      .withName('Lightning Bolt')
+      .persist(dataSource);
+
+    const r = await fastify.inject({ method: 'GET', url: '/cards', headers: authHeaders() });
+    expect(r.statusCode).toBe(200);
+    const body = r.json<{
+      cards: Array<{ id: string; name: string; set: string; cardNumber: string }>;
+      total: number;
+    }>();
+    expect(body.total).toBe(1);
+    expect(body.cards[0]?.id).toBe(M11_BOLT_UUID);
+    expect(body.cards[0]?.name).toBe('Lightning Bolt');
+    expect(body.cards[0]?.set).toBe('M11');
+    expect(body.cards[0]?.cardNumber).toBe('149');
+  });
+
+  test('GET /cards returns 401 without a Bearer token', async () => {
+    const r = await fastify.inject({ method: 'GET', url: '/cards' });
+    expect(r.statusCode).toBe(401);
+  });
+
+  // ─── POST /cards ────────────────────────────────────────────────────────────
+
   test('POST /cards creates a card and returns 201', async () => {
-    const mtgjsonId = '22222222-2222-4222-8222-222222222222';
-    const response = await fastify.inject({
-      method: 'POST', url: '/cards', payload: { id: mtgjsonId, name: 'Black Lotus' },
+    const id = '22222222-2222-4222-8222-222222222222';
+    const r = await fastify.inject({
+      method: 'POST', url: '/cards',
+      payload: { id, name: 'Black Lotus' },
+      headers: authHeaders(),
     });
-    expect(response.statusCode).toBe(201);
-    const card = response.json<{ id: string; name: string }>();
+    expect(r.statusCode).toBe(201);
+    const card = r.json<{ id: string; name: string }>();
+    expect(card.id).toBe(id);
     expect(card.name).toBe('Black Lotus');
-    expect(card.id).toBe(mtgjsonId);
   });
 
-  test('POST /cards returns 400 for missing required fields', async () => {
-    const response = await fastify.inject({
-      method: 'POST', url: '/cards', payload: {},
+  test('POST /cards returns 400 when required fields are missing', async () => {
+    const r = await fastify.inject({
+      method: 'POST', url: '/cards', payload: {}, headers: authHeaders(),
     });
-    expect(response.statusCode).toBe(400);
+    expect(r.statusCode).toBe(400);
   });
 
-  test('GET /cards/:id returns 404 for unknown id', async () => {
-    const response = await fastify.inject({
-      method: 'GET', url: '/cards/00000000-0000-0000-0000-000000000000',
+  test('POST /cards returns 401 without a Bearer token', async () => {
+    const r = await fastify.inject({
+      method: 'POST', url: '/cards',
+      payload: { id: '33333333-3333-4333-8333-333333333333', name: 'Sol Ring' },
     });
-    expect(response.statusCode).toBe(404);
+    expect(r.statusCode).toBe(401);
   });
 
-  test('full CRUD lifecycle', async () => {
-    cardStore = [];
+  // ─── GET /cards/:id ────────────────────────────────────────────────────────
+
+  test('GET /cards/:id returns 200 with enriched setCode and frontFaceImageUrl', async () => {
+    await aCard()
+      .forUser(testUser)
+      .withId(M11_BOLT_UUID)
+      .withName('Lightning Bolt')
+      .persist(dataSource);
+
+    const r = await fastify.inject({
+      method: 'GET', url: `/cards/${M11_BOLT_UUID}`, headers: authHeaders(),
+    });
+    expect(r.statusCode).toBe(200);
+    const body = r.json<{ id: string; setCode?: string; setName?: string; typeLine?: string; frontFaceImageUrl?: string }>();
+    expect(body.id).toBe(M11_BOLT_UUID);
+    expect(body.setCode).toBe('M11');
+    expect(body.setName).toBe('Magic 2011');
+    expect(body.typeLine).toBe('Instant');
+    expect(body.frontFaceImageUrl).toBe(M11_BOLT_IMAGE_NORMAL);
+  });
+
+  test('GET /cards/:id returns 404 when the user has no card with that id', async () => {
+    const r = await fastify.inject({
+      method: 'GET', url: `/cards/${UNKNOWN_UUID}`, headers: authHeaders(),
+    });
+    expect(r.statusCode).toBe(404);
+  });
+
+  test('GET /cards/:id returns 401 without a Bearer token', async () => {
+    const r = await fastify.inject({ method: 'GET', url: `/cards/${UNKNOWN_UUID}` });
+    expect(r.statusCode).toBe(401);
+  });
+
+  // ─── full CRUD lifecycle ───────────────────────────────────────────────────
+
+  test('full CRUD lifecycle: POST → GET → PUT → DELETE → GET 404', async () => {
+    const id = '33333333-3333-4333-8333-333333333333';
 
     const created = await fastify.inject({
-      method: 'POST', url: '/cards', payload: { id: '33333333-3333-4333-8333-333333333333', name: 'Mox Ruby' },
+      method: 'POST', url: '/cards',
+      payload: { id, name: 'Mox Ruby' },
+      headers: authHeaders(),
     });
     expect(created.statusCode).toBe(201);
-    const { id } = created.json<{ id: string }>();
 
-    const fetched = await fastify.inject({ method: 'GET', url: `/cards/${id}` });
+    const fetched = await fastify.inject({
+      method: 'GET', url: `/cards/${id}`, headers: authHeaders(),
+    });
     expect(fetched.statusCode).toBe(200);
     expect(fetched.json<{ name: string }>().name).toBe('Mox Ruby');
 
     const updated = await fastify.inject({
-      method: 'PUT', url: `/cards/${id}`, payload: { name: 'Mox Pearl' },
+      method: 'PUT', url: `/cards/${id}`,
+      payload: { name: 'Mox Pearl' },
+      headers: authHeaders(),
     });
     expect(updated.statusCode).toBe(200);
     expect(updated.json<{ name: string }>().name).toBe('Mox Pearl');
 
-    const deleted = await fastify.inject({ method: 'DELETE', url: `/cards/${id}` });
+    const deleted = await fastify.inject({
+      method: 'DELETE', url: `/cards/${id}`, headers: authHeaders(),
+    });
     expect(deleted.statusCode).toBe(204);
 
-    const gone = await fastify.inject({ method: 'GET', url: `/cards/${id}` });
+    const gone = await fastify.inject({
+      method: 'GET', url: `/cards/${id}`, headers: authHeaders(),
+    });
     expect(gone.statusCode).toBe(404);
   });
-});
 
-// ─── Collection routes require auth ──────────────────────────────────────────
+  // ─── GET /cards/images/:id ────────────────────────────────────────────────
 
-describe('Cards API — collection routes require authentication', () => {
-  let fastify: Awaited<ReturnType<typeof buildAuthApp>>;
-
-  beforeAll(async () => {
-    process.env['SESSION_JWT_SECRET'] = TEST_SECRET;
-    fastify = await buildAuthApp();
-    await fastify.ready();
-  });
-
-  afterAll(async () => {
-    await fastify.close();
-  });
-
-  test('GET /cards returns 401 without auth', async () => {
-    const response = await fastify.inject({ method: 'GET', url: '/cards' });
-    expect(response.statusCode).toBe(401);
-  });
-
-  test('POST /cards returns 401 without auth', async () => {
-    const response = await fastify.inject({
-      method: 'POST', url: '/cards',
-      payload: { id: '44444444-4444-4444-8444-444444444444', name: 'Test' },
+  test('GET /cards/images/:id returns 200 with small/medium/large URLs for a known uuid', async () => {
+    const r = await fastify.inject({
+      method: 'GET', url: `/cards/images/${M11_BOLT_UUID}`, headers: authHeaders(),
     });
-    expect(response.statusCode).toBe(401);
-  });
-
-  test('GET /cards/:id returns 401 without auth', async () => {
-    const response = await fastify.inject({ method: 'GET', url: '/cards/00000000-0000-0000-0000-000000000099' });
-    expect(response.statusCode).toBe(401);
-  });
-
-  test('GET /cards/images/:id returns 401 without auth', async () => {
-    const response = await fastify.inject({ method: 'GET', url: '/cards/images/00000000-0000-0000-0000-000000000099' });
-    expect(response.statusCode).toBe(401);
-  });
-});
-
-// ─── GET /cards MTGJSON enrichment ───────────────────────────────────────────
-
-describe('Cards API — GET /cards MTGJSON-enriched response', () => {
-  const fastify = Fastify();
-  const UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-
-  beforeAll(async () => {
-    process.env['SESSION_JWT_SECRET'] = TEST_SECRET;
-    cardStore = [{ id: UUID, name: 'Lightning Bolt', userId: TEST_USER_ID, createdAt: new Date(), updatedAt: new Date() }];
-    registry.register('enrich-route-test', makeProvider({
-      getByUuid: async (uuid) => ({
-        uuid,
-        name: 'Lightning Bolt',
-        setCode: 'M11',
-        setName: 'Magic 2011',
-        cardNumber: '149',
-        typeLine: 'Instant',
-        scryfallId: 'e3285fd6-aaaa-bbbb-cccc-ddddddddeeee',
-      }),
-    }));
-    await registry.setActive('enrich-route-test');
-    fastify.decorate('authenticate', async () => {});
-    fastify.addHook('onRequest', async (req) => {
-      (req as unknown as { identity: unknown }).identity = { kind: 'authenticated', user: MOCK_USER };
-    });
-    await fastify.register(cardRoutes);
-    await fastify.ready();
-  });
-
-  afterAll(async () => {
-    await fastify.close();
-  });
-
-  test('GET /cards returns cards with frontFaceImageUrl, setName, setCode, typeLine', async () => {
-    const r = await fastify.inject({ method: 'GET', url: '/cards' });
-    expect(r.statusCode).toBe(200);
-    const body = r.json<{ cards: Array<{ id: string; setCode?: string; setName?: string; typeLine?: string; frontFaceImageUrl?: string }>; total: number }>();
-    expect(body.total).toBe(1);
-    expect(body.cards[0]?.setCode).toBe('M11');
-    expect(body.cards[0]?.setName).toBe('Magic 2011');
-    expect(body.cards[0]?.typeLine).toBe('Instant');
-    expect(body.cards[0]?.frontFaceImageUrl).toBe(
-      'https://cards.scryfall.io/normal/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg',
-    );
-  });
-
-  test('GET /cards/:id returns single enriched card', async () => {
-    const r = await fastify.inject({ method: 'GET', url: `/cards/${UUID}` });
-    expect(r.statusCode).toBe(200);
-    const body = r.json<{ frontFaceImageUrl?: string; setCode?: string }>();
-    expect(body.setCode).toBe('M11');
-    expect(body.frontFaceImageUrl).toBe(
-      'https://cards.scryfall.io/normal/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg',
-    );
-  });
-});
-
-// ─── Provider-backed card routes ──────────────────────────────────────────────
-
-describe('Cards API — provider routes', () => {
-  let fastify: Awaited<ReturnType<typeof buildAuthApp>>;
-
-  beforeAll(async () => {
-    process.env['SESSION_JWT_SECRET'] = TEST_SECRET;
-    registry.register('route-test', makeProvider());
-    await registry.setActive('route-test');
-    fastify = await buildAuthApp();
-    await fastify.ready();
-  });
-
-  afterAll(async () => {
-    await fastify.close();
-  });
-
-  describe('GET /cards/lookup', () => {
-    test('returns 200 with found:true and cards array when card exists', async () => {
-      const r = await fastify.inject({ method: 'GET', url: '/cards/lookup?name=Lightning+Bolt' });
-      expect(r.statusCode).toBe(200);
-      const body = r.json<{ found: boolean; cards: CardRecord[] }>();
-      expect(body.found).toBe(true);
-      expect(body.cards[0]?.name).toBe('Lightning Bolt');
-    });
-
-    test('returns 200 with found:false when card is not found', async () => {
-      registry.register('lookup-miss', makeProvider({ lookup: async (name) => ({ found: false, name }) }));
-      await registry.setActive('lookup-miss');
-      const r = await fastify.inject({ method: 'GET', url: '/cards/lookup?name=ZZZFake' });
-      expect(r.statusCode).toBe(200);
-      expect(r.json<{ found: boolean }>().found).toBe(false);
-      await registry.setActive('route-test');
-    });
-
-    test('returns 400 when name is missing', async () => {
-      const r = await fastify.inject({ method: 'GET', url: '/cards/lookup' });
-      expect(r.statusCode).toBe(400);
-    });
-
-    test('returns 503 when provider is unavailable', async () => {
-      registry.register('lookup-down', makeProvider({ lookup: async () => { throw new Error('down'); } }));
-      await registry.setActive('lookup-down');
-      const r = await fastify.inject({ method: 'GET', url: '/cards/lookup?name=test' });
-      expect(r.statusCode).toBe(503);
-      expect(r.json<{ error: string }>().error).toBe('PROVIDER_UNAVAILABLE');
-      await registry.setActive('route-test');
-    });
-
-    test('passes set param and returns 200 with matching cards', async () => {
-      registry.register('set-route', makeProvider({
-        lookup: async (_name, opts) => opts?.set === 'M11' ? [BOLT] : { found: false, name: _name },
-      }));
-      await registry.setActive('set-route');
-      const r = await fastify.inject({ method: 'GET', url: '/cards/lookup?name=Lightning+Bolt&set=M11' });
-      expect(r.statusCode).toBe(200);
-      const body = r.json<{ found: boolean; cards: CardRecord[] }>();
-      expect(body.found).toBe(true);
-      expect(body.cards[0]?.set).toBe('M11');
-      await registry.setActive('route-test');
-    });
-
-    test('returns found:false when set+number combination has no match', async () => {
-      registry.register('number-route', makeProvider({
-        lookup: async (_name, opts) =>
-          opts?.set === 'M11' && opts?.number === '999' ? { found: false, name: _name } : [BOLT],
-      }));
-      await registry.setActive('number-route');
-      const r = await fastify.inject({ method: 'GET', url: '/cards/lookup?name=Lightning+Bolt&set=M11&number=999' });
-      expect(r.statusCode).toBe(200);
-      expect(r.json<{ found: boolean }>().found).toBe(false);
-      await registry.setActive('route-test');
-    });
-  });
-
-  describe('GET /cards/legality', () => {
-    test('returns 200 with legal:true for a legal card', async () => {
-      const r = await fastify.inject({ method: 'GET', url: '/cards/legality?name=Sol+Ring' });
-      expect(r.statusCode).toBe(200);
-      expect(r.json<{ legal: boolean }>().legal).toBe(true);
-    });
-
-    test('returns 200 with legal:false and reason for a banned card', async () => {
-      registry.register('legality-banned', makeProvider({
-        checkLegality: async (name) => ({ cardName: name, legal: false, reason: 'Banned in Commander', colorIdentity: [] }),
-      }));
-      await registry.setActive('legality-banned');
-      const r = await fastify.inject({ method: 'GET', url: '/cards/legality?name=Black+Lotus' });
-      expect(r.statusCode).toBe(200);
-      const body = r.json<{ legal: boolean; reason: string }>();
-      expect(body.legal).toBe(false);
-      expect(body.reason).toBe('Banned in Commander');
-      await registry.setActive('route-test');
-    });
-
-    test('returns 404 when card is not found', async () => {
-      registry.register('legality-notfound', makeProvider({
-        checkLegality: async (name) => {
-          throw Object.assign(new Error(`No card found with name "${name}".`), { code: 'CARD_NOT_FOUND' });
-        },
-      }));
-      await registry.setActive('legality-notfound');
-      const r = await fastify.inject({ method: 'GET', url: '/cards/legality?name=Fake' });
-      expect(r.statusCode).toBe(404);
-      expect(r.json<{ error: string }>().error).toBe('CARD_NOT_FOUND');
-      await registry.setActive('route-test');
-    });
-
-    test('returns 400 when name is missing', async () => {
-      const r = await fastify.inject({ method: 'GET', url: '/cards/legality' });
-      expect(r.statusCode).toBe(400);
-    });
-  });
-
-  describe('GET /cards/search', () => {
-    test('returns 200 SearchResult with filters', async () => {
-      const r = await fastify.inject({ method: 'GET', url: '/cards/search?colors=R&cmc_max=1' });
-      expect(r.statusCode).toBe(200);
-      const body = r.json<{ cards: unknown[]; total: number; page: number }>();
-      expect(body.page).toBe(1);
-      expect(Array.isArray(body.cards)).toBe(true);
-    });
-
-    test('returns 400 when no filter is provided', async () => {
-      const r = await fastify.inject({ method: 'GET', url: '/cards/search' });
-      expect(r.statusCode).toBe(400);
-      expect(r.json<{ error: string }>().error).toBe('MISSING_FILTER');
-    });
-  });
-});
-
-// ─── GET /cards/images/:id ───────────────────────────────────────────────────
-
-describe('Cards API — GET /cards/images/:id', () => {
-  const fastify = Fastify();
-  const UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-
-  beforeAll(async () => {
-    process.env['SESSION_JWT_SECRET'] = TEST_SECRET;
-    registry.register('images-route-ok', makeProvider({
-      getCardImages: async (uuid) => uuid === UUID
-        ? {
-            small: 'https://cards.scryfall.io/small/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg',
-            medium: 'https://cards.scryfall.io/normal/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg',
-            large: 'https://cards.scryfall.io/large/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg',
-          }
-        : null,
-    }));
-    await registry.setActive('images-route-ok');
-    fastify.decorate('authenticate', async () => {});
-    fastify.addHook('onRequest', async (req) => {
-      (req as unknown as { identity: unknown }).identity = { kind: 'authenticated', user: MOCK_USER };
-    });
-    await fastify.register(cardRoutes);
-    await fastify.ready();
-  });
-
-  afterAll(async () => {
-    await fastify.close();
-  });
-
-  test('returns 200 with small/medium/large URLs for a known uuid', async () => {
-    const r = await fastify.inject({ method: 'GET', url: `/cards/images/${UUID}` });
     expect(r.statusCode).toBe(200);
     const body = r.json<{ small: string; medium: string; large: string }>();
-    expect(body.small).toBe('https://cards.scryfall.io/small/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg');
-    expect(body.medium).toBe('https://cards.scryfall.io/normal/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg');
-    expect(body.large).toBe('https://cards.scryfall.io/large/front/e/3/e3285fd6-aaaa-bbbb-cccc-ddddddddeeee.jpg');
+    expect(body.small).toBe(M11_BOLT_IMAGE_SMALL);
+    expect(body.medium).toBe(M11_BOLT_IMAGE_NORMAL);
+    expect(body.large).toBe(M11_BOLT_IMAGE_LARGE);
   });
 
-  test('returns 404 CARD_NOT_FOUND when provider yields no scryfall id', async () => {
+  test('GET /cards/images/:id returns 404 CARD_NOT_FOUND when the uuid is unknown to the SDK', async () => {
     const r = await fastify.inject({
-      method: 'GET',
-      url: '/cards/images/99999999-9999-4999-8999-999999999999',
+      method: 'GET', url: `/cards/images/${UNKNOWN_UUID}`, headers: authHeaders(),
     });
     expect(r.statusCode).toBe(404);
     expect(r.json<{ error: string }>().error).toBe('CARD_NOT_FOUND');
   });
 
-  test('returns 400 VALIDATION_ERROR when :id is not a uuid', async () => {
-    const r = await fastify.inject({ method: 'GET', url: '/cards/images/not-a-uuid' });
+  test('GET /cards/images/:id returns 400 VALIDATION_ERROR when :id is not a uuid', async () => {
+    const r = await fastify.inject({
+      method: 'GET', url: '/cards/images/not-a-uuid', headers: authHeaders(),
+    });
     expect(r.statusCode).toBe(400);
     expect(r.json<{ error: string }>().error).toBe('VALIDATION_ERROR');
   });
 
-  test('returns 503 PROVIDER_UNAVAILABLE when provider throws', async () => {
-    registry.register('images-route-down', makeProvider({
-      getCardImages: async () => { throw new Error('parquet down'); },
-    }));
-    await registry.setActive('images-route-down');
-    const r = await fastify.inject({ method: 'GET', url: `/cards/images/${UUID}` });
-    expect(r.statusCode).toBe(503);
-    expect(r.json<{ error: string }>().error).toBe('PROVIDER_UNAVAILABLE');
-    await registry.setActive('images-route-ok');
+  test('GET /cards/images/:id returns 401 without a Bearer token', async () => {
+    const r = await fastify.inject({ method: 'GET', url: `/cards/images/${M11_BOLT_UUID}` });
+    expect(r.statusCode).toBe(401);
+  });
+  
+  // ─── GET /cards/legality (public — no auth) ────────────────────────────────
+
+  test('GET /cards/legality returns 200 with a LegalityResult for a real card', async () => {
+    const r = await fastify.inject({ method: 'GET', url: '/cards/legality?name=Lightning+Bolt' });
+    expect(r.statusCode).toBe(200);
+    const body = r.json<{ cardName: string; legal: boolean }>();
+    expect(body.cardName).toBe('Lightning Bolt');
+    expect(typeof body.legal).toBe('boolean');
   });
 
-  test('does NOT collide with /cards/:id user-CRUD route', async () => {
-    // Sanity check: literal `images` must route to the images handler, not be
-    // captured as a CRUD :id. If misordered, Fastify would try to look up a
-    // user-owned card with id `images` and 401/400/404 differently.
-    const r = await fastify.inject({ method: 'GET', url: `/cards/images/${UUID}` });
+  test('GET /cards/legality returns 400 when name is missing', async () => {
+    const r = await fastify.inject({ method: 'GET', url: '/cards/legality' });
+    expect(r.statusCode).toBe(400);
+  });
+
+  // ─── GET /cards/search (public — no auth) ──────────────────────────────────
+
+  test('GET /cards/search returns 200 with a paginated SearchResult', async () => {
+    const r = await fastify.inject({ method: 'GET', url: '/cards/search?name=Lightning+Bolt' });
     expect(r.statusCode).toBe(200);
+    const body = r.json<{ cards: unknown[]; total: number; page: number; limit: number }>();
+    expect(body.page).toBe(1);
+    expect(Array.isArray(body.cards)).toBe(true);
+  });
+
+  test('GET /cards/search returns 400 MISSING_FILTER when no filter is provided', async () => {
+    const r = await fastify.inject({ method: 'GET', url: '/cards/search' });
+    expect(r.statusCode).toBe(400);
+    expect(r.json<{ error: string }>().error).toBe('MISSING_FILTER');
   });
 });

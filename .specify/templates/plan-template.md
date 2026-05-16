@@ -136,6 +136,33 @@ co-location rule). E2E tests, if any, live under `tests/e2e/`.
 > the same PR. Per-test mocks via in-file `jest.mock(...)` are prohibited; use
 > `jest.spyOn` against the shared mock instead. See the **Mobile mocking conventions**
 > sub-section of Principle III.
+>
+> **Server route tests (`apps/server` only):** Fastify route tests under
+> `apps/server/src/routes/**/*.test.ts` are end-to-end tests of the full request
+> pipeline. They MUST NOT mock services (`@src/services/*`) or repositories
+> (`@src/db/repositories`, `@src/repositories/*`). Any route that reads or writes
+> the database MUST initialise the real TypeORM `DataSource` via
+> `initDataSource(...)` in `beforeAll` and tear it down with
+> `getDataSource().destroy()` in `afterAll`. Any route that resolves cards MUST
+> create the MTGJSON SDK in offline mode via
+> `MtgjsonSDK.create({ cacheDir, offline: true })`, register the resulting
+> `MtgjsonProvider` in `providerRegistry`, and call `providerRegistry.setActive('mtgjson')`
+> before the first test runs (with `sdk.close()` in `afterAll`). Service-level and
+> repository-level coverage belongs in the co-located unit tests next to the file
+> under test, not in the route tests. See the **Server route test conventions**
+> sub-section of Principle III.
+>
+> **Server route test data factories (`apps/server` only):** every entity a route
+> test seeds into the database MUST go through a named factory exported from
+> `apps/server/testing/<entity>Factory.ts` (e.g.,
+> `createTestUser(dataSource, overrides?)`), per rule #5 of the **Server route
+> test conventions** sub-section of Principle III. Inline
+> `dataSource.getRepository(...).save(...) / .upsert(...)` calls, raw `INSERT`
+> SQL, and one-off seed helpers inside a test file are prohibited. If this
+> feature introduces a new entity, or a route test in this feature needs an
+> entity for which no factory exists, this plan MUST list the factory file as
+> an explicit task **before** any task that depends on the seed. Capture the
+> factory work in the table below alongside the test file that consumes it.
 
 | Test file | Status | Behaviours covered (mapped to FR-### where applicable) |
 |---|---|---|

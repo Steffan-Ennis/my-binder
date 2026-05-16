@@ -1,32 +1,18 @@
 import Fastify from 'fastify';
 import fastifyCookie from '@fastify/cookie';
+import type { DataSource } from 'typeorm';
+
+import { connectTestDatabase, disconnectTestDatabase } from '@root/testing/testDatabase';
+import { aUser } from '@root/testing/userEntityBuilder';
 import authPlugin from '@src/auth/authPlugin';
 import { issueToken } from '@src/auth/sessionJwt';
 import { docsPlugin } from './docs';
 
 const TEST_SECRET = 'a-test-secret-that-is-at-least-32-characters-long!!';
-const TEST_USER_ID = 'docs-test-user-uuid';
-
-// Mock repositories so auth plugin can resolve the user from a JWT
-jest.mock('@src/db/repositories', () => ({
-  getRepositories: () => ({
-    user: {
-      findUserById: async (id: string) => (id === 'docs-test-user-uuid' ? { id: 'docs-test-user-uuid', email: 'docs@gmail.com', displayName: 'Docs User', avatarUrl: null } : null),
-      upsertUser: async () => ({ id: 'docs-test-user-uuid', email: 'docs@gmail.com', displayName: 'Docs User', avatarUrl: null }),
-    },
-  }),
-}));
-
-async function buildApp() {
-  const fastify = Fastify();
-  await fastify.register(fastifyCookie);
-  await fastify.register(authPlugin);
-  await fastify.register(docsPlugin);
-  return fastify;
-}
 
 describe('Docs API', () => {
-  let fastify: Awaited<ReturnType<typeof buildApp>>;
+  const fastify = Fastify();
+  let dataSource: DataSource;
   let authToken: string;
 
   beforeAll(async () => {
@@ -34,121 +20,89 @@ describe('Docs API', () => {
     process.env['GOOGLE_CLIENT_IDS'] = 'test-client-id';
     process.env['GOOGLE_WEB_CLIENT_ID'] = 'test-web-client-id.apps.googleusercontent.com';
 
-    fastify = await buildApp();
-    await fastify.ready();
+    dataSource = await connectTestDatabase();
+    const user = await aUser()
+      .withEmail('docs@gmail.com')
+      .withDisplayName('Docs User')
+      .persist(dataSource);
+    authToken = issueToken(user.id, TEST_SECRET);
 
-    authToken = issueToken(TEST_USER_ID, TEST_SECRET);
+    await fastify.register(fastifyCookie);
+    await fastify.register(authPlugin);
+    await fastify.register(docsPlugin);
+    await fastify.ready();
   });
 
   afterAll(async () => {
     await fastify.close();
+    await disconnectTestDatabase();
   });
 
-  // ─── Authenticated access ───────────────────────────────────────────────────
-
-  describe('GET /docs (authenticated)', () => {
-    test('returns 200 or 302 with Bearer token', async () => {
-      const response = await fastify.inject({
-        method: 'GET',
-        url: '/docs',
-        headers: { authorization: `Bearer ${authToken}` },
-      });
-      expect(
-        response.statusCode === 200 || response.statusCode === 302,
-      ).toBe(true);
+  test('GET /docs returns 200 or 302 with a Bearer token', async () => {
+    const r = await fastify.inject({
+      method: 'GET', url: '/docs', headers: { authorization: `Bearer ${authToken}` },
     });
-
-    test('returns 200 or 302 with session cookie', async () => {
-      const response = await fastify.inject({
-        method: 'GET',
-        url: '/docs',
-        headers: { cookie: `session=${authToken}` },
-      });
-      expect(
-        response.statusCode === 200 || response.statusCode === 302,
-      ).toBe(true);
-    });
+    expect(r.statusCode === 200 || r.statusCode === 302).toBe(true);
   });
 
-  describe('GET /docs/json (authenticated)', () => {
-    test('returns 200 with OpenAPI object', async () => {
-      const response = await fastify.inject({
-        method: 'GET',
-        url: '/docs/json',
-        headers: { authorization: `Bearer ${authToken}` },
-      });
-      expect(response.statusCode).toBe(200);
+  test('GET /docs returns 200 or 302 with a session cookie', async () => {
+    const r = await fastify.inject({
+      method: 'GET', url: '/docs', headers: { cookie: `session=${authToken}` },
     });
-
-    test('OpenAPI object has info.title === "my-binder API"', async () => {
-      const response = await fastify.inject({
-        method: 'GET',
-        url: '/docs/json',
-        headers: { authorization: `Bearer ${authToken}` },
-      });
-      const body = response.json<{ info: { title: string } }>();
-      expect(body.info.title).toBe('my-binder API');
-    });
+    expect(r.statusCode === 200 || r.statusCode === 302).toBe(true);
   });
 
-  // ─── Unauthenticated gate ───────────────────────────────────────────────────
-
-  describe('GET /docs/json (unauthenticated)', () => {
-    test('returns 401 with UNAUTHORIZED code when no credentials', async () => {
-      const response = await fastify.inject({ method: 'GET', url: '/docs/json' });
-      expect(response.statusCode).toBe(401);
-      const body = response.json<{ code: string }>();
-      expect(body.code).toBe('UNAUTHORIZED');
+  test('GET /docs/json returns 200 with the OpenAPI object for an authenticated request', async () => {
+    const r = await fastify.inject({
+      method: 'GET', url: '/docs/json', headers: { authorization: `Bearer ${authToken}` },
     });
+    expect(r.statusCode).toBe(200);
   });
 
-  describe('GET /docs (unauthenticated browser)', () => {
-    test('redirects to /auth/login when Accept: text/html and no credentials', async () => {
-      const response = await fastify.inject({
-        method: 'GET',
-        url: '/docs',
-        headers: { accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
-      });
-      expect(response.statusCode).toBe(302);
-      expect(response.headers['location']).toBe('/auth/login');
+  test('GET /docs/json reports info.title as "my-binder API"', async () => {
+    const r = await fastify.inject({
+      method: 'GET', url: '/docs/json', headers: { authorization: `Bearer ${authToken}` },
     });
+    expect(r.json<{ info: { title: string } }>().info.title).toBe('my-binder API');
   });
 
-  describe('GET /docs/yaml (unauthenticated)', () => {
-    test('returns 401 when no credentials', async () => {
-      const response = await fastify.inject({ method: 'GET', url: '/docs/yaml' });
-      expect(response.statusCode).toBe(401);
+  test('GET /docs/json exposes the bearerAuth security scheme', async () => {
+    const r = await fastify.inject({
+      method: 'GET', url: '/docs/json', headers: { authorization: `Bearer ${authToken}` },
     });
+    const body = r.json<{
+      components: { securitySchemes: { bearerAuth: { type: string; scheme: string } } };
+    }>();
+    expect(body.components.securitySchemes.bearerAuth.type).toBe('http');
+    expect(body.components.securitySchemes.bearerAuth.scheme).toBe('bearer');
   });
 
-  // ─── bearerAuth security scheme ─────────────────────────────────────────────
-
-  describe('GET /docs/json — security scheme (authenticated)', () => {
-    test('response contains components.securitySchemes.bearerAuth', async () => {
-      const response = await fastify.inject({
-        method: 'GET',
-        url: '/docs/json',
-        headers: { authorization: `Bearer ${authToken}` },
-      });
-      const body = response.json<{
-        components: { securitySchemes: { bearerAuth: { type: string; scheme: string } } };
-        security: Array<Record<string, unknown>>;
-      }>();
-      expect(body.components.securitySchemes.bearerAuth.type).toBe('http');
-      expect(body.components.securitySchemes.bearerAuth.scheme).toBe('bearer');
+  test('GET /docs/json includes top-level security: [{ bearerAuth: [] }]', async () => {
+    const r = await fastify.inject({
+      method: 'GET', url: '/docs/json', headers: { authorization: `Bearer ${authToken}` },
     });
+    const body = r.json<{ security: Array<Record<string, unknown>> }>();
+    expect(Array.isArray(body.security)).toBe(true);
+    expect(body.security.some((s) => 'bearerAuth' in s)).toBe(true);
+  });
 
-    test('response contains top-level security: [{ bearerAuth: [] }]', async () => {
-      const response = await fastify.inject({
-        method: 'GET',
-        url: '/docs/json',
-        headers: { authorization: `Bearer ${authToken}` },
-      });
-      const body = response.json<{ security: Array<Record<string, unknown>> }>();
-      expect(Array.isArray(body.security)).toBe(true);
-      expect(
-        body.security.some((s) => 'bearerAuth' in s),
-      ).toBe(true);
+  test('GET /docs/json returns 401 UNAUTHORIZED when no credentials are supplied', async () => {
+    const r = await fastify.inject({ method: 'GET', url: '/docs/json' });
+    expect(r.statusCode).toBe(401);
+    expect(r.json<{ code: string }>().code).toBe('UNAUTHORIZED');
+  });
+
+  test('GET /docs redirects to /auth/login when Accept: text/html and no credentials', async () => {
+    const r = await fastify.inject({
+      method: 'GET', url: '/docs',
+      headers: { accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
     });
+    expect(r.statusCode).toBe(302);
+    expect(r.headers['location']).toBe('/auth/login');
+  });
+
+  test('GET /docs/yaml returns 401 when no credentials are supplied', async () => {
+    const r = await fastify.inject({ method: 'GET', url: '/docs/yaml' });
+    expect(r.statusCode).toBe(401);
   });
 });

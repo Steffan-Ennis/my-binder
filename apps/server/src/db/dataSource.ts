@@ -4,10 +4,11 @@ import { UserEntity } from '@src/entities/UserEntity';
 import { CardEntity } from '@src/entities/CardEntity';
 import { AllowedUserEntity } from '@src/entities/AllowedUserEntity';
 
+export const entities = [UserEntity, CardEntity, AllowedUserEntity]
 
 const dataSource = new DataSource({
   type: 'postgres',
-  entities: [UserEntity, CardEntity, AllowedUserEntity],
+  entities,
   migrations: [__dirname + '/migrations/*.ts'],
   migrationsRun: false,
   synchronize: false,

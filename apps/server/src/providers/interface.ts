@@ -1,4 +1,4 @@
-import type { CardDetails, CardImages, CardRecord, CardNotFoundResult, LegalityResult, SearchQuery } from '@my-binder/core';
+import type { CardDetails, CardImages, CardRecord, LegalityResult, SearchQuery } from '@my-binder/core';
 
 // The contract every card data provider must satisfy.
 // Add a new provider by implementing this type and registering it in the registry.
@@ -9,7 +9,6 @@ export type LookupOptions = {
 };
 
 export type CardProvider = {
-  lookup(name: string, opts?: LookupOptions): Promise<CardRecord[] | CardNotFoundResult>;
   checkLegality(name: string, commanderColors?: string[]): Promise<LegalityResult>;
   search(query: SearchQuery): Promise<CardRecord[]>;
   // Resolve a single printing by its MTGJSON UUID. Returns null when the UUID

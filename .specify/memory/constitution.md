@@ -1,6 +1,174 @@
 <!--
 SYNC IMPACT REPORT
 ==================
+Version change: 1.22.0 → 1.23.0
+Bump type: MINOR — extends the "Server route test conventions" sub-
+  section of Principle III (Test-First Development) with a new rule
+  requiring that every entity seeded by a route test be inserted
+  through a named factory function exported from
+  `apps/server/testing/<entity>Factory.ts`. The rule strengthens the
+  existing "Per-test isolation via real data, not mocks" rule by
+  specifying *how* that real data must be constructed:
+
+    - Inline `dataSource.getRepository(...).save(...)` calls inside a
+      route test file are prohibited.
+    - Raw `INSERT` SQL inside a route test file is prohibited.
+    - One-off seed helpers declared at the top of a test file are
+      prohibited.
+    - Every required entity MUST go through a factory under
+      `apps/server/testing/` accepting a `Partial<Overrides>` argument,
+      returning the persisted entity, defaulting every unspecified
+      field to a deterministic value, and writing through the
+      production repository or `dataSource.getRepository(...)`.
+    - If a needed factory does not yet exist, the feature plan MUST
+      include a task to create it before any task that depends on the
+      seed. Skipping the factory because "we'll extract it later" is a
+      constitution breach.
+
+  The trigger was the consolidation of the server test-database setup
+  into `apps/server/testing/testDatabase.ts` during the spec 016
+  binder-home cleanup, which surfaced a parallel gap: `cards.test.ts`
+  and `auth.test.ts` still seeded users and allowed-users via inline
+  `dataSource.getRepository(UserEntity).upsert(...)` calls, drifting
+  schema defaults across files. Codifying the factory convention turns
+  the inline pattern into a constitution breach catchable by review
+  and aligns server-side route tests with the offline-mode SDK and
+  shared `connectTestDatabase()` helpers that already live next to
+  them in the `testing/` directory.
+
+  The new rule lands as rule #5 of the "Server route test
+  conventions" sub-section, immediately after "Per-test isolation via
+  real data, not mocks" (rule #4) and before what was previously rule
+  #5 ("Unit tests for services and repositories live separately"),
+  which is renumbered to #6. No principle is removed or redefined; no
+  version-pin language is altered. The rule applies only to
+  `apps/server`; `apps/mobile` and `packages/core` are unaffected.
+
+Last amended: 2026-05-16
+
+Added principles:
+  (none — Principle III expanded, not added)
+
+Modified sections:
+  - Principle III. Test-First Development — added rule #5 "Test data
+    MUST be seeded via factories in `apps/server/testing/`" to the
+    "Server route test conventions" sub-section; renumbered the prior
+    rule #5 ("Unit tests for services and repositories live
+    separately") to #6.
+
+Removed sections:
+  (none)
+
+Templates reviewed:
+  ✅ .specify/templates/plan-template.md  — Unit Testing Phase
+     "Server route tests" callout amended to require that every
+     persisted entity used by a route test be seeded through a
+     factory under `apps/server/testing/`, and that any missing
+     factory be listed as an explicit plan task before the test that
+     consumes it.
+  ✅ .specify/templates/spec-template.md  — No change required (specs
+     are technology-agnostic).
+  ✅ .specify/templates/tasks-template.md — No change required (the
+     factory requirement surfaces as ordinary plan tasks; tasks
+     categorisation is unchanged).
+  ⚠ apps/server/src/routes/cards.test.ts — currently seeds the test
+     user inline via `dataSource.getRepository(UserEntity).upsert(...)`
+     in `beforeAll`. Violates the new rule #5. Carried forward as a
+     deferred TODO: extract the seed into
+     `apps/server/testing/userFactory.ts` exporting
+     `createTestUser(dataSource, overrides)` and consume it from the
+     test.
+  ⚠ apps/server/src/routes/auth.test.ts — currently seeds the
+     allowlist row and the test user inline via
+     `dataSource.getRepository(AllowedUserEntity).save({ email })`
+     and `dataSource.getRepository(UserEntity).upsert(...)`. Violates
+     the new rule #5. Carried forward as a deferred TODO: extract
+     into `apps/server/testing/allowedUserFactory.ts` exporting
+     `createTestAllowedUser(dataSource, overrides)`, reuse
+     `createTestUser` from the user factory, and consume both from
+     the test.
+
+Carry-over from 1.22.0 (unchanged):
+  ⚠ apps/server/src/routes/docs.test.ts — still uses `jest.mock(...)`
+     against modules under `apps/server/src/services/` and
+     `apps/server/src/db/`. Violates the Server route test
+     conventions sub-section's rules #1-#4 (no service/repository
+     mocks; real DataSource; offline-mode SDK; real-data isolation).
+     MUST be rewritten as an E2E test against the real services, real
+     repositories, the real TypeORM `DataSource`, and the offline-mode
+     MTGJSON SDK, AND its data setup MUST go through the new
+     factories per rule #5.
+
+Carry-over from 1.22.0 (unchanged):
+  ⚠ apps/server/src/routes/docs.test.ts (and the broader auth.test.ts /
+     cards.test.ts rewrite tracked separately): the 1.22.0 directive to
+     drop service/repository mocks and run route tests against the real
+     pipeline remains in force. `cards.test.ts` and `auth.test.ts` are
+     now real-DataSource tests; `docs.test.ts` still violates rules
+     #1-#4 and must be rewritten.
+
+Carry-over from 1.21.0 (unchanged):
+  ⚠ CLAUDE.md — Stale references to `binderStore` remain at line 50
+     (folder structure tree) and line 200 (Active Technologies list).
+     The store has been deleted; CLAUDE.md MUST be updated to remove
+     the `binderStore` mentions and to note that `currentPage` plus
+     search state now live in `useBinderHome.ts`.
+
+Carry-over from 1.20.0 (unchanged):
+  ⚠ apps/mobile theme files — the Style co-location rule landed in
+     v1.20.0 with `BinderHomeView.theme.ts` as the canonical
+     reference. Other view components (LoginView, AccessDeniedView,
+     ComingSoonView) MUST migrate inline `StyleSheet.create` blocks
+     into sibling `<Component>.theme.ts` files in a follow-up pass.
+
+Carry-over from 1.19.0 (unchanged):
+  ⚠ apps/mobile/src/services/auth/googleAuth.ts — uses
+     `expo-auth-session/providers/google`, which the Expo docs flag as
+     deprecated. Migration is tracked in
+     `todo/migrate-google-auth-to-google-signin.md`. Per Principle XI,
+     either the migration completes or the deprecated dependency MUST be
+     justified in the spec 002 Complexity Tracking table.
+
+Carry-over from 1.17.0 (unchanged):
+  ⚠ apps/mobile/package-lock.json — npm lockfile from the create-expo-app
+     bootstrap. MUST be deleted and the workspace re-resolved via
+     `pnpm install` before merge.
+  ⚠ apps/mobile/tsconfig.json — currently declares `paths: { "@/*": ["./*"] }`;
+     Principle VII requires `@root/*` and `@src/*` aliases.
+  ⚠ apps/mobile/hooks/{use-color-scheme.ts,use-color-scheme.web.ts,
+     use-theme-color.ts}, apps/mobile/scripts/reset-project.js,
+     apps/mobile/app/modal.tsx — leftover create-expo-app template files
+     outside the Principle X four-layer structure.
+
+Carry-over from 1.14.0 (unchanged):
+  ⚠ specs/001-server-architecture/plan.md — JSDoc → TypeScript migration.
+  ⚠ specs/004-card-data-provider/plan.md — JSDoc → TypeScript migration.
+
+Deferred TODOs:
+  - Create `apps/server/testing/userFactory.ts` exporting
+    `createTestUser(dataSource, overrides)` and refactor
+    `apps/server/src/routes/cards.test.ts` and
+    `apps/server/src/routes/auth.test.ts` to seed via it instead of
+    inline `dataSource.getRepository(UserEntity).upsert(...)`.
+  - Create `apps/server/testing/allowedUserFactory.ts` exporting
+    `createTestAllowedUser(dataSource, overrides)` and refactor
+    `apps/server/src/routes/auth.test.ts` to seed the allowlist via
+    it instead of inline `dataSource.getRepository(AllowedUserEntity).save(...)`.
+  - Rewrite `apps/server/src/routes/docs.test.ts` to comply with the
+    Server route test conventions sub-section (rules #1-#5): drop
+    `jest.mock(...)` against `@src/services/*` / `@src/db/repositories`
+    / `@src/auth/*`, initialise the real `DataSource` via
+    `connectTestDatabase()`, register the offline-mode MTGJSON SDK as
+    the active provider, seed any required entities via the new
+    factories, and clean up in `afterAll`.
+  - Update CLAUDE.md to remove `binderStore` references at lines 50
+    and 200, reflecting that `currentPage` plus search state now live
+    in `useBinderHome.ts` per the State locality rule introduced in
+    v1.21.0.
+-->
+
+<!-- PREVIOUS SYNC IMPACT REPORT (v1.20.0 → v1.21.0) follows for archival reference.
+==================
 Version change: 1.20.0 → 1.21.0
 Bump type: MINOR — lands the previously-deferred "State locality rule"
   sub-section in the body of Principle X (Component Architecture —
@@ -295,6 +463,257 @@ contract so a renamed method or changed signature is caught at `tsc` time. Forbi
 in-file `jest.mock(...)` keeps the global mock surface auditable from a single file —
 when a future engineer asks "what does Jest think `expo-secure-store` is?" the answer
 is always "look at `jest.setup.ts`," never "grep every `*.test.ts`."
+
+**Server route test conventions** (`apps/server/src/routes/**/*.test.ts`). Fastify
+route tests are **end-to-end tests** of the full request pipeline. Each route test
+MUST exercise the inbound parser, the route handler, the service layer, the
+repository layer, and the real database (or the real MTGJSON SDK in offline mode)
+exactly as production does. Mocking the layers below the handler defeats the purpose
+of the test — a route test that mocks `cardService` or `cardRepository` proves only
+that the handler calls the function it was wired to, not that the request actually
+flows end-to-end against the real schema and the real provider data. The following
+rules are non-negotiable.
+
+1. **No mocking of services or repositories.** A route test under
+   `apps/server/src/routes/**/*.test.ts` MUST NOT call `jest.mock(...)` against any
+   module under `apps/server/src/services/`,
+   `apps/server/src/repositories/`, or `apps/server/src/db/repositories.ts`, and
+   MUST NOT use `jest.spyOn` to replace the behaviour of any function exported from
+   those modules. The service and repository implementations the route would call in
+   production MUST execute in the test exactly as they execute in production.
+   `jest.spyOn` is permitted only as a passive call-shape observer (no
+   `mockImplementation` / `mockResolvedValue` / `mockRejectedValue`) and only on
+   modules outside the services/repositories tree.
+
+2. **Database initialisation is mandatory** for any route whose handler chain reads
+   or writes the database. Each affected test file MUST initialise the real TypeORM
+   `DataSource` via `initDataSource(...)` in a `beforeAll` hook pointing at the test
+   Postgres instance and MUST tear it down in `afterAll` via `getDataSource().destroy()`.
+   Tests MUST NOT skip initialisation, swap in an in-memory shim, or stub the
+   `DataSource` instance. A handler that throws `"DataSource not initialised. Call
+   initDataSource() first."` at test time is a missing `beforeAll`, never a signal
+   to mock the data source.
+
+3. **MTGJSON SDK in offline mode is mandatory** for any route whose handler chain
+   resolves cards. Each affected test file MUST create the SDK with
+   `MtgjsonSDK.create({ cacheDir, offline: true })` against
+   `apps/server/data/mtgjson-cache` in `beforeAll`, wrap the SDK in
+   `MtgjsonProvider`, register the provider in the shared `ProviderRegistry`, and
+   call `registry.setActive('mtgjson')` before any test runs. `afterAll` MUST call
+   `sdk.close()`. Tests MUST NOT mock the SDK, the `MtgjsonProvider`, or the
+   `ProviderRegistry`, and MUST NOT register a fabricated provider in place of the
+   real one.
+
+4. **Per-test isolation via real data, not mocks.** Tests that need a specific
+   database state MUST arrange that state by writing rows through the production
+   repositories (or by running fixture seeds) and MUST clean up in `afterEach` or
+   `afterAll` with explicit deletes — never by deleting the database file or by
+   resetting global mocks. Tests that need a specific provider response MUST choose
+   fixtures from the offline MTGJSON cache that produce the desired output (e.g.,
+   the canonical M11 Lightning Bolt at UUID `6ca7af0b-4b6a-59ba-90be-6da4f62bcff1`
+   used by `MtgjsonProvider.test.ts`); they MUST NOT swap in fabricated data via a
+   mocked provider method.
+
+5. **Test data MUST be seeded via factories in `apps/server/testing/`.** Every
+   entity a route test needs to exist in the database — `UserEntity`,
+   `AllowedUserEntity`, `CardEntity`, anything declared under
+   `apps/server/src/entities/` — MUST be inserted through a named factory function
+   exported from a sibling file under `apps/server/testing/`. The convention is
+   `<entity>Factory.ts` exporting `createTest<Entity>(dataSource, overrides?)`
+   (e.g., `apps/server/testing/userFactory.ts` exporting
+   `createTestUser(dataSource, overrides?)`). Inline
+   `dataSource.getRepository(...).save(...)` / `.upsert(...)` calls, raw `INSERT`
+   SQL, and one-off seed helpers declared at the top of a test file are
+   prohibited. Each factory MUST:
+
+   - **Accept a typed overrides argument** of the shape
+     `Partial<Pick<<Entity>, ...assignable-keys>>` so tests can pin only the
+     fields they assert on.
+   - **Return the persisted entity** typed as the production TypeORM entity so
+     test assertions and refactors stay schema-aligned (a column rename surfaces
+     as a `tsc` error inside the factory and every consumer at once).
+   - **Default every unspecified field to a deterministic value.** No
+     `Math.random()`, no `Date.now()`, no `crypto.randomUUID()` — defaults are
+     hard-coded constants. Tests requiring uniqueness MUST pass an override.
+   - **Persist through the production repository or
+     `dataSource.getRepository(<Entity>).save(...) / .upsert(...)`.** The factory
+     is the seam that hides persistence from the test, not a parallel persistence
+     layer; it MUST NOT execute raw SQL or bypass entity validation.
+
+   If a route test needs an entity for which no factory exists yet, the feature
+   plan MUST include a task to create the factory **before** any task that
+   depends on the seed. Skipping the factory and seeding inline because "we'll
+   extract it later" is a constitution breach against this rule.
+
+   The compliant pattern (canonical reference: the `apps/server/testing/`
+   directory that already houses `testDatabase.ts`):
+
+   ```ts
+   // apps/server/testing/userFactory.ts
+   import type { DataSource } from 'typeorm';
+   import { UserEntity } from '@src/entities/UserEntity';
+
+   export type TestUserOverrides = Partial<
+     Pick<UserEntity, 'id' | 'email' | 'displayName' | 'avatarUrl'>
+   >;
+
+   const DEFAULTS = {
+     id: 'a1b2c3d4-e5f6-4789-8abc-def012345678',
+     email: 'test-user@example.com',
+     displayName: 'Test User',
+     avatarUrl: null,
+   } as const satisfies TestUserOverrides;
+
+   export async function createTestUser(
+     dataSource: DataSource,
+     overrides: TestUserOverrides = {},
+   ): Promise<UserEntity> {
+     const row = { ...DEFAULTS, ...overrides };
+     await dataSource.getRepository(UserEntity).upsert(row, ['id']);
+     return row as UserEntity;
+   }
+   ```
+
+   ```ts
+   // apps/server/src/routes/cards.test.ts (excerpt)
+   import { createTestUser } from '@root/testing/userFactory';
+
+   beforeAll(async () => {
+     dataSource = await connectTestDatabase();
+     await createTestUser(dataSource, { id: TEST_USER_ID, email: TEST_USER_EMAIL });
+   });
+   ```
+
+   The prohibited patterns are:
+
+   ```ts
+   // PROHIBITED — inline entity construction in a route test.
+   //              Drifts schema defaults across files; every test author has to
+   //              know every required column; refactors miss test seeds.
+   await dataSource.getRepository(UserEntity).upsert(
+     { id: TEST_USER_ID, email: TEST_USER_EMAIL, displayName: 'Test User' },
+     ['id'],
+   );
+
+   // PROHIBITED — raw SQL seed inside a route test.
+   //              Bypasses entity validation and the type system entirely; a
+   //              schema rename leaves the test silently inserting nothing
+   //              into the renamed column.
+   await dataSource.query(
+     `INSERT INTO "users" (id, email, display_name) VALUES ($1, $2, $3)`,
+     [TEST_USER_ID, TEST_USER_EMAIL, 'Test User'],
+   );
+
+   // PROHIBITED — a one-off seed helper declared at the top of the test file.
+   //              The same helper rewritten three times across three test files
+   //              is exactly the duplication the factory rule exists to prevent.
+   async function seedUser() {
+     await dataSource.getRepository(UserEntity).upsert(
+       { id: TEST_USER_ID, email: TEST_USER_EMAIL, displayName: 'Test User' },
+       ['id'],
+     );
+   }
+   ```
+
+6. **Unit tests for services and repositories live separately.** Service-level and
+   repository-level behaviour is exercised by co-located unit tests next to the
+   file under test (per the test co-location rule above). Those unit tests MAY mock
+   collaborators — including repositories and external providers — as long as the
+   mocking style mirrors the **Mobile mocking conventions** above (single default
+   mock per dependency, typed `jest.spyOn` in `beforeEach` for call-shape
+   assertions). Route tests are not the venue for exhaustive service-path
+   coverage; the unit test for the service is. Route tests prove the wiring, the
+   request validation, the response contract, and the end-to-end behaviour — the
+   layers below run unmodified.
+
+The compliant pattern (canonical reference: the offline-mode SDK setup already
+used by `apps/server/src/providers/mtgjson/MtgjsonProvider.test.ts`):
+
+```ts
+import path from 'node:path';
+import { MtgjsonSDK } from 'mtgjson-sdk';
+import { buildApp } from '@src/app';
+import { initDataSource, getDataSource } from '@src/db/dataSource';
+import { providerRegistry } from '@src/providers/registry';
+import MtgjsonProvider from '@src/providers/mtgjson/MtgjsonProvider';
+
+const CACHE_DIR = path.resolve(__dirname, '../../data/mtgjson-cache');
+
+let sdk: MtgjsonSDK;
+let app: Awaited<ReturnType<typeof buildApp>>;
+
+beforeAll(async () => {
+  await initDataSource(/* test Postgres config */);
+  sdk = await MtgjsonSDK.create({ cacheDir: CACHE_DIR, offline: true });
+  providerRegistry.register('mtgjson', new MtgjsonProvider(sdk));
+  await providerRegistry.setActive('mtgjson');
+  app = await buildApp();
+});
+
+afterAll(async () => {
+  await app.close();
+  await sdk.close();
+  await getDataSource().destroy();
+});
+
+describe('GET /cards', () => {
+  test('returns rows persisted via the real repository', async () => {
+    const response = await app.inject({ method: 'GET', url: '/cards' });
+    expect(response.statusCode).toBe(200);
+    // Assertions read the JSON the real handler + service + repository produced.
+  });
+});
+```
+
+The prohibited patterns are:
+
+```ts
+// PROHIBITED — mocking the service the route depends on.
+//              Reduces the test from E2E to a wiring assertion and
+//              hides every regression in the real service.
+jest.mock('@src/services/cardService', () => ({
+  cardService: { search: jest.fn().mockResolvedValue([]) },
+}));
+
+// PROHIBITED — mocking the repository module.
+//              Skips the database connection entirely; a real schema
+//              drift would never surface here.
+jest.mock('@src/db/repositories', () => ({
+  initRepositories: jest.fn(),
+  cardRepository: { find: jest.fn().mockResolvedValue([]) },
+}));
+
+// PROHIBITED — mocking the MTGJSON SDK or the active provider.
+//              Defeats the rule that the provider runs in offline mode
+//              against the real parquet cache.
+jest.spyOn(MtgjsonProvider.prototype, 'search').mockResolvedValue([]);
+providerRegistry.register('fake', { /* fabricated provider */ } as never);
+await providerRegistry.setActive('fake');
+
+// PROHIBITED — running a route test without `initDataSource`.
+//              Handler code that hits the repository throws
+//              "DataSource not initialised"; the fix is to call
+//              `initDataSource` in beforeAll, not to mock the data source.
+beforeAll(() => {
+  /* no-op — repository will explode at runtime */
+});
+```
+
+Rationale: the value of a route test comes from the layers it exercises, not the
+layers it skips. A route test that mocks `cardService` proves nothing about whether
+the service compiles, whether the repository's SQL is correct, whether the SDK
+returns the shape the service expects, or whether the request body schema agrees
+with what the service consumes. The bugs that route tests need to catch — a renamed
+column, a missing migration, a contract drift between the service return shape and
+the API response schema, a provider method whose signature has changed — only
+surface when the real implementations run. Initialising the real database and the
+offline-mode SDK once in `beforeAll` is fast (the SDK loads from a local parquet
+cache, Postgres is already running for development), produces a deterministic
+environment without external network calls, and keeps route tests as the single
+check that proves the API actually works end-to-end. Putting the real
+implementations behind the routes also enforces the **Phase completion validation
+gate** below at the right layer: a failing E2E catches the bug the unit tests were
+structured to miss.
 
 **Phase completion validation gate**: every phase declared in a feature's
 `tasks.md` (Setup, Foundational, each User Story, and Polish) MUST be validated by
@@ -1369,4 +1788,4 @@ Each feature plan MUST include a Constitution Check (as defined in
 before implementation begins. Violations MUST be justified in the plan's Complexity
 Tracking table.
 
-**Version**: 1.21.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-11
+**Version**: 1.23.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-16

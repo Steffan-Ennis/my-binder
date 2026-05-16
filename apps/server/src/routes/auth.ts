@@ -47,7 +47,7 @@ export async function authRoutes(
     } catch (err) {
       if (err instanceof AccessDeniedError) {
         return reply.code(403).send({
-          error: 'ACCESS_DENIED',
+          code: AUTH_ERROR_CODES.UNAUTHORIZED,
           message: 'This email address is not permitted to sign in.',
         });
       }

@@ -1,2 +1,2 @@
-export { MtgjsonProvider } from './MtgjsonProvider';
-export { mapCardSetToCardRecord } from './mapper';
+export { default as MtgjsonProvider } from './MtgjsonProvider';
+export { default as mapCardSetToCardRecord } from './mapper';

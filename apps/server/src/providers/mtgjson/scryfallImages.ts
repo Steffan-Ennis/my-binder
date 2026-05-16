@@ -27,7 +27,7 @@ const SIZES = { small: 'small', medium: 'normal', large: 'large' } as const;
  * buildScryfallImageUrls(''); // null
  * ```
  */
-export function buildScryfallImageUrls(scryfallId: string): CardImages | null {
+const buildScryfallImageUrls = (scryfallId: string): CardImages | null => {
   if (scryfallId.length < 2) return null;
   const c1 = scryfallId[0];
   const c2 = scryfallId[1];
@@ -39,3 +39,5 @@ export function buildScryfallImageUrls(scryfallId: string): CardImages | null {
     large: url(SIZES.large),
   };
 }
+
+export default buildScryfallImageUrls
