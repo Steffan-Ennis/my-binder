@@ -126,7 +126,6 @@ describe('apiClient.getCards', () => {
           name: 'Lightning Bolt',
           createdAt: '2026-05-01T00:00:00Z',
           updatedAt: '2026-05-01T00:00:00Z',
-          frontFaceImageUrl: 'https://img/1',
         },
       ],
       total: 1,
@@ -144,5 +143,40 @@ describe('apiClient.getCards', () => {
       expect.stringContaining('/cards?cursor=opaque-token'),
       expect.objectContaining({ method: 'GET' }),
     );
+  });
+});
+
+describe('apiClient.getCardImages', () => {
+  const IMAGES = {
+    small: 'https://cards.scryfall.io/small/front/e/7/x.jpg',
+    medium: 'https://cards.scryfall.io/normal/front/e/7/x.jpg',
+    large: 'https://cards.scryfall.io/large/front/e/7/x.jpg',
+  };
+  const ID = '6ca7af0b-4b6a-59ba-90be-6da4f62bcff1';
+
+  it('returns the parsed CardImages on 200', async () => {
+    fetchMock.mockResolvedValue(ok(IMAGES));
+    const result = await apiClient.getCardImages(ID);
+    expect(result).toEqual(IMAGES);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/cards/images/${ID}`),
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
+  it('throws ApiError(CARD_NOT_FOUND) on 404', async () => {
+    fetchMock.mockResolvedValue(err(404, { error: 'CARD_NOT_FOUND', message: 'nope' }));
+    const e = await apiClient.getCardImages(ID).catch((x) => x);
+    expect(e).toBeInstanceOf(ApiError);
+    expect((e as ApiError).kind).toBe('CARD_NOT_FOUND');
+    expect((e as ApiError).status).toBe(404);
+  });
+
+  it('throws ApiError(PROVIDER_UNAVAILABLE) on 503', async () => {
+    fetchMock.mockResolvedValue(err(503, { error: 'PROVIDER_UNAVAILABLE', message: 'down' }));
+    const e = await apiClient.getCardImages(ID).catch((x) => x);
+    expect(e).toBeInstanceOf(ApiError);
+    expect((e as ApiError).kind).toBe('PROVIDER_UNAVAILABLE');
+    expect((e as ApiError).status).toBe(503);
   });
 });

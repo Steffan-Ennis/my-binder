@@ -7,13 +7,13 @@ import { ApiError } from './ApiError';
 const RETRY_DELAYS_MS = [1_000, 2_000, 4_000];
 const MAX_RETRY_DELAY_MS = 30_000;
 
-const computeRetryDelay = (attemptIndex: number): number => {
+export const computeRetryDelay = (attemptIndex: number): number => {
   const exact = RETRY_DELAYS_MS[attemptIndex];
   if (typeof exact === 'number') return exact;
   return Math.min(MAX_RETRY_DELAY_MS, RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1] * 2 ** (attemptIndex - RETRY_DELAYS_MS.length + 1));
 };
 
-const isFourXX = (err: unknown): boolean => {
+export const isFourXX = (err: unknown): boolean => {
   if (!(err instanceof ApiError)) return false;
   if (err.status === null) return false;
   return err.status >= 400 && err.status < 500;

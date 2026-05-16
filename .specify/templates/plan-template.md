@@ -137,6 +137,21 @@ co-location rule). E2E tests, if any, live under `tests/e2e/`.
 > `jest.spyOn` against the shared mock instead. See the **Mobile mocking conventions**
 > sub-section of Principle III.
 >
+> **Mobile view tests (`apps/mobile/src/components/**/*View.test.tsx` only):** every
+> new or updated view test MUST (a) call `render(...)` from
+> `@testing-library/react-native` only inside `it(...)` blocks — never at module
+> scope, inside `describe`, inside `beforeAll` / `beforeEach` / `afterEach`, or
+> inside a top-of-file helper function such as a `renderView({...overrides})`
+> wrapper — and (b) when prop defaults need to be shared across the suite,
+> declare a `<ComponentName>WithDefaults: FC<Partial<<ComponentName>Props>>`
+> component at module scope that spreads a `defaults` object over the
+> production view and accepts overrides as JSX props. Tests render the
+> wrapper directly: `render(<<ComponentName>WithDefaults isLoading />)`.
+> Helper *functions* that wrap `render` are prohibited; the wrapper is a
+> real React component. Canonical reference:
+> `apps/mobile/src/components/binder-home/BinderHomeView.test.tsx`. See the
+> **Mobile view test conventions** sub-section of Principle III.
+>
 > **Server route tests (`apps/server` only):** Fastify route tests under
 > `apps/server/src/routes/**/*.test.ts` are end-to-end tests of the full request
 > pipeline. They MUST NOT mock services (`@src/services/*`) or repositories

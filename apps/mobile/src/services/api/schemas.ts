@@ -10,8 +10,9 @@
 export {
   CARD_RESPONSE_SCHEMA as CARD_SCHEMA,
   CARD_LIST_RESPONSE_SCHEMA,
+  CARD_IMAGES_RESPONSE_SCHEMA,
 } from '@my-binder/core';
-export type { Card, CardList as CardListResponse } from '@my-binder/core';
+export type { Card, CardImages, CardList as CardListResponse } from '@my-binder/core';
 
 export const AUTH_USER_SCHEMA = {
   type: 'object',

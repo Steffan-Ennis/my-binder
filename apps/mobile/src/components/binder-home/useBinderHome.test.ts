@@ -22,7 +22,6 @@ const makeCard = (id: string, name: string, extras: Partial<Card> = {}): Card =>
   name,
   createdAt: '2026-05-01T00:00:00Z',
   updatedAt: '2026-05-01T00:00:00Z',
-  frontFaceImageUrl: `https://img/${id}.png`,
   ...extras,
 });
 

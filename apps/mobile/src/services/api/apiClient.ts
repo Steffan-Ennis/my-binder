@@ -6,9 +6,11 @@ import { useSessionStore } from '@src/stores/sessionStore';
 import { ApiError, type ApiErrorKind } from './ApiError';
 import {
   AUTH_ME_RESPONSE_SCHEMA,
+  CARD_IMAGES_RESPONSE_SCHEMA,
   CARD_LIST_RESPONSE_SCHEMA,
   GOOGLE_SIGN_IN_RESPONSE_SCHEMA,
   type AuthMeResponse,
+  type CardImages,
   type CardListResponse,
   type GoogleSignInResponse,
 } from './schemas';
@@ -28,6 +30,7 @@ const ajv = new Ajv({
 const validateGoogleSignInResponse = ajv.compile(GOOGLE_SIGN_IN_RESPONSE_SCHEMA);
 const validateAuthMeResponse = ajv.compile(AUTH_ME_RESPONSE_SCHEMA);
 const validateCardListResponse = ajv.compile(CARD_LIST_RESPONSE_SCHEMA);
+const validateCardImages = ajv.compile(CARD_IMAGES_RESPONSE_SCHEMA);
 
 const getApiBaseUrl = (): string => {
   const extra = Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined;
@@ -51,11 +54,15 @@ const buildHeaders = (extra: HeadersInit = {}): HeadersInit => {
 };
 
 const mapStatusToKind = (status: number | null, body: unknown): ApiErrorKind => {
-  const code = (body as { error?: { code?: string }; code?: string } | null)?.error?.code
-    ?? (body as { code?: string } | null)?.code;
+  const bodyError = (body as { error?: string | { code?: string } } | null)?.error;
+  const code = typeof bodyError === 'string'
+    ? bodyError
+    : bodyError?.code ?? (body as { code?: string } | null)?.code;
   if (status === 400) return 'VALIDATION_ERROR';
   if (status === 401) return code === 'AUTH_INVALID_GOOGLE_TOKEN' ? 'AUTH_INVALID_GOOGLE_TOKEN' : 'AUTH_INVALID_TOKEN';
   if (status === 403) return 'AUTH_NOT_ALLOWLISTED';
+  if (status === 404 && code === 'CARD_NOT_FOUND') return 'CARD_NOT_FOUND';
+  if (status === 503 && code === 'PROVIDER_UNAVAILABLE') return 'PROVIDER_UNAVAILABLE';
   if (status === null) return 'NETWORK_OFFLINE';
   return 'UNKNOWN';
 };
@@ -198,11 +205,68 @@ export const getCards = async (cursor?: string): Promise<CardListResponse> => {
   return body as CardListResponse;
 };
 
+/**
+ * Fetch the small/medium/large image URLs for a single owned card via
+ * `GET /cards/images/:id`. Consumed by the reusable `<Card />` component
+ * (spec 017) — the image URLs are no longer eager-emitted by `/cards`.
+ *
+ * @param id - MTGJSON printing UUID.
+ * @returns the parsed `CardImages` payload (validated against `CARD_IMAGES_RESPONSE_SCHEMA`).
+ * @throws {ApiError} with `kind: 'CARD_NOT_FOUND'` (404), `'PROVIDER_UNAVAILABLE'` (503),
+ *   `'AUTH_INVALID_TOKEN'` (401), `'VALIDATION_ERROR'` (400), `'NETWORK_OFFLINE'`,
+ *   or `'SCHEMA_MISMATCH'` (502) when the payload fails Ajv validation.
+ *
+ * @example
+ *   const images = await getCardImages('6ca7af0b-4b6a-59ba-90be-6da4f62bcff1');
+ */
+export const getCardImages = async (id: string): Promise<CardImages> => {
+  const url = `${getApiBaseUrl()}/cards/images/${encodeURIComponent(id)}`;
+  let response: Response;
+  try {
+    response = await fetch(url, { method: 'GET', headers: buildHeaders() });
+  } catch (cause) {
+    console.error(`[apiClient] network failure for GET /cards/images/${id}`, cause);
+    throw new ApiError({
+      message: 'Network unavailable',
+      status: null,
+      kind: 'NETWORK_OFFLINE',
+      cause,
+    });
+  }
+
+  if (!response.ok) {
+    const body = await parseJsonSafely(response);
+    console.error(`[apiClient] non-OK response ${response.status} for GET /cards/images/${id}`, body);
+    throw new ApiError({
+      message: `Request failed with status ${response.status}`,
+      status: response.status,
+      kind: mapStatusToKind(response.status, body),
+      cause: body,
+    });
+  }
+
+  const json = await parseJsonSafely(response);
+  if (!validateCardImages(json)) {
+    console.error(
+      `[apiClient] schema validation failed for GET /cards/images/${id}`,
+      validateCardImages.errors,
+    );
+    throw new ApiError({
+      message: 'CardImages payload failed validation',
+      status: 502,
+      kind: 'SCHEMA_MISMATCH',
+      cause: validateCardImages.errors,
+    });
+  }
+  return json as CardImages;
+};
+
 export const apiClient = {
   signInWithGoogle,
   getMe,
   signOut,
   getCards,
+  getCardImages,
 };
 
 export type ApiClient = typeof apiClient;

@@ -114,9 +114,6 @@ describe('cardService — collection functions', () => {
 // ─── MTGJSON-decorated collection reads ───────────────────────────────────────
 
 describe('cardService — getCards/getCard MTGJSON enrichment', () => {
-  const SCRYFALL_BOLT = 'e3285fd6-aaaa-bbbb-cccc-ddddddddeeee';
-  const BOLT_IMAGE = `https://cards.scryfall.io/normal/front/e/3/${SCRYFALL_BOLT}.jpg`;
-
   beforeEach(async () => {
     await aCard().forUser(userA).withId(UUID_BOLT).withName('Lightning Bolt').persist(dataSource);
     await aCard().forUser(userA).withId(UUID_SOL).withName('Sol Ring').persist(dataSource);
@@ -139,10 +136,10 @@ describe('cardService — getCards/getCard MTGJSON enrichment', () => {
     expect(sol.set).toBe('C11');
   });
 
-  test('getCard decorates a single row with setCode, setName, typeLine, and frontFaceImageUrl', async () => {
+  test('getCard decorates a single row with setCode, setName, and typeLine', async () => {
     registry.register('enrich-getcard', makeProvider({
       getByUuid: async (uuid) => uuid === UUID_BOLT
-        ? { uuid, name: 'Lightning Bolt', setCode: 'M11', setName: 'Magic 2011', cardNumber: '149', typeLine: 'Instant', scryfallId: SCRYFALL_BOLT }
+        ? { uuid, name: 'Lightning Bolt', setCode: 'M11', setName: 'Magic 2011', cardNumber: '149', typeLine: 'Instant', scryfallId: null }
         : null,
     }));
     await registry.setActive('enrich-getcard');
@@ -152,19 +149,6 @@ describe('cardService — getCards/getCard MTGJSON enrichment', () => {
     expect(card.setCode).toBe('M11');
     expect(card.setName).toBe('Magic 2011');
     expect(card.typeLine).toBe('Instant');
-    expect(card.frontFaceImageUrl).toBe(BOLT_IMAGE);
-  });
-
-  test('getCard omits frontFaceImageUrl when scryfallId is null', async () => {
-    registry.register('enrich-no-scryfall', makeProvider({
-      getByUuid: async (uuid) => ({ uuid, name: 'Sol Ring', setCode: 'C11', setName: 'Commander 2011', cardNumber: '58', typeLine: 'Artifact', scryfallId: null }),
-    }));
-    await registry.setActive('enrich-no-scryfall');
-
-    const card = await getCard(UUID_SOL, userA.id);
-    expect(card.setCode).toBe('C11');
-    expect(card.setName).toBe('Commander 2011');
-    expect(card.frontFaceImageUrl).toBeUndefined();
   });
 
   test('getCard returns the row unenriched when provider.getByUuid returns null', async () => {
@@ -174,7 +158,6 @@ describe('cardService — getCards/getCard MTGJSON enrichment', () => {
     const card = await getCard(UUID_BOLT, userA.id);
     expect(card.id).toBe(UUID_BOLT);
     expect(card.setCode).toBeUndefined();
-    expect(card.frontFaceImageUrl).toBeUndefined();
   });
 
   test('getCard returns the row unenriched when provider.getByUuid throws', async () => {
@@ -186,7 +169,6 @@ describe('cardService — getCards/getCard MTGJSON enrichment', () => {
     const card = await getCard(UUID_BOLT, userA.id);
     expect(card.id).toBe(UUID_BOLT);
     expect(card.setCode).toBeUndefined();
-    expect(card.frontFaceImageUrl).toBeUndefined();
   });
 });
 

@@ -1,15 +1,33 @@
 import type { Card } from '@my-binder/core';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render } from '@testing-library/react-native';
 import { FC } from 'react';
 
+import { useSessionStore } from '@src/stores/sessionStore';
+
 import BinderHomeView, { type BinderHomeViewProps } from './BinderHomeView';
+
+jest.mock('@src/hooks/useSession', () => {
+  const { useSessionStore: store } = jest.requireActual('@src/stores/sessionStore');
+  return {
+    useSession: () => {
+      const s = store.getState();
+      return { status: s.status, userId: s.userId, email: s.email, jwt: s.jwt };
+    },
+  };
+});
+
+const IMAGES = {
+  small: 'https://example/s.jpg',
+  medium: 'https://example/m.jpg',
+  large: 'https://example/l.jpg',
+};
 
 const makeCard = (id: string, name: string): Card => ({
   id,
   name,
   createdAt: '2026-05-01T00:00:00Z',
   updatedAt: '2026-05-01T00:00:00Z',
-  frontFaceImageUrl: `https://img/${id}.png`,
 });
 
 const defaults: BinderHomeViewProps = {
@@ -32,17 +50,46 @@ const defaults: BinderHomeViewProps = {
   onRetryPress: jest.fn(),
 };
 
+let client: QueryClient;
+
+const seedImages = (cards: ReadonlyArray<Card>) => {
+  for (const c of cards) {
+    client.setQueryData(['cards', 'images', c.id], IMAGES);
+  }
+};
+
 const BinderViewWithDefaults: FC<Partial<BinderHomeViewProps>> = (overrides) => (
-  <BinderHomeView {...defaults} {...overrides} />
+  <QueryClientProvider client={client}>
+    <BinderHomeView {...defaults} {...overrides} />
+  </QueryClientProvider>
 );
+
+beforeEach(() => {
+  useSessionStore.setState({
+    jwt: 'tok',
+    iat: 1,
+    userId: 'u',
+    email: 'e@x.com',
+    status: 'active',
+  });
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+});
+
+afterEach(() => {
+  client.cancelQueries();
+  client.clear();
+  client.unmount();
+});
 
 describe('BinderHomeView — US1 surface', () => {
   it('renders the masthead overline + italic-serif title', () => {
+    seedImages([makeCard('1', 'A')]);
     const screen = render(<BinderViewWithDefaults cards={[makeCard('1', 'A')]} />);
     expect(screen.getByText('MY-BINDER')).toBeTruthy();
   });
 
   it('renders header binder-search and Profile buttons with the expected labels (FR-003 → FR-004)', () => {
+    seedImages([makeCard('1', 'A')]);
     const screen = render(<BinderViewWithDefaults cards={[makeCard('1', 'A')]} />);
     expect(screen.getByLabelText('Search the binder')).toBeTruthy();
     expect(screen.getByLabelText('Open profile')).toBeTruthy();
@@ -50,6 +97,7 @@ describe('BinderHomeView — US1 surface', () => {
 
   it('tapping Profile fires onProfilePress (FR-006)', () => {
     const onProfilePress = jest.fn();
+    seedImages([makeCard('1', 'A')]);
     const screen = render(
       <BinderViewWithDefaults cards={[makeCard('1', 'A')]} onProfilePress={onProfilePress} />,
     );
@@ -59,6 +107,7 @@ describe('BinderHomeView — US1 surface', () => {
 
   it('tapping the binder-search button fires onSearchOpen (FR-005)', () => {
     const onSearchOpen = jest.fn();
+    seedImages([makeCard('1', 'A')]);
     const screen = render(
       <BinderViewWithDefaults cards={[makeCard('1', 'A')]} onSearchOpen={onSearchOpen} />,
     );
@@ -72,6 +121,7 @@ describe('BinderHomeView — US1 surface', () => {
   });
 
   it('renders three ring perforations on the binder page surface (FR-013)', () => {
+    seedImages([makeCard('1', 'A')]);
     const screen = render(<BinderViewWithDefaults cards={[makeCard('1', 'A')]} />);
     expect(screen.getAllByTestId('binder-page-ring').length).toBe(3);
   });
@@ -104,6 +154,7 @@ describe('BinderHomeView — US2 grid + pager', () => {
   const elevenCards = Array.from({ length: 11 }, (_, i) => makeCard(`${i}`, `c${i}`));
 
   it('renders 9 occupied pockets on page 1 of an 11-card collection', () => {
+    seedImages(elevenCards);
     const screen = render(
       <BinderViewWithDefaults
         cards={elevenCards}
@@ -118,6 +169,7 @@ describe('BinderHomeView — US2 grid + pager', () => {
   });
 
   it('renders 2 occupied + 7 empty pockets on page 2 of an 11-card collection (FR-014/15/16/22)', () => {
+    seedImages(elevenCards);
     const screen = render(
       <BinderViewWithDefaults
         cards={elevenCards}
@@ -132,6 +184,7 @@ describe('BinderHomeView — US2 grid + pager', () => {
   });
 
   it('renders the two-line "Page N" / "OF M" indicator (FR-019)', () => {
+    seedImages(elevenCards);
     const screen = render(
       <BinderViewWithDefaults
         cards={elevenCards}
@@ -145,6 +198,7 @@ describe('BinderHomeView — US2 grid + pager', () => {
   });
 
   it('the pager fires onPageChange with the 1-based page when scrolled', () => {
+    seedImages(elevenCards);
     const screen = render(
       <BinderViewWithDefaults
         cards={elevenCards}
@@ -163,6 +217,7 @@ describe('BinderHomeView — US3 inline search', () => {
   const tenCards = Array.from({ length: 10 }, (_, i) => makeCard(`${i}`, `c${i}`));
 
   it('replaces the masthead with a TextInput when isSearchActive is true', () => {
+    seedImages(tenCards);
     const screen = render(
       <BinderViewWithDefaults
         cards={tenCards}
@@ -180,6 +235,7 @@ describe('BinderHomeView — US3 inline search', () => {
 
   it('typing in the inline input fires onSearchChange', () => {
     const onSearchChange = jest.fn();
+    seedImages(tenCards);
     const screen = render(
       <BinderViewWithDefaults
         cards={tenCards}
@@ -195,6 +251,7 @@ describe('BinderHomeView — US3 inline search', () => {
 
   it('tapping the cancel control fires onSearchClear (FR-005f)', () => {
     const onSearchClear = jest.fn();
+    seedImages(tenCards);
     const screen = render(
       <BinderViewWithDefaults
         cards={tenCards}
@@ -224,6 +281,7 @@ describe('BinderHomeView — US3 inline search', () => {
   });
 
   it('renders an active-state visual indicator on the search affordance when query is non-empty (FR-005b)', () => {
+    seedImages(tenCards);
     const screen = render(
       <BinderViewWithDefaults
         cards={tenCards}

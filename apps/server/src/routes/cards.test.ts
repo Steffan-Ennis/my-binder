@@ -134,7 +134,7 @@ describe('Cards API', () => {
 
   // ─── GET /cards/:id ────────────────────────────────────────────────────────
 
-  test('GET /cards/:id returns 200 with enriched setCode and frontFaceImageUrl', async () => {
+  test('GET /cards/:id returns 200 with enriched setCode without frontFaceImageUrl', async () => {
     await aCard()
       .forUser(testUser)
       .withId(M11_BOLT_UUID)
@@ -150,7 +150,7 @@ describe('Cards API', () => {
     expect(body.setCode).toBe('M11');
     expect(body.setName).toBe('Magic 2011');
     expect(body.typeLine).toBe('Instant');
-    expect(body.frontFaceImageUrl).toBe(M11_BOLT_IMAGE_NORMAL);
+    expect(body.frontFaceImageUrl).toBeUndefined();
   });
 
   test('GET /cards/:id returns 404 when the user has no card with that id', async () => {

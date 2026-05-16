@@ -45,6 +45,21 @@ const config: Config = {
       lines: 80,
       statements: 80,
     },
+    // Spec 017 — per-feature 90% floor for the reusable Card slice + its hook
+    // (load-bearing component reused across screens; regressions in its state
+    // machine silently break every consumer).
+    './src/components/card/': {
+      branches: 90,
+      functions: 90,
+      lines: 90,
+      statements: 90,
+    },
+    './src/hooks/useCardImagesQuery.ts': {
+      branches: 90,
+      functions: 90,
+      lines: 90,
+      statements: 90,
+    },
   },
 };
 

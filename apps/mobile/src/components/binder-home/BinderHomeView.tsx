@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { Card } from '@my-binder/core';
-import { Image } from 'expo-image';
 import type { FC } from 'react';
 import {
   Pressable,
@@ -10,6 +9,7 @@ import {
 } from 'react-native';
 import PagerView, {PagerViewProps} from 'react-native-pager-view';
 
+import { Card as CardSlot } from '@src/components/card';
 import { Colors } from '@src/constants/theme';
 import { SLOTS_PER_BINDER_PAGE } from '@src/utils/pageMath';
 
@@ -46,15 +46,8 @@ export type CardPocketProps = {
 
 const CardPocket: FC<CardPocketProps> = ({ card, isLoading, slotIndex }) => {
   const styles = useStyles();
-  if (!isLoading && card?.frontFaceImageUrl) {
-    return (
-      <View key={card.id} style={styles.pocket} testID="pocket-occupied">
-        <Image
-          source={{ uri: card.frontFaceImageUrl }}
-          style={styles.pocketImage}
-        />
-      </View>
-    );
+  if (!isLoading && card) {
+    return <CardSlot key={card.id} id={card.id} footprint="pocket" />;
   }
   return (
     <View

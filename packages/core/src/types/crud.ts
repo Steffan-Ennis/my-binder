@@ -7,8 +7,7 @@ export interface Card {
   updatedAt: string;
   // Mobile binder-home additions (spec 016) — all OPTIONAL. Server may begin
   // returning these in a follow-up enrichment; mobile consumers MUST tolerate
-  // their absence and degrade gracefully (placeholder image, name-only filter).
-  frontFaceImageUrl?: string;
+  // their absence and degrade gracefully (name-only filter).
   setName?: string;
   setCode?: string;
   typeLine?: string;

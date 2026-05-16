@@ -11,7 +11,6 @@ export const CARD_RESPONSE_SCHEMA = {
     createdAt: { type: 'string', format: 'date-time' },
     updatedAt: { type: 'string', format: 'date-time' },
     // Optional binder-home fields (spec 016) — not yet returned by the server.
-    frontFaceImageUrl: { type: 'string', minLength: 1 },
     setName: { type: 'string' },
     setCode: { type: 'string' },
     typeLine: { type: 'string' },

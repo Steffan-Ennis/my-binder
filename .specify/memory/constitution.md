@@ -2119,4 +2119,4 @@ Each feature plan MUST include a Constitution Check (as defined in
 before implementation begins. Violations MUST be justified in the plan's Complexity
 Tracking table.
 
-**Version**: 1.23.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-16
+**Version**: 1.24.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-16

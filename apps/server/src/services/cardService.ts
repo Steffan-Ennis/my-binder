@@ -7,27 +7,16 @@ import { getRepositories } from '@src/db/repositories';
 import { registry } from '@src/providers/registry';
 import { CardProvider } from "@src/providers/interface";
 
-// Scryfall image CDN convention: paths shard by the first two characters of
-// the Scryfall id. Exposed only for tests; not part of the public surface.
-function scryfallNormalImageUrl(scryfallId: string): string | undefined {
-  if (scryfallId.length < 2) return undefined;
-  return `https://cards.scryfall.io/normal/front/${scryfallId[0]}/${scryfallId[1]}/${scryfallId}.jpg`;
-}
-
 async function enrichCard(card: Card, provider: CardProvider | null): Promise<Card> {
   if (provider === null) return card;
   try {
     const details = await provider.getByUuid(card.id);
     if (details === null) return card;
-    const frontFaceImageUrl = details.scryfallId
-      ? scryfallNormalImageUrl(details.scryfallId)
-      : undefined;
     return {
       ...card,
       setCode: details.setCode,
       ...(details.setName !== null && { setName: details.setName }),
       typeLine: details.typeLine,
-      ...(frontFaceImageUrl !== undefined && { frontFaceImageUrl }),
     };
   } catch (err) {
     console.error(`[cardService] enrichment failed for card id=${card.id}`, err);
