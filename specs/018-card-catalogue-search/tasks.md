@@ -35,9 +35,9 @@ Monorepo (`pnpm` + Turborepo). Three workspaces touched:
 
 **Purpose**: One new mobile dependency, one Jest mock, one Jest coverage-threshold update.
 
-- [ ] T001 Add `@gorhom/bottom-sheet@^5` to `apps/mobile/package.json` via `pnpm --filter @my-binder/mobile add @gorhom/bottom-sheet@^5` (Principle XI — pinned to the registry-current v5 line)
-- [ ] T002 [P] Add the `@gorhom/bottom-sheet` default mock to `apps/mobile/jest.setup.ts` per plan.md "Mobile mocking conventions" (typed `forwardRef` `BottomSheetModal` with `present`/`dismiss`; default-exported + named exports for `BottomSheetModalProvider`, `BottomSheetBackdrop`, `BottomSheetScrollView`)
-- [ ] T003 [P] Extend `coverageThreshold` in `apps/mobile/jest.config.ts` to cover the four new feature directories (`components/masthead/**` 90%, `components/catalogue/**` 85%, `components/catalogue-filter-sheet/**` 85%, `components/card-detail-sheet/**` 85%) and `hooks/useUpdateBinderEntryMutation.ts` at 90% per plan.md "Coverage target"
+- [X] T001 Add `@gorhom/bottom-sheet@^5` to `apps/mobile/package.json` via `pnpm --filter @my-binder/mobile add @gorhom/bottom-sheet@^5` (Principle XI — pinned to the registry-current v5 line)
+- [X] T002 [P] Add the `@gorhom/bottom-sheet` default mock to `apps/mobile/jest.setup.ts` per plan.md "Mobile mocking conventions" (typed `forwardRef` `BottomSheetModal` with `present`/`dismiss`; default-exported + named exports for `BottomSheetModalProvider`, `BottomSheetBackdrop`, `BottomSheetScrollView`)
+- [X] T003 [P] Extend `coverageThreshold` in `apps/mobile/jest.config.ts` to cover the four new feature directories (`components/masthead/**` 90%, `components/catalogue/**` 85%, `components/catalogue-filter-sheet/**` 85%, `components/card-detail-sheet/**` 85%) and `hooks/useUpdateBinderEntryMutation.ts` at 90% per plan.md "Coverage target"
 
 ---
 
@@ -51,27 +51,27 @@ mobile `apiClient` extensions that every user story depends on.
 
 ### `@my-binder/core` — types, schemas, and their tests
 
-- [ ] T004 [P] Write Ajv schema tests in `packages/core/src/schemas/card.test.ts` for the eight new/extended schemas (`CARD_RESPONSE_SCHEMA` accepts `numberOwned: integer ≥ 0`; `CARD_RECORD_SCHEMA` accepts `numberOwned`; `SEARCH_QUERYSTRING_SCHEMA` accepts each new field; `PRICE_QUOTE_SCHEMA` accepts `null` OR a quote object; `CARD_PRICES_RESPONSE_SCHEMA` requires both source slots; `CARD_PRICE_HISTORY_RESPONSE_SCHEMA` validates per-source arrays; `PATCH_CARD_BODY_SCHEMA` rejects `delta` values other than `1` or `-1`). Tests MUST fail before T005–T007 land.
-- [ ] T005 [P] Extend `packages/core/src/types/card.ts` with `numberOwned?` on `CardRecord`, the five catalogue filter fields (`formats`, `superTypes`, `subTypes`, `creatureTypes`, `missingOnly`) plus internal `userId` on `SearchQuery`, and the new `PRICE_SOURCES` const + `PriceSource`, `PriceQuote`, `CardPricesResponse`, `PricePoint`, `CardPriceHistoryResponse` types per data-model §1.3, §1.4, §2.3, §2.4.
-- [ ] T006 [P] Extend `packages/core/src/types/crud.ts` with optional `numberOwned?: number` on `Card`, and add the new `PatchCardBody` type (`{ delta: 1 | -1 }`) per data-model §1.2, §2.5.
-- [ ] T007 Extend `packages/core/src/schemas/card.ts`: add `numberOwned` to `CARD_RESPONSE_SCHEMA` and `CARD_RECORD_SCHEMA`; add `formats`, `super_types`, `sub_types`, `creature_types`, `missing_only` to `SEARCH_QUERYSTRING_SCHEMA`; add `PRICE_QUOTE_SCHEMA`, `CARD_PRICES_RESPONSE_SCHEMA`, `PRICE_POINT_SCHEMA`, `CARD_PRICE_HISTORY_RESPONSE_SCHEMA`, `PATCH_CARD_BODY_SCHEMA` per data-model §2.4, §2.5 (makes T004 pass).
+- [X] T004 [P] Write Ajv schema tests in `packages/core/src/schemas/card.test.ts` for the eight new/extended schemas (`CARD_RESPONSE_SCHEMA` accepts `numberOwned: integer ≥ 0`; `CARD_RECORD_SCHEMA` accepts `numberOwned`; `SEARCH_QUERYSTRING_SCHEMA` accepts each new field; `PRICE_QUOTE_SCHEMA` accepts `null` OR a quote object; `CARD_PRICES_RESPONSE_SCHEMA` requires both source slots; `CARD_PRICE_HISTORY_RESPONSE_SCHEMA` validates per-source arrays; `PATCH_CARD_BODY_SCHEMA` rejects `delta` values other than `1` or `-1`). Tests MUST fail before T005–T007 land.
+- [X] T005 [P] Extend `packages/core/src/types/card.ts` with `numberOwned?` on `CardRecord`, the five catalogue filter fields (`formats`, `superTypes`, `subTypes`, `creatureTypes`, `missingOnly`) plus internal `userId` on `SearchQuery`, and the new `PRICE_SOURCES` const + `PriceSource`, `PriceQuote`, `CardPricesResponse`, `PricePoint`, `CardPriceHistoryResponse` types per data-model §1.3, §1.4, §2.3, §2.4.
+- [X] T006 [P] Extend `packages/core/src/types/crud.ts` with optional `numberOwned?: number` on `Card`, and add the new `PatchCardBody` type (`{ delta: 1 | -1 }`) per data-model §1.2, §2.5.
+- [X] T007 Extend `packages/core/src/schemas/card.ts`: add `numberOwned` to `CARD_RESPONSE_SCHEMA` and `CARD_RECORD_SCHEMA`; add `formats`, `super_types`, `sub_types`, `creature_types`, `missing_only` to `SEARCH_QUERYSTRING_SCHEMA`; add `PRICE_QUOTE_SCHEMA`, `CARD_PRICES_RESPONSE_SCHEMA`, `PRICE_POINT_SCHEMA`, `CARD_PRICE_HISTORY_RESPONSE_SCHEMA`, `PATCH_CARD_BODY_SCHEMA` per data-model §2.4, §2.5 (makes T004 pass).
 
 ### Server — entity, migration, provider interface
 
-- [ ] T008 [P] Add `@Column({ name: 'number_owned', type: 'integer', default: 1 }) numberOwned!: number` to `apps/server/src/entities/CardEntity.ts` per data-model §1.1.
-- [ ] T009 Generate a new TypeORM migration at `apps/server/src/db/migrations/<ts>-add-number-owned.ts` that runs `ALTER TABLE "cards" ADD COLUMN "number_owned" integer NOT NULL DEFAULT 1 CHECK ("number_owned" >= 1)` and reverses with `DROP COLUMN`. Verify locally with `pnpm --filter @my-binder/server migration:run`.
-- [ ] T010 [P] Extend the `CardProvider` interface in `apps/server/src/providers/interface.ts` with two new method signatures: `getPrices(uuid: string): Promise<CardPricesResponse>` and `getPriceHistory(uuid: string, days: number): Promise<CardPriceHistoryResponse>` per data-model §2.1 (imports the wire types from `@my-binder/core`).
+- [X] T008 [P] Add `@Column({ name: 'number_owned', type: 'integer', default: 1 }) numberOwned!: number` to `apps/server/src/entities/CardEntity.ts` per data-model §1.1.
+- [X] T009 Generate a new TypeORM migration at `apps/server/src/db/migrations/<ts>-add-number-owned.ts` that runs `ALTER TABLE "cards" ADD COLUMN "number_owned" integer NOT NULL DEFAULT 1 CHECK ("number_owned" >= 1)` and reverses with `DROP COLUMN`. Verify locally with `pnpm --filter @my-binder/server migration:run`.
+- [X] T010 [P] Extend the `CardProvider` interface in `apps/server/src/providers/interface.ts` with two new method signatures: `getPrices(uuid: string): Promise<CardPricesResponse>` and `getPriceHistory(uuid: string, days: number): Promise<CardPriceHistoryResponse>` per data-model §2.1 (imports the wire types from `@my-binder/core`).
 
 ### Mobile — shared `<Masthead />` component (Principle IV; FR-002)
 
-- [ ] T011 [P] Create `apps/mobile/src/components/masthead/types.ts` exporting `MastheadProps` per data-model §5 / contracts/ui.md §2.1.
-- [ ] T012 [P] Write `apps/mobile/src/components/masthead/Masthead.test.tsx` covering the full render contract from contracts/ui.md §2.2 + accessibility labels from §2.3: renders subtitle / overline / binder mark / search + profile buttons when `isSearchActive=false`; renders inline `TextInput` + close button when `isSearchActive=true`; fires `onSearchOpen`, `onProfilePress`, `onSearchClose`, `onSearchChange` from the corresponding controls; renders the `filterPills` slot when provided; renders the gold-dot active-query indicator when `hasActiveQuery=true`. Use `<MastheadWithDefaults>` per the v1.24.0 rule.
-- [ ] T013 Implement `apps/mobile/src/components/masthead/Masthead.tsx` and `apps/mobile/src/components/masthead/Masthead.theme.ts` (pure presentation component — no hook layer; FC declaration rule; style co-location rule) so T012 passes.
+- [X] T011 [P] Create `apps/mobile/src/components/masthead/types.ts` exporting `MastheadProps` per data-model §5 / contracts/ui.md §2.1.
+- [X] T012 [P] Write `apps/mobile/src/components/masthead/Masthead.test.tsx` covering the full render contract from contracts/ui.md §2.2 + accessibility labels from §2.3: renders subtitle / overline / binder mark / search + profile buttons when `isSearchActive=false`; renders inline `TextInput` + close button when `isSearchActive=true`; fires `onSearchOpen`, `onProfilePress`, `onSearchClose`, `onSearchChange` from the corresponding controls; renders the `filterPills` slot when provided; renders the gold-dot active-query indicator when `hasActiveQuery=true`. Use `<MastheadWithDefaults>` per the v1.24.0 rule.
+- [X] T013 Implement `apps/mobile/src/components/masthead/Masthead.tsx` and `apps/mobile/src/components/masthead/Masthead.theme.ts` (pure presentation component — no hook layer; FC declaration rule; style co-location rule) so T012 passes.
 
 ### Mobile — apiClient extensions
 
-- [ ] T014 [P] Extend `apps/mobile/src/services/api/apiClient.test.ts` with coverage for the six new client methods (`searchCards(query)` serialises filter arrays as comma-separated strings; `getCardPrices(id)` parses `CardPricesResponse`; `getCardPriceHistory(id, days)` parses `CardPriceHistoryResponse`; `getCard(id)` throws `ApiError('NOT_FOUND')` on 404; `upsertCard({id,name})` calls `POST /cards`; `patchCard(id, {delta})` returns `{status:200, card} | {status:204}`).
-- [ ] T015 Extend `apps/mobile/src/services/api/apiClient.ts` with `searchCards`, `getCardPrices`, `getCardPriceHistory`, `getCard`, `upsertCard`, `patchCard`, each validating responses against the Ajv schemas re-exported from `@my-binder/core`.
+- [X] T014 [P] Extend `apps/mobile/src/services/api/apiClient.test.ts` with coverage for the six new client methods (`searchCards(query)` serialises filter arrays as comma-separated strings; `getCardPrices(id)` parses `CardPricesResponse`; `getCardPriceHistory(id, days)` parses `CardPriceHistoryResponse`; `getCard(id)` throws `ApiError('NOT_FOUND')` on 404; `upsertCard({id,name})` calls `POST /cards`; `patchCard(id, {delta})` returns `{status:200, card} | {status:204}`).
+- [X] T015 Extend `apps/mobile/src/services/api/apiClient.ts` with `searchCards`, `getCardPrices`, `getCardPriceHistory`, `getCard`, `upsertCard`, `patchCard`, each validating responses against the Ajv schemas re-exported from `@my-binder/core`.
 
 **Checkpoint**: Foundation ready — user story implementation can now begin.
 
