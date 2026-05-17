@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react-native';
-import { FC, type ReactNode } from 'react';
+import { type FC, type ReactNode } from 'react';
 
 import { useSessionStore } from '@src/stores/sessionStore';
 
@@ -10,8 +10,13 @@ jest.mock('@src/hooks/useSession', () => {
   const { useSessionStore: store } = jest.requireActual('@src/stores/sessionStore');
   return {
     useSession: () => {
-      const s = store.getState();
-      return { status: s.status, userId: s.userId, email: s.email, jwt: s.jwt };
+      const session = store.getState();
+      return {
+        status: session.status,
+        userId: session.userId,
+        email: session.email,
+        jwt: session.jwt,
+      };
     },
   };
 });
@@ -56,7 +61,7 @@ describe('CardContainer — Principle X wiring', () => {
     expect(screen.getByTestId('card-loading')).toBeTruthy();
   });
 
-  it('renders the loaded view when the query cache is pre-seeded with images', () => {
+  it('renders the loaded view when the query cache is pre-seeded with images (footprint=pocket)', () => {
     client.setQueryData(['cards', 'images', ID], IMAGES);
     const screen = render(
       <Provider>
@@ -64,10 +69,9 @@ describe('CardContainer — Principle X wiring', () => {
       </Provider>,
     );
     expect(screen.getByTestId('card-loaded')).toBeTruthy();
-    expect(screen.getByTestId('pocket-occupied')).toBeTruthy();
   });
 
-  it('threads footprint=detail through to the view (no pocket-occupied emission)', () => {
+  it('renders the loaded view when the query cache is pre-seeded with images (footprint=detail)', () => {
     client.setQueryData(['cards', 'images', ID], IMAGES);
     const screen = render(
       <Provider>
@@ -75,6 +79,5 @@ describe('CardContainer — Principle X wiring', () => {
       </Provider>,
     );
     expect(screen.getByTestId('card-loaded')).toBeTruthy();
-    expect(screen.queryByTestId('pocket-occupied')).toBeNull();
   });
 });

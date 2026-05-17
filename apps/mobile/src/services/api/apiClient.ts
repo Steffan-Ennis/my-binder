@@ -122,7 +122,7 @@ const fetchJson = async <T>(input: {
     throw new ApiError({
       message: 'Response failed schema validation',
       status: response.status,
-      kind: 'SCHEMA_VALIDATION_ERROR',
+      kind: 'VALIDATION_ERROR',
       cause: input.validator.errors,
     });
   }
@@ -214,51 +214,18 @@ export const getCards = async (cursor?: string): Promise<CardListResponse> => {
  * @returns the parsed `CardImages` payload (validated against `CARD_IMAGES_RESPONSE_SCHEMA`).
  * @throws {ApiError} with `kind: 'CARD_NOT_FOUND'` (404), `'PROVIDER_UNAVAILABLE'` (503),
  *   `'AUTH_INVALID_TOKEN'` (401), `'VALIDATION_ERROR'` (400), `'NETWORK_OFFLINE'`,
- *   or `'SCHEMA_MISMATCH'` (502) when the payload fails Ajv validation.
+ *   or `'SCHEMA_VALIDATION_ERROR'` when the payload fails Ajv validation.
  *
  * @example
  *   const images = await getCardImages('6ca7af0b-4b6a-59ba-90be-6da4f62bcff1');
  */
 export const getCardImages = async (id: string): Promise<CardImages> => {
-  const url = `${getApiBaseUrl()}/cards/images/${encodeURIComponent(id)}`;
-  let response: Response;
-  try {
-    response = await fetch(url, { method: 'GET', headers: buildHeaders() });
-  } catch (cause) {
-    console.error(`[apiClient] network failure for GET /cards/images/${id}`, cause);
-    throw new ApiError({
-      message: 'Network unavailable',
-      status: null,
-      kind: 'NETWORK_OFFLINE',
-      cause,
-    });
-  }
-
-  if (!response.ok) {
-    const body = await parseJsonSafely(response);
-    console.error(`[apiClient] non-OK response ${response.status} for GET /cards/images/${id}`, body);
-    throw new ApiError({
-      message: `Request failed with status ${response.status}`,
-      status: response.status,
-      kind: mapStatusToKind(response.status, body),
-      cause: body,
-    });
-  }
-
-  const json = await parseJsonSafely(response);
-  if (!validateCardImages(json)) {
-    console.error(
-      `[apiClient] schema validation failed for GET /cards/images/${id}`,
-      validateCardImages.errors,
-    );
-    throw new ApiError({
-      message: 'CardImages payload failed validation',
-      status: 502,
-      kind: 'SCHEMA_MISMATCH',
-      cause: validateCardImages.errors,
-    });
-  }
-  return json as CardImages;
+  const body = await fetchJson<CardImages>({
+    path: `/cards/images/${encodeURIComponent(id)}`,
+    method: 'GET',
+    validator: validateCardImages,
+  });
+  return body as CardImages;
 };
 
 export const apiClient = {

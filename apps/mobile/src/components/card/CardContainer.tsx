@@ -10,8 +10,17 @@ export type CardProps = {
 };
 
 const CardContainer: FC<CardProps> = ({ id, footprint }) => {
-  const viewProps = useCard(id, footprint);
-  return <CardView {...viewProps} />;
+  const { isSuccess, isLoading, onRetry, imageUrl, pulseRef, error } = useCard({id, footprint});
+  return (
+    <CardView
+      isLoading={isLoading}
+      pulseRef={pulseRef}
+      isSuccess={isSuccess}
+      onRetry={onRetry}
+      imageUrl={imageUrl}
+      error={error}
+    />
+  );
 };
 
 export default CardContainer;

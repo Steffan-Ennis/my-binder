@@ -1,6 +1,392 @@
 <!--
 SYNC IMPACT REPORT
 ==================
+Version change: 1.25.0 → 1.26.0
+Bump type: MINOR — adds a new "Data-fetching hook composition rule"
+  sub-section to Principle X (Component Architecture, Mobile), placed
+  between the existing "Hook return-value memoisation rule" and
+  "State locality rule". The sub-section codifies the canonical shape
+  of a feature hook that wraps a TanStack Query primitive
+  (`useCardImagesQuery`, `useCardsInfiniteQuery`, `useMeQuery`,
+  etc.) using `apps/mobile/src/components/card/` (spec 017) as the
+  reference implementation. Seven non-negotiable rules:
+
+    1. **Destructure the query result at the hook boundary.** Pull
+       only the fields the feature consumes (`data`, `error`,
+       `isLoading`, `isSuccess`, `refetch`); passing the entire
+       `UseQueryResult` through to the container or view is
+       prohibited (it leaks the TanStack surface across layer
+       boundaries).
+    2. **Derive view-shaped data with `useMemo` or TanStack
+       `select`.** Transformation between `query.data` and the shape
+       the view consumes MUST happen at the hook boundary; view-side
+       transformation is prohibited.
+    3. **Pass `error` through without redeclaring it.** The view
+       consumes the query's `error` directly via the view-props type
+       (rule 5); wrapping the query error in a feature-specific error
+       model is prohibited on both sides.
+    4. **Encapsulate side effects (animations, subscriptions,
+       listeners) in the hook.** Animation refs (`Animated.Value`),
+       timing loops, gesture handlers, and native API subscriptions
+       MUST be constructed in `use<Feature>.ts` and surfaced to the
+       view as a stable handle (a `RefObject<Animated.Value>`, a
+       memoised callback, a subscription token). View-layer effects
+       remain prohibited per the existing Layer rules table.
+    5. **Derive view props from the query result type via `Pick`.**
+       The `<Feature>ViewProps` type MUST compose
+       `Pick<UseXxxQueryResult, 'error' | 'isLoading' | 'isSuccess'
+       | ...>` joined with feature-specific additions via `&`;
+       redeclaring `error`, `isLoading`, or any other field TanStack
+       already types on its result is prohibited (silent drift on
+       library upgrade or API schema change).
+    6. **Name hook options as `Use<Feature>Options`.** Hooks that
+       accept parameters MUST receive a single options object typed
+       with a named `Use<Feature>Options` type living in the feature
+       directory's `types.ts` (or as a named export from the hook
+       file if no `types.ts` exists). Inline parameter destructuring
+       without a named type is prohibited.
+    7. **Feature-local `types.ts` for non-wire types.** Component
+       directories that compose a query hook MAY add a sibling
+       `types.ts` to host Pick'd view-props types, options types, and
+       feature-specific typedefs. The file MUST NOT import from
+       another feature directory (Principle IV) and MUST NOT
+       redeclare types already in `packages/core` (Principle IX).
+
+  The trigger was the spec 017 reusable card component review of
+  `apps/mobile/src/components/card/{CardContainer.tsx,CardView.tsx,
+  types.ts,useCard.ts}`. The card feature collapses cleanly into a
+  three-file unit (plus `types.ts`) whose type contract composes
+  end-to-end: query result → hook options → view props → container
+  destructure → view render. The amendment codifies that shape so
+  every future data-fetching feature in `apps/mobile` follows the
+  same pattern from the first commit.
+
+  No principle is removed or redefined; no version-pin language is
+  altered. The rule applies project-wide from this amendment forward;
+  existing data-fetching components that pre-date the rule are
+  surfaced as carry-over TODOs and MUST be migrated before any new
+  task touches the file in question.
+
+Last amended: 2026-05-17
+
+Added principles:
+  (none — Principle X expanded, not added)
+
+Modified sections:
+  - Principle X. Component Architecture (Mobile) — added
+    "Data-fetching hook composition rule" sub-section between the
+    "Hook return-value memoisation rule" and "State locality rule"
+    sub-sections, codifying the seven rules listed above with a
+    canonical compliant pattern (drawn verbatim from
+    `apps/mobile/src/components/card/`) and a prohibited-pattern
+    catalogue.
+
+Removed sections:
+  (none)
+
+Templates reviewed:
+  ✅ .specify/templates/plan-template.md  — No change required. The
+     Constitution Check section already directs plans to verify
+     compliance with every principle; the new Data-fetching hook
+     composition rule is a Principle X refinement caught by the
+     existing gate.
+  ✅ .specify/templates/spec-template.md  — No change required
+     (specs are technology-agnostic; hook composition is an
+     implementation concern surfaced in plan.md).
+  ✅ .specify/templates/tasks-template.md — No change required (the
+     new rule surfaces as ordinary code-review work inside the
+     existing task categorisation; data-fetching feature plans MUST
+     state in their Unit Testing Phase how the hook, view, and
+     options types compose end-to-end).
+
+Deferred TODOs (new in 1.26.0 — code-side migrations):
+  (none — `apps/mobile/src/components/card/` is the reference
+   implementation and is already compliant. Future data-fetching
+   features MUST adopt the sub-section's pattern from the first
+   commit. The 1.25.0 trigger TODO for
+   `apps/mobile/src/components/card/useCard.ts` line 27 — rename
+   `const state = useMemo<CardViewState>(...)` to `cardViewState` —
+   is resolved by the present code, which returns the differently-
+   named primitives `imageUrl`, `pulseRef`, `error`, `isLoading`,
+   `isSuccess`, and `onRetry` directly. The stale JSDoc reference to
+   `{ state, footprint }` at lines 18–20 MUST be rewritten to
+   describe the actual return shape; tracked as a v1.25.0 carry-over
+   item below.)
+
+Carry-over from 1.25.0 (updated):
+  ✅ apps/mobile/src/components/card/useCard.ts — Resolved. The
+     identifier `state` from the trigger TODO no longer exists in
+     this file; the hook returns named view-prop primitives directly.
+  ⚠ apps/mobile/src/components/card/useCard.ts — JSDoc at lines 18-20
+     still references `{ state, footprint }` as the returned shape.
+     The actual return is `{ pulseRef, imageUrl, error, isLoading,
+     isSuccess, onRetry }`. The JSDoc MUST be rewritten to describe
+     the current return shape and to point at `CardViewProps` from
+     `./types.ts` as the type-level source of truth.
+  ⚠ apps/mobile/src/components/binder-home/useBinderHome.ts —
+     `const [state, dispatch] = useReducer(binderHomeReducer, ...)`
+     (line 129) and the reducer parameter `state: BinderHomeState`
+     (line 46). Rename both to `binderHomeState` so the reducer
+     signature reads `(binderHomeState, action) => ...` and the hook
+     body reads `const [binderHomeState, dispatch] = useReducer(...)`.
+  ⚠ apps/mobile/src/components/binder-home/useBinderHome.ts —
+     `(p) => p.cards` short-form callback parameter (line 125).
+     Rename to `(page) => page.cards`. Update the JSDoc example at
+     `apps/mobile/src/hooks/useCardsInfiniteQuery.ts` line 40 to
+     match.
+  ⚠ apps/mobile/src/services/auth/googleAuth.ts — `(e) => log.warn(...)`
+     JSDoc example (line 55). Rename to `(error) => log.warn(...)`.
+  ⚠ apps/server/src/providers/mtgjson/MtgjsonProvider.ts —
+     `(c) => c.availability...` (line 78), `(c) => c.toUpperCase()`
+     (line 101), `(c) => !commanderColorSet.has(c)` (line 102).
+     Rename each to `(card)` / `(color)` per its domain meaning.
+  ⚠ apps/server/src/routes/cards.ts — `(c) => c.trim()...` (lines
+     177, 206). Rename to `(color) => color.trim()...`.
+
+Carry-over from 1.24.0 (unchanged):
+  ⚠ Audit existing `apps/mobile/src/**/*View.test.tsx` files for
+    helper-style `renderView` / `renderComponent` functions and
+    migrate each to a sibling `<ComponentName>WithDefaults` FC.
+
+Carry-over from 1.23.0 (unchanged):
+  ⚠ apps/server/src/routes/cards.test.ts — extract inline
+     `dataSource.getRepository(UserEntity).upsert(...)` seed into
+     `apps/server/testing/userFactory.ts` exporting
+     `createTestUser(dataSource, overrides)`.
+  ⚠ apps/server/src/routes/auth.test.ts — extract inline
+     `AllowedUserEntity.save(...)` / `UserEntity.upsert(...)` seeds
+     into `apps/server/testing/allowedUserFactory.ts` exporting
+     `createTestAllowedUser(dataSource, overrides)`.
+
+Carry-over from 1.22.0 (unchanged):
+  ⚠ apps/server/src/routes/docs.test.ts — still uses `jest.mock(...)`
+     against `apps/server/src/services/` and `apps/server/src/db/`.
+     MUST be rewritten as an E2E test against real services,
+     repositories, the real TypeORM `DataSource`, and the offline-mode
+     MTGJSON SDK, with data setup through the rule-5 factories.
+
+Carry-over from 1.21.0 (unchanged):
+  ⚠ CLAUDE.md — Stale references to `binderStore` remain at line 50
+     (folder tree) and line 200 (Active Technologies list). MUST be
+     updated to remove the `binderStore` mentions and note that
+     `currentPage` plus search state now live in `useBinderHome.ts`.
+
+Carry-over from 1.20.0 (unchanged):
+  ⚠ apps/mobile theme files — LoginView, AccessDeniedView, and
+     ComingSoonView MUST migrate inline `StyleSheet.create` blocks
+     into sibling `<Component>.theme.ts` files.
+
+Carry-over from 1.19.0 (unchanged):
+  ⚠ apps/mobile/src/services/auth/googleAuth.ts — uses
+     `expo-auth-session/providers/google` (deprecated by Expo).
+     Migration tracked in
+     `todo/migrate-google-auth-to-google-signin.md`.
+
+Carry-over from 1.17.0 (unchanged):
+  ⚠ apps/mobile/package-lock.json — npm lockfile from the
+     create-expo-app bootstrap; delete and re-resolve via
+     `pnpm install`.
+  ⚠ apps/mobile/tsconfig.json — currently declares
+     `paths: { "@/*": ["./*"] }`; Principle VII requires `@root/*`
+     and `@src/*` aliases.
+  ⚠ apps/mobile/hooks/{use-color-scheme.ts,use-color-scheme.web.ts,
+     use-theme-color.ts}, apps/mobile/scripts/reset-project.js,
+     apps/mobile/app/modal.tsx — leftover create-expo-app template
+     files outside the Principle X four-layer structure.
+
+Carry-over from 1.14.0 (unchanged):
+  ⚠ specs/001-server-architecture/plan.md — JSDoc → TypeScript
+     migration.
+  ⚠ specs/004-card-data-provider/plan.md — JSDoc → TypeScript
+     migration.
+-->
+
+<!-- PREVIOUS SYNC IMPACT REPORT (v1.24.0 → v1.25.0) follows for archival reference.
+==================
+Version change: 1.24.0 → 1.25.0
+Bump type: MINOR — materially expands Principle V (Transparency &
+  Legibility) with a new "Identifier intent rule" sub-section that
+  codifies two non-negotiable identifier-naming rules applying to
+  every TypeScript source file across the monorepo (`apps/server`,
+  `apps/mobile`, `packages/core`, `packages/infrastructure`):
+
+    1. **Generic placeholder nouns are prohibited.** Identifier names
+       like `state`, `data`, `value`, `result`, `info`, `obj`, `item`,
+       `thing`, `temp`, `tmp`, `foo`, `bar` (and their plurals) MUST
+       NOT be used. They name what the value *is to the language*
+       (a piece of state, a piece of data) rather than what the value
+       *means in the domain* (a `cardCount`, a `searchTerm`, a
+       `signInError`). Every reducer has state, every fetch returns
+       data, every handler produces a result — the placeholder noun
+       communicates nothing the reader cannot already infer from the
+       surrounding code.
+    2. **Short-form acronyms and contractions are prohibited.**
+       Identifier names like `usr`, `cfg`, `mgr`, `svc`, `mod`, `idx`,
+       `lst`, `len`, `cnt`, `qry`, `txn`, `cb`, `req`/`res` (inside
+       handler bodies), `e` (for events or errors), `pwd`, `addr`,
+       single-letter parameter names in `.map` / `.filter` / `.find` /
+       `.flatMap` callbacks (e.g. `(p) => p.cards`, `(c) => c.id`),
+       and similar contractions MUST NOT be used. Write the full
+       word: `user`, `config`, `manager`, `service`, `module`,
+       `index`, `list`, `length`, `count`, `query`, `transaction`,
+       `callback`, `event` / `error`, `password`, `address`,
+       `(page) => page.cards`, `(card) => card.id`.
+
+  Carve-outs (explicitly permitted): widely-standardised industry
+  acronyms whose expanded form is rarely written (`url`, `http`,
+  `https`, `json`, `xml`, `id`, `uuid`, `jwt`, `api`, `sdk`, `dto`,
+  `ui`, `uri`, `iso`, `utc`, `jsx`, `tsx`, `db`) MAY appear as full
+  identifier tokens (`userId`, `apiClient`, `jwtSecret`,
+  `dbConnection`). Single-letter loop indices (`i`, `j`, `k`) inside
+  tight numeric `for` loops over a known-finite range are also
+  permitted. Reducer signatures MUST type the state parameter with
+  the domain noun, not the generic word `state` —
+  `(binderHomeState, action)` instead of `(state, action)`.
+
+  The trigger was the spec 017 reusable card component work, which
+  introduced `const state = useMemo<CardViewState>(() => { ... })` in
+  `apps/mobile/src/components/card/useCard.ts` (line 27). The
+  identifier `state` says nothing about which slice of state the
+  memo produces; renaming it to `cardViewState` makes the hook's
+  return shape self-documenting and aligns it with the existing
+  `<Component>Props` / `<Component>State` naming pattern.
+
+  No principle is removed or redefined; no version-pin language is
+  altered. The rule applies project-wide from this amendment forward.
+  Existing in-tree violations are surfaced as carry-over TODOs and
+  MUST be migrated before any new task touches the file in question.
+
+Last amended: 2026-05-17
+
+Added principles:
+  (none — Principle V expanded, not added)
+
+Modified sections:
+  - Principle V. Transparency & Legibility — added "Identifier intent
+    rule" sub-section codifying the two prohibitions above plus the
+    carve-out list and a compliant/prohibited code-pattern pair.
+
+Removed sections:
+  (none)
+
+Templates reviewed:
+  ✅ .specify/templates/plan-template.md  — No change required. The
+     Constitution Check section already directs plans to verify
+     compliance with every principle; the new Identifier intent rule
+     is a Principle V refinement caught by the existing gate. No new
+     template scaffolding is needed.
+  ✅ .specify/templates/spec-template.md  — No change required
+     (specs are technology-agnostic; naming is an implementation
+     concern).
+  ✅ .specify/templates/tasks-template.md — No change required (the
+     Identifier intent rule surfaces as ordinary code-review work
+     inside the existing task categorisation).
+
+Deferred TODOs (new in 1.25.0 — code-side migrations):
+  ⚠ apps/mobile/src/components/card/useCard.ts — `const state =
+     useMemo<CardViewState>(...)` (line 27). Rename to
+     `cardViewState` and update the hook's return shape accordingly.
+     Trigger file for this amendment; MUST be migrated before any
+     follow-up task touches the file.
+  ⚠ apps/mobile/src/components/binder-home/useBinderHome.ts —
+     `const [state, dispatch] = useReducer(binderHomeReducer, ...)`
+     (line 129) and the reducer parameter `state: BinderHomeState`
+     (line 46). Rename both to `binderHomeState` so the reducer
+     signature reads `(binderHomeState, action) => ...` and the hook
+     body reads `const [binderHomeState, dispatch] = useReducer(...)`.
+  ⚠ apps/mobile/src/components/binder-home/useBinderHome.ts —
+     `(p) => p.cards` short-form callback parameter (line 125).
+     Rename to `(page) => page.cards`. Update the JSDoc example at
+     `apps/mobile/src/hooks/useCardsInfiniteQuery.ts` line 40 to
+     match.
+  ⚠ apps/mobile/src/services/auth/googleAuth.ts — `(e) => log.warn(...)`
+     JSDoc example (line 55). Rename to `(error) => log.warn(...)`.
+  ⚠ apps/server/src/providers/mtgjson/MtgjsonProvider.ts —
+     `(c) => c.availability...` (line 78), `(c) => c.toUpperCase()`
+     (line 101), `(c) => !commanderColorSet.has(c)` (line 102).
+     Rename each to `(card)` / `(color)` per its domain meaning.
+  ⚠ apps/server/src/routes/cards.ts — `(c) => c.trim()...` (lines
+     177, 206). Rename to `(color) => color.trim()...`.
+
+Carry-over from 1.24.0 (unchanged):
+  ⚠ Audit existing `apps/mobile/src/**/*View.test.tsx` files for
+    helper-style `renderView` / `renderComponent` functions and
+    migrate each to a sibling `<ComponentName>WithDefaults` FC. At
+    time of v1.24.0, `BinderHomeView.test.tsx` was the only view
+    test in the workspace and already complies; future view tests
+    landing in `apps/mobile/src/components/login/`,
+    `apps/mobile/src/components/access-denied/`, and
+    `apps/mobile/src/components/coming-soon/` MUST follow the v1.24.0
+    convention from the first commit.
+
+Carry-over from 1.23.0 (unchanged):
+  ⚠ apps/server/src/routes/cards.test.ts — currently seeds the test
+     user inline via `dataSource.getRepository(UserEntity).upsert(...)`
+     in `beforeAll`. Violates the rule #5 added in v1.23.0. Extract
+     the seed into `apps/server/testing/userFactory.ts` exporting
+     `createTestUser(dataSource, overrides)` and consume it from the
+     test.
+  ⚠ apps/server/src/routes/auth.test.ts — currently seeds the
+     allowlist row and the test user inline via
+     `dataSource.getRepository(AllowedUserEntity).save({ email })`
+     and `dataSource.getRepository(UserEntity).upsert(...)`. Violates
+     the rule #5 added in v1.23.0. Extract into
+     `apps/server/testing/allowedUserFactory.ts` exporting
+     `createTestAllowedUser(dataSource, overrides)`, reuse
+     `createTestUser` from the user factory, and consume both from
+     the test.
+
+Carry-over from 1.22.0 (unchanged):
+  ⚠ apps/server/src/routes/docs.test.ts — still uses `jest.mock(...)`
+     against modules under `apps/server/src/services/` and
+     `apps/server/src/db/`. Violates the Server route test
+     conventions sub-section's rules #1-#4 (no service/repository
+     mocks; real DataSource; offline-mode SDK; real-data isolation).
+     MUST be rewritten as an E2E test against the real services, real
+     repositories, the real TypeORM `DataSource`, and the offline-mode
+     MTGJSON SDK, AND its data setup MUST go through the factories
+     added by rule #5.
+
+Carry-over from 1.21.0 (unchanged):
+  ⚠ CLAUDE.md — Stale references to `binderStore` remain at line 50
+     (folder structure tree) and line 200 (Active Technologies list).
+     The store has been deleted; CLAUDE.md MUST be updated to remove
+     the `binderStore` mentions and to note that `currentPage` plus
+     search state now live in `useBinderHome.ts`.
+
+Carry-over from 1.20.0 (unchanged):
+  ⚠ apps/mobile theme files — the Style co-location rule landed in
+     v1.20.0 with `BinderHomeView.theme.ts` as the canonical
+     reference. Other view components (LoginView, AccessDeniedView,
+     ComingSoonView) MUST migrate inline `StyleSheet.create` blocks
+     into sibling `<Component>.theme.ts` files in a follow-up pass.
+
+Carry-over from 1.19.0 (unchanged):
+  ⚠ apps/mobile/src/services/auth/googleAuth.ts — uses
+     `expo-auth-session/providers/google`, which the Expo docs flag as
+     deprecated. Migration is tracked in
+     `todo/migrate-google-auth-to-google-signin.md`. Per Principle XI,
+     either the migration completes or the deprecated dependency MUST be
+     justified in the spec 002 Complexity Tracking table.
+
+Carry-over from 1.17.0 (unchanged):
+  ⚠ apps/mobile/package-lock.json — npm lockfile from the create-expo-app
+     bootstrap. MUST be deleted and the workspace re-resolved via
+     `pnpm install` before merge.
+  ⚠ apps/mobile/tsconfig.json — currently declares `paths: { "@/*": ["./*"] }`;
+     Principle VII requires `@root/*` and `@src/*` aliases.
+  ⚠ apps/mobile/hooks/{use-color-scheme.ts,use-color-scheme.web.ts,
+     use-theme-color.ts}, apps/mobile/scripts/reset-project.js,
+     apps/mobile/app/modal.tsx — leftover create-expo-app template files
+     outside the Principle X four-layer structure.
+
+Carry-over from 1.14.0 (unchanged):
+  ⚠ specs/001-server-architecture/plan.md — JSDoc → TypeScript migration.
+  ⚠ specs/004-card-data-provider/plan.md — JSDoc → TypeScript migration.
+-->
+
+<!-- PREVIOUS SYNC IMPACT REPORT (v1.23.0 → v1.24.0) follows for archival reference.
+==================
 Version change: 1.23.0 → 1.24.0
 Bump type: MINOR — adds a new "Mobile view test conventions" sub-
   section to Principle III (Test-First Development), placed
@@ -1128,6 +1514,105 @@ Code MUST be readable by someone unfamiliar with the project. Identifier names M
 intent, not implementation detail. Magic literals MUST be replaced by named constants.
 Comments MUST explain *why*, not *what* — the code itself conveys the what.
 
+**Identifier intent rule.** Every variable, parameter, field, function, and type name
+MUST describe the *intent* of what it labels — what the value represents in the domain —
+not the mechanical role the value plays in the code. The rule applies to every TypeScript
+source file across the monorepo (`apps/server`, `apps/mobile`, `packages/core`,
+`packages/infrastructure`). Two specific shapes are prohibited outright:
+
+1. **Generic placeholder nouns.** Identifier names like `state`, `data`, `value`,
+   `result`, `info`, `obj`, `item`, `thing`, `temp`, `tmp`, `foo`, `bar` (and their
+   plurals) MUST NOT be used. They describe what the value *is to the language* (a
+   piece of state, a piece of data) rather than what the value *means in the domain*
+   (a `cardCount`, a `searchTerm`, a `signInError`). Every reducer has state, every
+   fetch returns data, every handler produces a result — the placeholder noun
+   communicates nothing the reader cannot already infer from the surrounding code.
+
+2. **Short-form acronyms and contractions.** Identifier names like `usr`, `cfg`,
+   `mgr`, `svc`, `mod`, `idx`, `lst`, `len`, `cnt`, `qry`, `txn`, `cb`, `cb1`,
+   `req` / `res` (inside handler bodies), `e` (for events or errors), `pwd`, `addr`,
+   and single-letter callback parameters in `.map` / `.filter` / `.find` / `.flatMap`
+   (e.g. `(p) => p.cards`, `(c) => c.id`) MUST NOT be used. Write the full word:
+   `user`, `config`, `manager`, `service`, `module`, `index`, `list`, `length`,
+   `count`, `query`, `transaction`, `callback`, `event` / `error`, `password`,
+   `address`, `(page) => page.cards`, `(card) => card.id`. Modern editors and the
+   type checker make full words free; abbreviations save bytes the codebase does
+   not need to save and force every reader to translate.
+
+**Carve-outs.** The following are explicitly permitted because their expanded form
+is rarely written in industry, or because the contraction is itself the standard
+token:
+
+- Widely-standardised acronyms whose expanded form is rarely written: `url`, `http`,
+  `https`, `json`, `xml`, `id`, `uuid`, `jwt`, `api`, `sdk`, `dto`, `ui`, `uri`,
+  `iso`, `utc`, `jsx`, `tsx`, `db`. These MAY appear as full identifier tokens
+  (`userId`, `apiClient`, `jwtSecret`, `dbConnection`) and as the leading or
+  trailing fragment of a compound name (`getUserId`, `apiBaseUrl`).
+- Single-letter loop indices (`i`, `j`, `k`) inside tight numeric `for` loops over a
+  known-finite range. Anywhere else, prefer a descriptive name.
+- Reducer signatures MUST type the state parameter with the domain noun, not the
+  generic word `state` — i.e., `(binderHomeState, action) => ...` instead of
+  `(state, action) => ...`. The signature is not exempt from this rule.
+
+The compliant patterns are:
+
+```ts
+// REQUIRED — names that say what the value means in the domain.
+const [signInError, setSignInError] = useState<ApiError | null>(null);
+const visibleCards = cardsQuery.data?.pages.flatMap((page) => page.cards) ?? [];
+const sessionJwtExpiresAt = decodeJwt(token).exp;
+const cardCount = visibleCards.length;
+
+// REQUIRED — reducer signature uses the domain-typed state name.
+const binderHomeReducer = (
+  binderHomeState: BinderHomeState,
+  action: BinderHomeAction,
+): BinderHomeState => { /* ... */ };
+const [binderHomeState, dispatch] = useReducer(binderHomeReducer, INITIAL_STATE);
+
+// REQUIRED — callback parameters use the domain noun.
+const paperCards = cards.filter((card) => card.availability.includes('paper'));
+const normalizedColors = commanderColors.map((color) => color.toUpperCase());
+```
+
+The prohibited patterns are:
+
+```ts
+// PROHIBITED — `state` says nothing about which state.
+const [state, setState] = useState<ApiError | null>(null);
+const state = useMemo<CardViewState>(() => ({ /* ... */ }), [deps]);
+
+// PROHIBITED — `data` and `info` are placeholder nouns.
+const data = cardsQuery.data?.pages.flatMap((page) => page.cards) ?? [];
+const info = decodeJwt(token);
+
+// PROHIBITED — short-form acronyms.
+const usr = await userRepository.findById(id);
+const cfg = loadConfig();
+const cb = () => navigate('/login');
+const idx = cards.findIndex((card) => card.id === target);
+
+// PROHIBITED — single-letter callback parameters.
+cardsQuery.data?.pages.flatMap((p) => p.cards);          // → (page) => page.cards
+cards.findIndex((c) => c.id === target);                 // → (card) => card.id === target
+commanderColors.map((c) => c.toUpperCase());             // → (color) => color.toUpperCase()
+revokeGoogleGrant(accessToken).catch((e) => log.warn('revoke failed', e)); // → (error)
+```
+
+Rationale: identifier names are the cheapest documentation in the codebase — they
+appear at every read site, every diff, every stack trace, every search result. A
+name that describes intent (`signInError`) tells the reader what the value *is* in
+the domain without forcing a jump to the declaration; a name that describes
+mechanism (`state`, `data`, `result`) forces the reader to read the surrounding
+code to recover what the original author already knew. The placeholder ban
+eliminates the most common drift mode: a variable that starts as a generic
+`state` accumulates concerns over time because the name imposes no semantic
+constraint on what may be added. The acronym ban eliminates a second drift mode:
+shortened names create per-author dialects (`usr` vs `u` vs `user`) that grep
+cannot reconcile and that turn every code review into a translation exercise.
+Spelling out `event`, `callback`, `transaction` in full once at declaration is
+free; reading `e`, `cb`, `txn` at every call site is not.
+
 ### VI. Layered Architecture
 
 The system is composed of four distinct layers: **Mobile App → API Server → Database** and
@@ -1735,6 +2220,239 @@ declared. This rule pairs with the **Container prop-passing rule** above —
 named props plus stable references give the view a contract the type system
 *and* the React reconciler can both rely on.
 
+**Data-fetching hook composition rule.** When a `use<Feature>.ts` hook wraps a
+TanStack Query primitive (`useCardImagesQuery`, `useCardsInfiniteQuery`,
+`useMeQuery`, etc.) the composition MUST follow the seven rules below. The
+canonical reference is `apps/mobile/src/components/card/` (spec 017):
+`CardContainer.tsx`, `CardView.tsx`, `useCard.ts`, and the sibling `types.ts`
+together form a three-file unit whose types compose end-to-end from the query
+result through to the container destructure.
+
+1. **Destructure the query result at the hook boundary.** Read the specific
+   fields the feature consumes (`data`, `error`, `isLoading`, `isSuccess`,
+   `refetch`, etc.) off the query in a single destructure inside
+   `use<Feature>.ts`. Passing the entire `UseQueryResult` through to the
+   container or view is prohibited — it leaks the TanStack surface across
+   layer boundaries and forces downstream files to depend on a library that
+   the View layer should not import.
+
+2. **Derive view-shaped data with `useMemo` or TanStack `select`.** Any
+   transformation between the raw `query.data` and the shape the view
+   consumes MUST happen at the hook boundary, either as a `useMemo` whose
+   deps include the query data (per the Hook return-value memoisation rule
+   above) or as TanStack Query's `select` option on the query hook itself.
+   View-side transformation is prohibited — the View layer's only
+   responsibility is rendering ready-shaped props.
+
+3. **Pass `error` through without redeclaring it.** The view consumes the
+   query's `error` directly via the view-props type (see rule 5). The hook
+   MUST NOT wrap the query error in a feature-specific error model, and the
+   view MUST NOT re-type it. The query library's error type is the single
+   source of truth; redeclaring it on either side guarantees drift the
+   moment the underlying schema or library version changes.
+
+4. **Encapsulate side effects (animations, subscriptions, listeners) in the
+   hook.** Pulse animations for loading states, gesture handlers, timing
+   loops, native API subscriptions, and any other stateful or effect-bearing
+   primitive MUST be constructed in `use<Feature>.ts` and surfaced to the
+   view as a stable handle (a `RefObject<Animated.Value>`, a memoised
+   callback, a subscription token, etc.). The view receives ready-to-render
+   data and stable handles only; effects in the view layer are prohibited
+   (the existing Layer rules table forbids `useEffect` in the view).
+
+5. **Derive view props from the query result type via `Pick`.** The
+   `<Feature>ViewProps` type MUST compose `Pick<UseXxxQueryResult, 'error' |
+   'isLoading' | 'isSuccess' | ...>` joined with feature-specific additions
+   via `&`. Redeclaring `error: ApiError | null`, `isLoading: boolean`, or
+   any other field TanStack already types on its result is prohibited —
+   silent drift between the two declarations surfaces only at runtime when
+   the library is upgraded or the API error shape evolves.
+
+6. **Name hook options as `Use<Feature>Options`.** Every `use<Feature>.ts`
+   hook that takes parameters MUST accept a single options object typed
+   with a named `Use<Feature>Options` type. Inline parameter destructuring
+   without a named type — e.g. `useCard({ id, footprint }: { id: string;
+   footprint: CardFootprint })` — is prohibited. The type MUST live in the
+   feature directory's `types.ts` (or, if the directory has no `types.ts`,
+   as a named export from the hook file itself). A named options type is
+   greppable, lets callers forward options without duplicating the parameter
+   shape, and gives the test suite a single type to mock against.
+
+7. **Feature-local `types.ts` for non-wire types.** Component directories
+   that compose a query hook MAY add a sibling `types.ts` to host Pick'd
+   view-props types, options types, and any other domain typedefs the
+   feature owns and that never cross the wire. The file MUST NOT import
+   from `apps/mobile/src/components/<other-feature>/` (Single Responsibility,
+   Principle IV) and MUST NOT redeclare types that already live in
+   `packages/core` (Public API Discipline, Principle IX) — re-export from
+   `@my-binder/core` instead. Types in `types.ts` are mobile-only; types
+   that the server also consumes belong in `packages/core`.
+
+The compliant pattern (canonical reference:
+`apps/mobile/src/components/card/`):
+
+```ts
+// types.ts
+import type { RefObject } from 'react';
+import type { Animated } from 'react-native';
+
+import type { UseCardImagesQueryResult } from '@src/hooks/useCardImagesQuery';
+
+export type CardFootprint = 'pocket' | 'detail';
+
+export type UseCardOptions = {
+  id: string;
+  footprint: CardFootprint;
+};
+
+export type CardViewProps = Pick<
+  UseCardImagesQueryResult,
+  'error' | 'isLoading' | 'isSuccess'
+> & {
+  onRetry: () => Promise<void>;
+  imageUrl?: string;
+  pulseRef: RefObject<Animated.Value>;
+};
+```
+
+```ts
+// useCard.ts
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { Animated } from 'react-native';
+
+import { useCardImagesQuery } from '@src/hooks/useCardImagesQuery';
+
+import type { CardViewProps, UseCardOptions } from './types';
+
+export const useCard = ({ id, footprint }: UseCardOptions): CardViewProps => {
+  const { isLoading, isSuccess, data, refetch, error } = useCardImagesQuery(id);
+
+  const onRetry = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
+  const imageUrl = useMemo(() => {
+    if (isSuccess) return variantForFootprint(footprint, data);
+  }, [data, footprint, isSuccess]);
+
+  const pulseRef = useRef(new Animated.Value(PULSE_MIN));
+  useEffect(() => {
+    if (!isLoading) return;
+    const loop = Animated.loop(/* ...pulse sequence... */);
+    loop.start();
+    return () => loop.stop();
+  }, [isLoading]);
+
+  return { pulseRef, imageUrl, error, isLoading, isSuccess, onRetry };
+};
+```
+
+```tsx
+// CardContainer.tsx
+import type { FC } from 'react';
+
+import CardView from './CardView';
+import { useCard } from './useCard';
+import type { CardFootprint } from './types';
+
+export type CardProps = {
+  id: string;
+  footprint: CardFootprint;
+};
+
+const CardContainer: FC<CardProps> = ({ id, footprint }) => {
+  const { isSuccess, isLoading, onRetry, imageUrl, pulseRef, error } =
+    useCard({ id, footprint });
+  return (
+    <CardView
+      isLoading={isLoading}
+      isSuccess={isSuccess}
+      pulseRef={pulseRef}
+      onRetry={onRetry}
+      imageUrl={imageUrl}
+      error={error}
+    />
+  );
+};
+
+export default CardContainer;
+```
+
+The prohibited patterns are:
+
+```ts
+// PROHIBITED — view-props redeclare `error` / `isLoading` instead of
+//              Pick'ing them from the query result type. The hook and
+//              the view drift the moment TanStack or the API error
+//              model changes shape; tsc cannot catch the mismatch.
+type CardViewProps = {
+  error: ApiError | null;
+  isLoading: boolean;
+  isSuccess: boolean;
+  /* ... */
+};
+
+// PROHIBITED — entire query result passed wholesale to the view.
+//              Leaks the TanStack surface across layer boundaries;
+//              the view now imports `UseQueryResult` and depends on
+//              fields it does not consume.
+const useCard = (id: string) => useCardImagesQuery(id);
+const CardContainer: FC<CardProps> = ({ id }) => {
+  const query = useCard(id);
+  return <CardView query={query} />;
+};
+
+// PROHIBITED — animation lives in the view. Loading-state side
+//              effects fight the render loop, the view is no longer
+//              pure JSX, and testing it requires mounting it with a
+//              working Animated driver.
+const CardView: FC<CardViewProps> = ({ isLoading }) => {
+  const pulseRef = useRef(new Animated.Value(0.6));
+  useEffect(() => { /* start/stop loop on isLoading */ }, [isLoading]);
+  return <Animated.View style={{ opacity: pulseRef.current }} />;
+};
+
+// PROHIBITED — view transforms query.data. The transformation belongs
+//              in the hook (useMemo) or in the query's `select`
+//              option. Otherwise the view layer imports domain logic
+//              ("medium for pocket, large for detail") it should not
+//              own.
+const CardView: FC<CardViewProps> = ({ data, footprint }) => {
+  const imageUrl = footprint === 'pocket' ? data.medium : data.large;
+  return <Image source={{ uri: imageUrl }} />;
+};
+
+// PROHIBITED — inline options shape with no named type. Callers
+//              cannot import the options type to forward parameters;
+//              a rename of one field forces edits in every call site
+//              instead of one type.
+const useCard = (
+  { id, footprint }: { id: string; footprint: CardFootprint },
+) => { /* ... */ };
+```
+
+Rationale: a data-fetching feature collapses cleanly when the four-layer
+split aligns with the query lifecycle. Destructuring at the hook boundary
+names exactly which fields the feature consumes, so a TanStack Query
+upgrade — or a swap to a hand-rolled client — is a one-file change inside
+`use<Feature>.ts`. Deriving view props from the query result type with
+`Pick` makes drift a `tsc` error instead of a silent runtime mismatch:
+when `UseCardImagesQueryResult` changes shape, `CardViewProps` either
+compiles or it does not. Encapsulating animations and other side effects
+in the hook keeps the view a pure render function the `@testing-library/
+react-native` suite can exercise without faking timers or animation
+drivers (Principle III's mobile test convention). Naming hook options as
+`Use<Feature>Options` keeps the parameter contract greppable — searching
+for `UseCardOptions` lands on the single source of truth — and lets
+callers forward options without duplicating the parameter shape.
+Together, these rules turn a data-fetching feature into a three-file unit
+(`<Feature>Container.tsx`, `use<Feature>.ts`, `<Feature>View.tsx`, with
+an optional sibling `types.ts`) whose type contract composes end-to-end:
+query result → hook options → view props → container destructure → view
+render. Every layer's responsibility is auditable in isolation, and
+upgrades to the underlying query library leave the View and Container
+layers untouched.
+
 **State locality rule.** State MUST live as close to the component that
 consumes it as possible. The placement decision follows a strict hierarchy
 and MUST be applied at the moment a state field is introduced:
@@ -2119,4 +2837,4 @@ Each feature plan MUST include a Constitution Check (as defined in
 before implementation begins. Violations MUST be justified in the plan's Complexity
 Tracking table.
 
-**Version**: 1.24.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-16
+**Version**: 1.26.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-17

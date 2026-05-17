@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useEffect, useRef, type FC } from 'react';
+import { type FC } from 'react';
 import { Animated, Pressable, Text, View } from 'react-native';
 
 import { Colors } from '@src/constants/theme';
@@ -8,55 +8,30 @@ import { Colors } from '@src/constants/theme';
 import useStyles from './CardView.theme';
 import type { CardViewProps } from './types';
 
-const PULSE_MIN = 0.6;
-const PULSE_MAX = 1.0;
-const PULSE_DURATION_MS = 600;
 
-const CardView: FC<CardViewProps> = ({ state, footprint }) => {
+const CardView: FC<CardViewProps> = ({ onRetry, isLoading, imageUrl, isSuccess, error, pulseRef}) => {
   const styles = useStyles();
-  const pulse = useRef(new Animated.Value(PULSE_MIN)).current;
 
-  useEffect(() => {
-    if (state.kind !== 'loading') return;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: PULSE_MAX,
-          duration: PULSE_DURATION_MS,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulse, {
-          toValue: PULSE_MIN,
-          duration: PULSE_DURATION_MS,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [pulse, state.kind]);
-
-  if (state.kind === 'loading') {
+  if (isLoading) {
     return (
       <View style={styles.root} testID="card-loading">
         <View style={styles.frame}>
-          <Animated.View style={[styles.skeleton, { opacity: pulse }]} />
+          <Animated.View style={[styles.skeleton, { opacity: pulseRef.current }]} />
         </View>
       </View>
     );
   }
 
-  if (state.kind === 'loaded') {
-    const occupiedTestID = footprint === 'pocket' ? 'pocket-occupied' : undefined;
+  if (isSuccess) {
     return (
       <View style={styles.root} testID="card-loaded">
-        {occupiedTestID ? <View testID={occupiedTestID} /> : null}
-        <Image source={{ uri: state.imageUrl }} style={styles.image} />
+        <View testID={'pocket-occupied'} />
+        <Image source={{ uri: imageUrl}} style={styles.image} />
       </View>
     );
   }
 
-  if (state.kind === 'notFound') {
+  if (error?.status === 404) {
     return (
       <View style={styles.root} testID="card-not-found">
         <View style={styles.frame}>
@@ -75,7 +50,7 @@ const CardView: FC<CardViewProps> = ({ state, footprint }) => {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Retry loading card"
-          onPress={state.onRetry}
+          onPress={onRetry}
           style={styles.retryButton}
           testID="card-retry"
         >
