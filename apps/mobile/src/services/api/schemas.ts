@@ -9,10 +9,25 @@
 
 export {
   CARD_RESPONSE_SCHEMA as CARD_SCHEMA,
+  CARD_RESPONSE_SCHEMA,
   CARD_LIST_RESPONSE_SCHEMA,
   CARD_IMAGES_RESPONSE_SCHEMA,
+  CARD_PRICES_RESPONSE_SCHEMA,
+  CARD_PRICE_HISTORY_RESPONSE_SCHEMA,
+  SEARCH_RESULT_SCHEMA,
 } from '@my-binder/core';
-export type { Card, CardImages, CardList as CardListResponse } from '@my-binder/core';
+export type {
+  Card,
+  CardImages,
+  CardList as CardListResponse,
+  CardPriceHistoryResponse,
+  CardPricesResponse,
+  CardRecord,
+  PatchCardBody,
+  PriceQuote,
+  SearchQuery,
+  SearchResult,
+} from '@my-binder/core';
 
 export const AUTH_USER_SCHEMA = {
   type: 'object',

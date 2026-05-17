@@ -60,6 +60,39 @@ const config: Config = {
       lines: 90,
       statements: 90,
     },
+    // Spec 018 — shared masthead is consumed by Binder + Catalogue; a
+    // regression silently breaks two screens at once, so we hold it to 90%.
+    './src/components/masthead/': {
+      branches: 90,
+      functions: 90,
+      lines: 90,
+      statements: 90,
+    },
+    './src/components/catalogue/': {
+      branches: 85,
+      functions: 85,
+      lines: 85,
+      statements: 85,
+    },
+    './src/components/catalogue-filter-sheet/': {
+      branches: 85,
+      functions: 85,
+      lines: 85,
+      statements: 85,
+    },
+    './src/components/card-detail-sheet/': {
+      branches: 85,
+      functions: 85,
+      lines: 85,
+      statements: 85,
+    },
+    // Optimistic-mutation rollback path is the SC-011 / SC-012 safety net.
+    './src/hooks/useUpdateBinderEntryMutation.ts': {
+      branches: 90,
+      functions: 90,
+      lines: 90,
+      statements: 90,
+    },
   },
 };
 

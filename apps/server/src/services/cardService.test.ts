@@ -47,6 +47,8 @@ function makeProvider(overrides: Partial<CardProvider> = {}): CardProvider {
     getByUuid: async () => null,
     getByUuids: async () => [],
     getCardImages: async () => null,
+    getPrices: async (uuid) => ({ printingId: uuid, cardKingdom: null, tcgPlayer: null }),
+    getPriceHistory: async (uuid, days) => ({ printingId: uuid, days, cardKingdom: [], tcgPlayer: [] }),
     isReachable: async () => true,
     ...overrides,
   };

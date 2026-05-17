@@ -93,11 +93,11 @@ describe('apiClient.signInWithGoogle', () => {
     expect((e as ApiError).kind).toBe('NETWORK_OFFLINE');
   });
 
-  it('throws ApiError(SCHEMA_VALIDATION_ERROR) when response is missing required fields', async () => {
+  it('throws ApiError(VALIDATION_ERROR) when response is missing required fields', async () => {
     fetchMock.mockResolvedValue(ok({ unexpected: 'shape' }));
     const e = await apiClient.signInWithGoogle({ idToken: 'gid' }).catch((x) => x);
     expect(e).toBeInstanceOf(ApiError);
-    expect((e as ApiError).kind).toBe('SCHEMA_VALIDATION_ERROR');
+    expect((e as ApiError).kind).toBe('VALIDATION_ERROR');
   });
 });
 
@@ -164,11 +164,11 @@ describe('apiClient.getCardImages', () => {
     );
   });
 
-  it('throws ApiError(CARD_NOT_FOUND) on 404', async () => {
+  it('throws ApiError(NOT_FOUND) on 404', async () => {
     fetchMock.mockResolvedValue(err(404, { error: 'CARD_NOT_FOUND', message: 'nope' }));
     const e = await apiClient.getCardImages(ID).catch((x) => x);
     expect(e).toBeInstanceOf(ApiError);
-    expect((e as ApiError).kind).toBe('CARD_NOT_FOUND');
+    expect((e as ApiError).kind).toBe('NOT_FOUND');
     expect((e as ApiError).status).toBe(404);
   });
 
@@ -178,5 +178,201 @@ describe('apiClient.getCardImages', () => {
     expect(e).toBeInstanceOf(ApiError);
     expect((e as ApiError).kind).toBe('PROVIDER_UNAVAILABLE');
     expect((e as ApiError).status).toBe(503);
+  });
+});
+
+// ─── Spec 018 — catalogue + price + mutation methods ─────────────────────
+
+const PRINTING_ID = '6ca7af0b-4b6a-59ba-90be-6da4f62bcff1';
+
+describe('apiClient.searchCards (spec 018 / FR-005, FR-013)', () => {
+  const SEARCH_RESULT = {
+    cards: [
+      {
+        id: PRINTING_ID,
+        name: 'Lightning Bolt',
+        set: 'M11',
+        cardNumber: '146',
+        manaCost: '{R}',
+        colorIdentity: ['R'],
+        numberOwned: 0,
+      },
+    ],
+    total: 1,
+    page: 1,
+    limit: 9,
+    totalPages: 1,
+  };
+
+  it('serialises filter arrays as comma-separated querystring values', async () => {
+    fetchMock.mockResolvedValue(ok(SEARCH_RESULT));
+    await apiClient.searchCards({
+      name: 'bolt',
+      formats: ['Modern', 'Legacy'],
+      superTypes: ['Legendary'],
+      subTypes: ['Equipment', 'Aura'],
+      creatureTypes: ['Elf'],
+      missingOnly: true,
+      page: 1,
+      limit: 9,
+    });
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).toContain('/cards/search?');
+    expect(url).toContain('name=bolt');
+    expect(url).toContain('formats=Modern%2CLegacy');
+    expect(url).toContain('super_types=Legendary');
+    expect(url).toContain('sub_types=Equipment%2CAura');
+    expect(url).toContain('creature_types=Elf');
+    expect(url).toContain('missing_only=true');
+    expect(url).toContain('page=1');
+    expect(url).toContain('limit=9');
+  });
+
+  it('returns the validated SearchResult body', async () => {
+    fetchMock.mockResolvedValue(ok(SEARCH_RESULT));
+    const result = await apiClient.searchCards({ page: 1, limit: 9 });
+    expect(result).toEqual(SEARCH_RESULT);
+  });
+
+  it('omits absent dimensions from the querystring', async () => {
+    fetchMock.mockResolvedValue(ok(SEARCH_RESULT));
+    await apiClient.searchCards({ page: 1, limit: 9 });
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).not.toContain('formats=');
+    expect(url).not.toContain('super_types=');
+    expect(url).not.toContain('missing_only=');
+  });
+});
+
+describe('apiClient.getCardPrices (FR-017, FR-019)', () => {
+  it('parses a fully-populated CardPricesResponse', async () => {
+    const body = {
+      printingId: PRINTING_ID,
+      cardKingdom: {
+        source: 'CARD_KINGDOM',
+        amountCents: 1378,
+        currency: 'USD',
+        observedOn: '2026-05-18',
+      },
+      tcgPlayer: {
+        source: 'TCG_PLAYER',
+        amountCents: 1311,
+        currency: 'USD',
+        observedOn: '2026-05-18',
+      },
+    };
+    fetchMock.mockResolvedValue(ok(body));
+    const result = await apiClient.getCardPrices(PRINTING_ID);
+    expect(result).toEqual(body);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/cards/${PRINTING_ID}/prices`),
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
+  it('parses null slots (no observation)', async () => {
+    const body = { printingId: PRINTING_ID, cardKingdom: null, tcgPlayer: null };
+    fetchMock.mockResolvedValue(ok(body));
+    const result = await apiClient.getCardPrices(PRINTING_ID);
+    expect(result).toEqual(body);
+  });
+});
+
+describe('apiClient.getCardPriceHistory (FR-018)', () => {
+  it('returns per-source arrays for the requested window', async () => {
+    const body = {
+      printingId: PRINTING_ID,
+      days: 30,
+      cardKingdom: [{ observedOn: '2026-05-18', amountCents: 1378 }],
+      tcgPlayer: [{ observedOn: '2026-05-18', amountCents: 1311 }],
+    };
+    fetchMock.mockResolvedValue(ok(body));
+    const result = await apiClient.getCardPriceHistory(PRINTING_ID, 30);
+    expect(result).toEqual(body);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/cards/${PRINTING_ID}/prices/history?days=30`),
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+});
+
+describe('apiClient.getCard', () => {
+  const CARD = {
+    id: PRINTING_ID,
+    name: 'Lightning Bolt',
+    createdAt: '2026-05-01T00:00:00Z',
+    updatedAt: '2026-05-01T00:00:00Z',
+    numberOwned: 1,
+  };
+
+  it('returns the validated Card on 200', async () => {
+    fetchMock.mockResolvedValue(ok(CARD));
+    const result = await apiClient.getCard(PRINTING_ID);
+    expect(result).toEqual(CARD);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/cards/${PRINTING_ID}`),
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
+  it('throws ApiError(NOT_FOUND) on 404', async () => {
+    fetchMock.mockResolvedValue(err(404, { error: 'CARD_NOT_FOUND', message: 'no' }));
+    const e = await apiClient.getCard(PRINTING_ID).catch((x) => x);
+    expect(e).toBeInstanceOf(ApiError);
+    expect((e as ApiError).kind).toBe('NOT_FOUND');
+  });
+});
+
+describe('apiClient.upsertCard (FR-025)', () => {
+  it('POSTs to /cards with id+name and returns the validated Card', async () => {
+    const CARD = {
+      id: PRINTING_ID,
+      name: 'Lightning Bolt',
+      createdAt: '2026-05-01T00:00:00Z',
+      updatedAt: '2026-05-01T00:00:00Z',
+      numberOwned: 1,
+    };
+    fetchMock.mockResolvedValue(ok(CARD, 201));
+    const result = await apiClient.upsertCard({ id: PRINTING_ID, name: 'Lightning Bolt' });
+    expect(result).toEqual(CARD);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/cards'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ id: PRINTING_ID, name: 'Lightning Bolt' }),
+      }),
+    );
+  });
+});
+
+describe('apiClient.patchCard (FR-026, FR-028)', () => {
+  it('returns {status:200, card} when the server returns 200', async () => {
+    const CARD = {
+      id: PRINTING_ID,
+      name: 'Lightning Bolt',
+      createdAt: '2026-05-01T00:00:00Z',
+      updatedAt: '2026-05-01T00:00:00Z',
+      numberOwned: 2,
+    };
+    fetchMock.mockResolvedValue(ok(CARD));
+    const result = await apiClient.patchCard(PRINTING_ID, { delta: 1 });
+    expect(result).toEqual({ status: 200, card: CARD });
+  });
+
+  it('returns {status:204} when the server returns 204 (row deleted)', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 204,
+      json: () => Promise.resolve(null),
+    } as unknown as Response);
+    const result = await apiClient.patchCard(PRINTING_ID, { delta: -1 });
+    expect(result).toEqual({ status: 204 });
+  });
+
+  it('throws ApiError(NOT_FOUND) on 404', async () => {
+    fetchMock.mockResolvedValue(err(404, { error: 'CARD_NOT_FOUND', message: 'no' }));
+    const e = await apiClient.patchCard(PRINTING_ID, { delta: -1 }).catch((x) => x);
+    expect(e).toBeInstanceOf(ApiError);
+    expect((e as ApiError).kind).toBe('NOT_FOUND');
   });
 });

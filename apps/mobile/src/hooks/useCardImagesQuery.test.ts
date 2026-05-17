@@ -132,7 +132,7 @@ describe('useCardImagesQuery — warm-cache hit (FR-008)', () => {
 describe('useCardImagesQuery — 4xx skip-retry (FR-005, FR-006)', () => {
   it('surfaces a 404 ApiError immediately without retrying', async () => {
     const spy = jest.spyOn(apiModule.apiClient, 'getCardImages').mockRejectedValue(
-      new ApiError({ message: 'no', status: 404, kind: 'CARD_NOT_FOUND' }),
+      new ApiError({ message: 'no', status: 404, kind: 'NOT_FOUND' }),
     );
 
     const { result } = renderHook(() => useCardImagesQuery(ID_A), { wrapper });

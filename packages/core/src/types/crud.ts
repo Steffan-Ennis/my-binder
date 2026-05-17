@@ -11,6 +11,10 @@ export interface Card {
   setName?: string;
   setCode?: string;
   typeLine?: string;
+  // Spec 018 / FR-023: physical copies the signed-in user owns for this
+  // printing. Present on all /cards responses (always >= 1 — the binder never
+  // returns zero-count rows). May be absent on legacy fixtures.
+  numberOwned?: number;
 }
 
 export interface CardList {
@@ -34,4 +38,11 @@ export interface UpdateCardBody {
 
 export interface CardIdParams {
   id: string;
+}
+
+// Spec 018 / FR-028 — PATCH /cards/:id request body. `+1` increments
+// numberOwned; `-1` decrements (and deletes the row at 0). Any other value
+// is rejected with VALIDATION_ERROR by the Ajv schema.
+export interface PatchCardBody {
+  delta: 1 | -1;
 }

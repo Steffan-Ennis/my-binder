@@ -74,6 +74,43 @@ jest.mock('react-native-pager-view', () => {
   return { __esModule: true, default: PagerView };
 });
 
+jest.mock('@gorhom/bottom-sheet', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const React = require('react') as typeof import('react');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { View, Pressable } = require('react-native') as typeof import('react-native');
+
+  const BottomSheetModal = React.forwardRef<
+    { present: () => void; dismiss: () => void },
+    { children?: React.ReactNode }
+  >(({ children }, ref) => {
+    const [visible, setVisible] = React.useState(false);
+    React.useImperativeHandle(ref, () => ({
+      present: () => setVisible(true),
+      dismiss: () => setVisible(false),
+    }));
+    return visible ? React.createElement(View, { testID: 'bottom-sheet' }, children) : null;
+  });
+
+  const BottomSheetModalProvider = ({ children }: { children?: React.ReactNode }) =>
+    React.createElement(View, null, children);
+
+  const BottomSheetBackdrop = ({ onPress }: { onPress?: () => void }) =>
+    React.createElement(Pressable, { testID: 'bottom-sheet-backdrop', onPress });
+
+  const BottomSheetScrollView = ({ children }: { children?: React.ReactNode }) =>
+    React.createElement(View, null, children);
+
+  return {
+    __esModule: true,
+    default: BottomSheetModal,
+    BottomSheetModal,
+    BottomSheetModalProvider,
+    BottomSheetBackdrop,
+    BottomSheetScrollView,
+  };
+});
+
 jest.mock('expo-router', () => {
   const Redirect = ({ href }: { href: string }) => `Redirect(${href})`;
 

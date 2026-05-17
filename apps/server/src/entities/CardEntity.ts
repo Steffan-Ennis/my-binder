@@ -22,6 +22,14 @@ export class CardEntity {
   @PrimaryColumn({ name: 'user_id', type: 'uuid' })
   userId!: string;
 
+  // Spec 018 / FR-023 — the user owns this many physical copies of this
+  // printing. Always >= 1 while the row exists (DB-level CHECK >= 1); a
+  // decrement to 0 deletes the row inside the same transaction. The default
+  // applies on first insert; subsequent inserts for the same (id, user_id)
+  // are upserts that increment instead.
+  @Column({ name: 'number_owned', type: 'integer', default: 1 })
+  numberOwned!: number;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 

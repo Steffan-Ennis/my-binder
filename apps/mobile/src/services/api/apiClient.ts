@@ -8,11 +8,21 @@ import {
   AUTH_ME_RESPONSE_SCHEMA,
   CARD_IMAGES_RESPONSE_SCHEMA,
   CARD_LIST_RESPONSE_SCHEMA,
+  CARD_PRICES_RESPONSE_SCHEMA,
+  CARD_PRICE_HISTORY_RESPONSE_SCHEMA,
+  CARD_RESPONSE_SCHEMA,
   GOOGLE_SIGN_IN_RESPONSE_SCHEMA,
+  SEARCH_RESULT_SCHEMA,
   type AuthMeResponse,
+  type Card,
   type CardImages,
   type CardListResponse,
+  type CardPriceHistoryResponse,
+  type CardPricesResponse,
   type GoogleSignInResponse,
+  type PatchCardBody,
+  type SearchQuery,
+  type SearchResult,
 } from './schemas';
 
 const ajv = new Ajv({
@@ -24,13 +34,17 @@ const ajv = new Ajv({
   // ship these formats; the mobile client accepts any string for them and
   // relies on the server-side Ajv (with ajv-formats registered) to enforce
   // structural correctness at the source of truth.
-  formats: { uuid: true, 'date-time': true },
+  formats: { uuid: true, 'date-time': true, date: true },
 });
 
 const validateGoogleSignInResponse = ajv.compile(GOOGLE_SIGN_IN_RESPONSE_SCHEMA);
 const validateAuthMeResponse = ajv.compile(AUTH_ME_RESPONSE_SCHEMA);
 const validateCardListResponse = ajv.compile(CARD_LIST_RESPONSE_SCHEMA);
 const validateCardImages = ajv.compile(CARD_IMAGES_RESPONSE_SCHEMA);
+const validateCard = ajv.compile(CARD_RESPONSE_SCHEMA);
+const validateSearchResult = ajv.compile(SEARCH_RESULT_SCHEMA);
+const validateCardPrices = ajv.compile(CARD_PRICES_RESPONSE_SCHEMA);
+const validateCardPriceHistory = ajv.compile(CARD_PRICE_HISTORY_RESPONSE_SCHEMA);
 
 const getApiBaseUrl = (): string => {
   const extra = Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined;
@@ -61,7 +75,7 @@ const mapStatusToKind = (status: number | null, body: unknown): ApiErrorKind => 
   if (status === 400) return 'VALIDATION_ERROR';
   if (status === 401) return code === 'AUTH_INVALID_GOOGLE_TOKEN' ? 'AUTH_INVALID_GOOGLE_TOKEN' : 'AUTH_INVALID_TOKEN';
   if (status === 403) return 'AUTH_NOT_ALLOWLISTED';
-  if (status === 404 && code === 'CARD_NOT_FOUND') return 'CARD_NOT_FOUND';
+  if (status === 404 && code === 'CARD_NOT_FOUND') return 'NOT_FOUND';
   if (status === 503 && code === 'PROVIDER_UNAVAILABLE') return 'PROVIDER_UNAVAILABLE';
   if (status === null) return 'NETWORK_OFFLINE';
   return 'UNKNOWN';
@@ -228,12 +242,195 @@ export const getCardImages = async (id: string): Promise<CardImages> => {
   return body as CardImages;
 };
 
+/**
+ * Search the global card catalogue (spec 018 / FR-005, FR-013).
+ * Serialises array filter dimensions as comma-separated querystring values.
+ *
+ * @param query - filter dimensions + page + limit. See {@link SearchQuery}.
+ * @returns the validated `SearchResult` body.
+ * @throws {ApiError} on 401/403/4xx/5xx/network/schema failures.
+ *
+ * @example
+ *   const res = await searchCards({ formats: ['Modern'], page: 1, limit: 9 });
+ */
+export const searchCards = async (query: SearchQuery): Promise<SearchResult> => {
+  const params = new URLSearchParams();
+  if (query.name) params.set('name', query.name);
+  if (query.set) params.set('set', query.set);
+  if (query.colorIdentity?.length) params.set('colors', query.colorIdentity.join(','));
+  if (query.cmcMin != null) params.set('cmc_min', String(query.cmcMin));
+  if (query.cmcMax != null) params.set('cmc_max', String(query.cmcMax));
+  if (query.formats?.length) params.set('formats', query.formats.join(','));
+  if (query.superTypes?.length) params.set('super_types', query.superTypes.join(','));
+  if (query.subTypes?.length) params.set('sub_types', query.subTypes.join(','));
+  if (query.creatureTypes?.length) params.set('creature_types', query.creatureTypes.join(','));
+  if (query.missingOnly) params.set('missing_only', 'true');
+  if (query.page != null) params.set('page', String(query.page));
+  if (query.limit != null) params.set('limit', String(query.limit));
+  const body = await fetchJson<SearchResult>({
+    path: `/cards/search?${params.toString()}`,
+    method: 'GET',
+    validator: validateSearchResult,
+  });
+  return body as SearchResult;
+};
+
+/**
+ * Fetch the latest per-source price quote for one printing (spec 018 / FR-017).
+ *
+ * @param id - MTGJSON printing UUID.
+ * @returns the validated `CardPricesResponse`; `null` slots when no observation.
+ * @throws {ApiError} on 404 (`NOT_FOUND`), 503 (`PROVIDER_UNAVAILABLE`), or schema failures.
+ *
+ * @example
+ *   const prices = await getCardPrices('6ca7af0b-…');
+ */
+export const getCardPrices = async (id: string): Promise<CardPricesResponse> => {
+  const body = await fetchJson<CardPricesResponse>({
+    path: `/cards/${encodeURIComponent(id)}/prices`,
+    method: 'GET',
+    validator: validateCardPrices,
+  });
+  return body as CardPricesResponse;
+};
+
+/**
+ * Fetch the per-source price history for one printing (spec 018 / FR-018).
+ *
+ * @param id - MTGJSON printing UUID.
+ * @param days - window length in calendar days (default 30 server-side).
+ * @returns the validated `CardPriceHistoryResponse`.
+ *
+ * @example
+ *   const history = await getCardPriceHistory('6ca7af0b-…', 30);
+ */
+export const getCardPriceHistory = async (
+  id: string,
+  days: number,
+): Promise<CardPriceHistoryResponse> => {
+  const body = await fetchJson<CardPriceHistoryResponse>({
+    path: `/cards/${encodeURIComponent(id)}/prices/history?days=${days}`,
+    method: 'GET',
+    validator: validateCardPriceHistory,
+  });
+  return body as CardPriceHistoryResponse;
+};
+
+/**
+ * Fetch a single owned card by its MTGJSON printing UUID. Used by the card
+ * detail sheet to hydrate hero metadata not present in the catalogue payload.
+ *
+ * @param id - MTGJSON printing UUID.
+ * @returns the validated `Card`.
+ * @throws {ApiError} with `kind: 'NOT_FOUND'` (404).
+ *
+ * @example
+ *   const card = await getCard('6ca7af0b-…');
+ */
+export const getCard = async (id: string): Promise<Card> => {
+  const body = await fetchJson<Card>({
+    path: `/cards/${encodeURIComponent(id)}`,
+    method: 'GET',
+    validator: validateCard,
+  });
+  return body as Card;
+};
+
+/**
+ * Upsert a card into the binder (spec 018 / FR-025). A fresh `(id, userId)`
+ * pair creates a row at `numberOwned=1`; a duplicate increments. The server
+ * returns the resulting Card in either case.
+ *
+ * @param input - `{ id, name }` where `id` is the MTGJSON printing UUID.
+ * @returns the validated `Card`.
+ *
+ * @example
+ *   await upsertCard({ id: '…', name: 'Lightning Bolt' });
+ */
+export const upsertCard = async (input: { id: string; name: string }): Promise<Card> => {
+  const body = await fetchJson<Card>({
+    path: '/cards',
+    method: 'POST',
+    body: input,
+    validator: validateCard,
+  });
+  return body as Card;
+};
+
+/**
+ * Increment or decrement a card's `numberOwned` (spec 018 / FR-026, FR-028).
+ * `delta: -1` at `numberOwned = 1` deletes the row server-side and returns
+ * 204; the response shape distinguishes the two outcomes.
+ *
+ * @param id - MTGJSON printing UUID.
+ * @param body - `{ delta: 1 | -1 }`.
+ * @returns `{ status: 200, card }` when the row remains, `{ status: 204 }` when deleted.
+ * @throws {ApiError} with `kind: 'NOT_FOUND'` (404) when the row doesn't exist.
+ *
+ * @example
+ *   const result = await patchCard(printingId, { delta: -1 });
+ *   if (result.status === 204) { … row deleted … }
+ */
+export const patchCard = async (
+  id: string,
+  body: PatchCardBody,
+): Promise<{ status: 200; card: Card } | { status: 204 }> => {
+  const url = `${getApiBaseUrl()}/cards/${encodeURIComponent(id)}`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'PATCH',
+      headers: buildHeaders(),
+      body: JSON.stringify(body),
+    });
+  } catch (cause) {
+    console.error(`[apiClient] network failure for PATCH /cards/${id}`, cause);
+    throw new ApiError({
+      message: 'Network unavailable',
+      status: null,
+      kind: 'NETWORK_OFFLINE',
+      cause,
+    });
+  }
+
+  if (!response.ok) {
+    const errBody = await parseJsonSafely(response);
+    console.error(`[apiClient] non-OK response ${response.status} for PATCH /cards/${id}`, errBody);
+    throw new ApiError({
+      message: `Request failed with status ${response.status}`,
+      status: response.status,
+      kind: mapStatusToKind(response.status, errBody),
+      cause: errBody,
+    });
+  }
+
+  if (response.status === 204) return { status: 204 };
+
+  const json = await parseJsonSafely(response);
+  if (!validateCard(json)) {
+    console.error('[apiClient] schema validation failed for PATCH /cards', validateCard.errors);
+    throw new ApiError({
+      message: 'Response failed schema validation',
+      status: response.status,
+      kind: 'VALIDATION_ERROR',
+      cause: validateCard.errors,
+    });
+  }
+  return { status: 200, card: json as Card };
+};
+
 export const apiClient = {
   signInWithGoogle,
   getMe,
   signOut,
   getCards,
   getCardImages,
+  searchCards,
+  getCardPrices,
+  getCardPriceHistory,
+  getCard,
+  upsertCard,
+  patchCard,
 };
 
 export type ApiClient = typeof apiClient;

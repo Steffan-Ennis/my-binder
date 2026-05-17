@@ -13,9 +13,15 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "test": "jest",
     "dev": "tsc --watch"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "ajv": "^8.18.0",
+    "ajv-formats": "^3.0.1",
+    "jest": "^30.3.0",
+    "ts-jest": "^29.4.6",
     "typescript": "^5.7.0"
   }
 }

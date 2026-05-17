@@ -1,0 +1,1957 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spec 018 · Card Catalogue Search — Clickable Wireframe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  /* === Design tokens — sourced from apps/mobile/src/constants/theme.ts === */
+  :root {
+    /* Palette */
+    --crimson-900: #1a0606;
+    --crimson-700: #3a0f10;
+    --crimson-500: #5c1d1f;
+    --crimson-400: #5c2b2e;
+    --coral-400:   #ff8a80;
+    --tab-bg:      rgb(251, 247, 240);
+    --gold-500:    #c9a86b;
+    --gold-600:    #b8924a;
+    --gold-300:    #e0c891;
+    --rose-200:    #e9b5b5;
+    --rose-400:    #a6797a;
+    --white:       #ffffff;
+    --ink:         #1f1f1f;
+    --black:       #050304;
+
+    /* Semantic (dark scheme — the default per theme.ts) */
+    --bg-cover:        var(--crimson-700);
+    --bg-elevated:     var(--crimson-500);
+    --bg-deep:         var(--crimson-900);
+    --bg-canvas:       var(--tab-bg);
+    --pocket-empty:    var(--crimson-400);
+    --text:            var(--rose-200);
+    --text-muted:      var(--rose-400);
+    --text-inverted:   var(--ink);
+    --accent:          var(--gold-500);
+    --accent-pressed:  var(--gold-600);
+    --accent-soft:     var(--gold-300);
+    --tabbar-bg:       var(--tab-bg);
+    --tab-icon:        var(--rose-400);
+    --tab-icon-sel:    var(--gold-500);
+    --error:           var(--coral-400);
+    --border:          var(--crimson-400);
+
+    /* Type */
+    --font-serif:   'Cormorant Garamond', Georgia, serif;
+    --font-sans:    'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+    /* Spacing (4pt) */
+    --sp-xxs: 4px;
+    --sp-xs:  8px;
+    --sp-sm:  12px;
+    --sp-md:  16px;
+    --sp-lg:  20px;
+    --sp-xl:  24px;
+    --sp-xxl: 32px;
+    --sp-xxxl: 48px;
+
+    /* Radius */
+    --r-sm: 4px;
+    --r-md: 8px;
+    --r-lg: 12px;
+    --r-xl: 16px;
+    --r-xxl: 24px;
+    --r-pill: 999px;
+
+    /* Motion */
+    --mo-fast: 120ms;
+    --mo-base: 200ms;
+    --mo-slow: 320ms;
+    --mo-page: 360ms;
+
+    /* Touch */
+    --touch-min: 48px;
+    --tabbar-h:  56px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #1a1a1a;
+    color: var(--text);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+    padding: 32px 16px 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+
+  /* ============================================================== */
+  /*  Workspace header + demo controls (outside phone frame)         */
+  /* ============================================================== */
+  .workspace-header {
+    color: #d8d8d8;
+    text-align: center;
+    max-width: 480px;
+  }
+  .workspace-header h1 {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 700;
+    font-size: 28px;
+    margin: 0 0 4px;
+    color: var(--gold-300);
+  }
+  .workspace-header p {
+    margin: 0;
+    font-size: 13px;
+    color: #999;
+    letter-spacing: 0.2px;
+  }
+
+  .demo-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    max-width: 720px;
+  }
+  .demo-toolbar button {
+    background: #2a2a2a;
+    color: #e0e0e0;
+    border: 1px solid #3a3a3a;
+    border-radius: var(--r-pill);
+    padding: 6px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    transition: all var(--mo-fast);
+  }
+  .demo-toolbar button:hover { background: #3a3a3a; border-color: var(--gold-500); color: var(--gold-300); }
+  .demo-toolbar .toolbar-sep {
+    width: 1px; background: #3a3a3a; margin: 0 4px;
+  }
+
+  /* ============================================================== */
+  /*  Phone frame                                                    */
+  /* ============================================================== */
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: var(--bg-deep);
+    border-radius: 44px;
+    padding: 8px;
+    box-shadow:
+      0 0 0 4px #0a0a0a,
+      0 0 0 6px #1f1f1f,
+      0 30px 60px -10px rgba(0,0,0,0.6),
+      0 0 80px -20px rgba(0,0,0,0.4);
+    position: relative;
+    overflow: hidden;
+  }
+  .phone-screen {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(var(--crimson-700) 0%, var(--crimson-500) 100%);
+    border-radius: 36px;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Status bar (visual chrome only) */
+  .status-bar {
+    height: 44px;
+    flex-shrink: 0;
+    color: var(--rose-200);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px 0 32px;
+    font-size: 14px;
+    font-weight: 600;
+    position: relative;
+  }
+  .status-bar::after {
+    content: '';
+    position: absolute;
+    top: 8px; left: 50%; transform: translateX(-50%);
+    width: 120px; height: 28px;
+    background: var(--black);
+    border-radius: 999px;
+  }
+  .status-bar .status-right { display: flex; gap: 6px; align-items: center; }
+  .status-bar .status-right svg { width: 16px; height: 12px; }
+
+  /* ============================================================== */
+  /*  Masthead (shared header — FR-002)                              */
+  /* ============================================================== */
+  .masthead {
+    background: linear-gradient(180deg, var(--crimson-700) 0%, var(--crimson-500) 100%);
+    padding: var(--sp-md) var(--sp-lg) var(--sp-lg);
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(201, 168, 107, 0.15);
+    position: relative;
+    z-index: 4;
+  }
+  .masthead-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-md);
+  }
+  .masthead-icon {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    color: var(--gold-500);
+  }
+  .masthead-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .masthead-overline {
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 4px;
+    color: var(--gold-500);
+    margin: 0;
+    text-transform: uppercase;
+  }
+  .masthead-title {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 700;
+    font-size: 36px;
+    line-height: 1;
+    color: var(--rose-200);
+    margin: 4px 0 0;
+    letter-spacing: -0.5px;
+  }
+  .masthead-actions {
+    display: flex;
+    gap: var(--sp-xs);
+    flex-shrink: 0;
+  }
+  .masthead-btn {
+    width: var(--touch-min);
+    height: var(--touch-min);
+    border-radius: var(--r-pill);
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(201, 168, 107, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gold-300);
+    cursor: pointer;
+    transition: all var(--mo-fast);
+    padding: 0;
+  }
+  .masthead-btn:hover { background: rgba(0,0,0,0.5); border-color: var(--gold-500); color: var(--gold-500); }
+  .masthead-btn.active {
+    background: var(--gold-500);
+    color: var(--crimson-900);
+    border-color: var(--gold-300);
+  }
+  .masthead-btn svg { width: 20px; height: 20px; }
+
+  /* Search-expanded state */
+  .masthead.searching .masthead-row {
+    background: rgba(0,0,0,0.3);
+    border-radius: var(--r-pill);
+    padding: 4px 8px 4px 16px;
+    border: 1px solid var(--gold-500);
+  }
+  .masthead.searching .masthead-icon,
+  .masthead.searching .masthead-text { display: none; }
+  .masthead.searching .search-prefix {
+    color: var(--gold-300);
+    display: flex;
+    flex-shrink: 0;
+  }
+  .masthead.searching .search-prefix svg { width: 18px; height: 18px; }
+  .masthead.searching .search-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--rose-200);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    padding: 12px;
+    outline: none;
+  }
+  .masthead.searching .search-input::placeholder {
+    color: var(--rose-400);
+    font-style: italic;
+  }
+  .masthead .search-prefix { display: none; }
+
+  .filter-pill-bar {
+    display: none;
+    margin-top: var(--sp-sm);
+    gap: var(--sp-xs);
+    flex-wrap: wrap;
+  }
+  .masthead.searching .filter-pill-bar,
+  .masthead.has-filters .filter-pill-bar {
+    display: flex;
+  }
+  .filter-pill {
+    background: rgba(201, 168, 107, 0.18);
+    border: 1px solid rgba(201, 168, 107, 0.45);
+    color: var(--gold-300);
+    border-radius: var(--r-pill);
+    padding: 4px 8px 4px 12px;
+    font-size: 11px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--font-sans);
+    letter-spacing: 0.3px;
+  }
+  .filter-pill button {
+    background: transparent;
+    border: none;
+    color: var(--gold-300);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 2px;
+  }
+  .filter-pill.open-filters {
+    background: transparent;
+    border-color: var(--gold-500);
+    color: var(--gold-500);
+    cursor: pointer;
+  }
+
+  /* ============================================================== */
+  /*  Canvas (paper-cream, holds binder page + pager)                */
+  /* ============================================================== */
+  .canvas {
+    flex: 1;
+    background: var(--bg-canvas);
+    display: flex;
+    flex-direction: column;
+    padding: var(--sp-lg) var(--sp-md) var(--sp-md);
+    overflow: hidden;
+    position: relative;
+  }
+  .summary-caption {
+    text-align: center;
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: var(--sp-md);
+    flex-shrink: 0;
+  }
+  .summary-caption .dot { color: var(--gold-600); margin: 0 6px; }
+
+  .binder-page {
+    flex: 1;
+    background: var(--white);
+    border-radius: var(--r-xl);
+    padding: var(--sp-lg) var(--sp-md) var(--sp-md) var(--sp-lg);
+    position: relative;
+    box-shadow:
+      inset 0 0 0 1px rgba(0,0,0,0.05),
+      0 4px 16px -4px rgba(0,0,0,0.12);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  /* Ring perforations */
+  .binder-page::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 220px;
+    background-image:
+      radial-gradient(circle at 50% 30px, var(--crimson-400) 3px, transparent 3.5px),
+      radial-gradient(circle at 50% 50%, var(--crimson-400) 3px, transparent 3.5px),
+      radial-gradient(circle at 50% calc(100% - 30px), var(--crimson-400) 3px, transparent 3.5px);
+  }
+
+  .pocket-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: var(--sp-xs);
+    min-height: 0;
+  }
+
+  /* ============================================================== */
+  /*  Card pocket                                                    */
+  /* ============================================================== */
+  .pocket {
+    position: relative;
+    border-radius: var(--r-md);
+    overflow: hidden;
+    aspect-ratio: 5 / 7;
+    cursor: pointer;
+    transition: transform var(--mo-fast);
+  }
+  .pocket:active { transform: scale(0.96); }
+
+  .pocket.empty {
+    background: transparent;
+    border: 1.5px dashed rgba(92, 43, 46, 0.5);
+    cursor: default;
+  }
+  .pocket.skeleton {
+    background: linear-gradient(110deg,
+      #efe9dc 8%, #f7f2e6 18%, #efe9dc 33%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s linear infinite;
+    cursor: default;
+  }
+  @keyframes shimmer {
+    from { background-position-x: 200%; }
+    to   { background-position-x: -200%; }
+  }
+
+  .pocket-card {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* Owned-count glyph (FR-024) */
+  .owned-glyph {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    background: var(--gold-500);
+    color: var(--crimson-900);
+    border-radius: var(--r-pill);
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid var(--white);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    z-index: 2;
+    line-height: 1;
+  }
+
+  /* Inline +/- action glyph (FR-025 / FR-026) */
+  .pocket-action {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    width: 24px;
+    height: 24px;
+    border-radius: var(--r-pill);
+    background: rgba(26, 6, 6, 0.85);
+    color: var(--gold-300);
+    border: 1.5px solid var(--gold-500);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 2;
+    transition: all var(--mo-fast);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0;
+    font-family: var(--font-sans);
+  }
+  .pocket-action:hover {
+    background: var(--gold-500);
+    color: var(--crimson-900);
+    transform: scale(1.08);
+  }
+  .pocket-action.remove { background: rgba(255, 138, 128, 0.18); border-color: var(--coral-400); color: var(--coral-400); }
+  .pocket-action.remove:hover { background: var(--coral-400); color: var(--crimson-900); }
+
+  /* Empty-state message inside the binder page */
+  .empty-canvas-msg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--sp-xl);
+    text-align: center;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .empty-canvas-msg p {
+    font-family: var(--font-serif);
+    font-style: italic;
+    color: var(--text-muted);
+    font-size: 15px;
+    margin: 0 0 var(--sp-sm);
+  }
+  .empty-canvas-msg button {
+    pointer-events: auto;
+    background: transparent;
+    border: 1px solid var(--gold-600);
+    color: var(--gold-600);
+    border-radius: var(--r-pill);
+    padding: 6px 14px;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    font-family: var(--font-sans);
+  }
+  .empty-canvas-msg button:hover { background: var(--gold-600); color: var(--white); }
+
+  /* "Results out-of-date — refresh" affordance (FR-031) */
+  .refresh-hint {
+    position: absolute;
+    top: var(--sp-md);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--ink);
+    color: var(--gold-300);
+    border-radius: var(--r-pill);
+    padding: 8px 16px;
+    font-size: 12px;
+    font-family: var(--font-sans);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+    z-index: 5;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--gold-500);
+    animation: hintIn var(--mo-slow);
+  }
+  @keyframes hintIn {
+    from { opacity: 0; transform: translate(-50%, -10px); }
+    to   { opacity: 1; transform: translate(-50%, 0); }
+  }
+  .refresh-hint svg { width: 14px; height: 14px; }
+
+  /* ============================================================== */
+  /*  Pager                                                          */
+  /* ============================================================== */
+  /*
+   * Pager — gesture-driven (horizontal swipe) per spec FR-010 + the 2026-05-17
+   * Clarifications entry. No flanking < / > arrow buttons in the shipped UI;
+   * only a centred italic "Page N of M" / "Page N of MANY" indicator.
+   *
+   * This wireframe is static HTML so we surface a small left/right tap zone
+   * on either side of the indicator as a click-only fallback for demo —
+   * those tap zones are invisible in the real app.
+   */
+  .pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-md);
+    padding: var(--sp-md) 0 var(--sp-xs);
+    flex-shrink: 0;
+  }
+  .pager-zone {
+    width: 56px; height: 28px;
+    background: transparent;
+    border: 1px dashed rgba(184, 146, 74, 0.35);
+    border-radius: var(--r-pill);
+    color: rgba(184, 146, 74, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--mo-fast);
+    font-family: var(--font-sans);
+    font-size: 9px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+  }
+  .pager-zone:hover { background: rgba(201, 168, 107, 0.12); color: var(--gold-600); border-color: var(--gold-600); }
+  .pager-zone:disabled { opacity: 0.15; cursor: not-allowed; }
+  .pager-indicator {
+    text-align: center;
+    min-width: 140px;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 18px;
+    color: var(--ink);
+    letter-spacing: 1px;
+  }
+  .pager-indicator .many { color: var(--gold-600); }
+
+  /* ============================================================== */
+  /*  Tab bar (bottom — spec 002)                                    */
+  /* ============================================================== */
+  .tabbar {
+    height: var(--tabbar-h);
+    background: var(--tabbar-bg);
+    border-top: 1px solid rgba(0,0,0,0.06);
+    flex-shrink: 0;
+    display: flex;
+    padding: 4px 0 0;
+    z-index: 3;
+  }
+  .tab {
+    flex: 1;
+    background: none;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    color: var(--tab-icon);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.4px;
+    padding: 4px 0;
+  }
+  .tab.active { color: var(--tab-icon-sel); }
+  .tab svg { width: 22px; height: 22px; }
+
+  /* ============================================================== */
+  /*  Bottom sheets (filter sheet, detail sheet)                     */
+  /* ============================================================== */
+  .scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 4, 4, 0.55);
+    z-index: 10;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--mo-base);
+  }
+  .scrim.open { opacity: 1; pointer-events: auto; }
+
+  .sheet {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--white);
+    border-top-left-radius: var(--r-xxl);
+    border-top-right-radius: var(--r-xxl);
+    z-index: 11;
+    transform: translateY(100%);
+    transition: transform var(--mo-slow) cubic-bezier(0.2, 0.8, 0.2, 1);
+    color: var(--ink);
+    max-height: 78%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 -10px 30px rgba(0,0,0,0.3);
+  }
+  .sheet.open { transform: translateY(0); }
+  .sheet-grabber {
+    width: 40px;
+    height: 4px;
+    background: rgba(0,0,0,0.18);
+    border-radius: 2px;
+    margin: 10px auto 0;
+    flex-shrink: 0;
+  }
+  .sheet-header {
+    padding: var(--sp-md) var(--sp-lg) var(--sp-sm);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .sheet-header h2 {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 700;
+    font-size: 22px;
+    margin: 0;
+    color: var(--ink);
+  }
+  .sheet-close {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--r-pill);
+    background: rgba(0,0,0,0.06);
+    border: none;
+    color: var(--ink);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sheet-close svg { width: 16px; height: 16px; }
+  .sheet-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 var(--sp-lg) var(--sp-lg);
+  }
+  .sheet-footer {
+    padding: var(--sp-sm) var(--sp-lg) calc(var(--sp-lg) + env(safe-area-inset-bottom, 0));
+    display: flex;
+    gap: var(--sp-sm);
+    border-top: 1px solid rgba(0,0,0,0.06);
+    flex-shrink: 0;
+  }
+  .sheet-footer button { flex: 1; }
+
+  .btn {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: var(--r-pill);
+    padding: 12px 20px;
+    border: none;
+    cursor: pointer;
+    transition: all var(--mo-fast);
+  }
+  .btn-primary { background: var(--crimson-700); color: var(--white); }
+  .btn-primary:hover { background: var(--crimson-900); }
+  .btn-ghost { background: transparent; color: var(--ink); border: 1px solid rgba(0,0,0,0.18); }
+  .btn-ghost:hover { background: rgba(0,0,0,0.05); }
+
+  /* ============================================================== */
+  /*  Filter sheet                                                   */
+  /* ============================================================== */
+  .filter-row { margin-bottom: var(--sp-lg); }
+  .filter-label {
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    color: var(--rose-400);
+    margin: 0 0 8px;
+  }
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chip {
+    background: rgba(58, 15, 16, 0.06);
+    border: 1px solid rgba(58, 15, 16, 0.18);
+    color: var(--ink);
+    border-radius: var(--r-pill);
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all var(--mo-fast);
+    font-family: var(--font-sans);
+  }
+  .chip:hover { border-color: var(--gold-600); }
+  .chip.selected {
+    background: var(--crimson-700);
+    color: var(--white);
+    border-color: var(--crimson-700);
+  }
+
+  .color-chip {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--r-pill);
+    border: 2px solid rgba(0,0,0,0.12);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink);
+    font-weight: 700;
+    font-size: 13px;
+    transition: all var(--mo-fast);
+    background: var(--white);
+  }
+  .color-chip[data-color="W"] { background: #fffbe6; color: #8b7700; }
+  .color-chip[data-color="U"] { background: #cfe7ff; color: #0a4a8c; }
+  .color-chip[data-color="B"] { background: #2a2a2a; color: #e0c891; }
+  .color-chip[data-color="R"] { background: #ffc9c0; color: #8c1818; }
+  .color-chip[data-color="G"] { background: #c6e2c1; color: #2a5c2a; }
+  .color-chip[data-color="C"] { background: #e0e0d8; color: #5a5a4a; }
+  .color-chip.selected { box-shadow: 0 0 0 3px var(--gold-500), 0 0 0 5px var(--white); }
+
+  .cmc-range {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-sm);
+  }
+  .cmc-range input {
+    width: 56px;
+    padding: 8px 12px;
+    border: 1px solid rgba(0,0,0,0.18);
+    border-radius: var(--r-md);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    text-align: center;
+  }
+  .cmc-range span { color: var(--text-muted); font-size: 12px; }
+
+  /* Toggle (Missing only) */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--sp-md) 0;
+    border-top: 1px solid rgba(0,0,0,0.06);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    margin-bottom: var(--sp-lg);
+  }
+  .toggle-row .label-block { flex: 1; padding-right: var(--sp-md); }
+  .toggle-row .label-block strong {
+    display: block;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .toggle-row .label-block small {
+    display: block;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .toggle {
+    width: 48px;
+    height: 28px;
+    background: rgba(0,0,0,0.18);
+    border-radius: var(--r-pill);
+    position: relative;
+    cursor: pointer;
+    transition: background var(--mo-fast);
+    flex-shrink: 0;
+    border: none;
+    padding: 0;
+  }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 22px; height: 22px;
+    background: var(--white);
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    transition: transform var(--mo-fast);
+  }
+  .toggle.on { background: var(--gold-500); }
+  .toggle.on::after { transform: translateX(20px); }
+
+  /* ============================================================== */
+  /*  Card detail sheet                                              */
+  /* ============================================================== */
+  .detail-hero {
+    display: flex;
+    gap: var(--sp-md);
+    padding: 0 var(--sp-lg) var(--sp-md);
+  }
+  .detail-art {
+    width: 110px;
+    aspect-ratio: 5 / 7;
+    border-radius: var(--r-md);
+    overflow: hidden;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+  }
+  .detail-meta { flex: 1; min-width: 0; }
+  .detail-name {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 700;
+    font-size: 22px;
+    color: var(--ink);
+    margin: 0 0 4px;
+    line-height: 1.15;
+  }
+  .detail-set {
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--rose-400);
+    margin: 0 0 8px;
+  }
+  .detail-type {
+    font-family: var(--font-sans);
+    font-size: 13px;
+    color: var(--ink);
+    margin: 0 0 var(--sp-sm);
+  }
+  .detail-oracle {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.4;
+    margin: 0;
+  }
+
+  /* Stepper (FR-028) */
+  .stepper-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--sp-md) var(--sp-lg);
+    background: rgba(201, 168, 107, 0.08);
+    border-top: 1px solid rgba(201, 168, 107, 0.18);
+    border-bottom: 1px solid rgba(201, 168, 107, 0.18);
+    margin: 0 0 var(--sp-md);
+  }
+  .stepper-row .label {
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .stepper-row .label small {
+    display: block;
+    font-weight: 400;
+    color: var(--text-muted);
+    font-size: 11px;
+    margin-top: 2px;
+  }
+  .stepper {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-sm);
+    background: var(--white);
+    border-radius: var(--r-pill);
+    border: 1px solid var(--gold-600);
+    padding: 4px;
+  }
+  .stepper button {
+    width: 36px; height: 36px;
+    border-radius: var(--r-pill);
+    background: var(--crimson-700);
+    color: var(--white);
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--mo-fast);
+    font-family: var(--font-sans);
+    line-height: 1;
+    padding: 0;
+  }
+  .stepper button:hover:not(:disabled) { background: var(--crimson-900); }
+  .stepper button:disabled { opacity: 0.3; cursor: not-allowed; }
+  .stepper .count {
+    min-width: 32px;
+    text-align: center;
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 700;
+    font-size: 22px;
+    color: var(--ink);
+  }
+
+  /* Prices section (FR-017) */
+  .prices {
+    padding: 0 var(--sp-lg);
+    margin-bottom: var(--sp-md);
+  }
+  .prices h3 {
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--rose-400);
+    margin: 0 0 var(--sp-sm);
+  }
+  .price-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px dashed rgba(0,0,0,0.08);
+  }
+  .price-row:last-child { border-bottom: none; }
+  .price-source {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-sm);
+  }
+  .price-swatch { width: 10px; height: 10px; border-radius: var(--r-sm); }
+  .price-name {
+    font-family: var(--font-sans);
+    font-size: 13px;
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .price-value {
+    font-family: var(--font-serif);
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--ink);
+    font-feature-settings: 'tnum';
+  }
+  .price-value.missing { color: var(--text-muted); font-style: italic; }
+
+  /* 30-day chart (FR-018) */
+  .chart-wrap {
+    padding: var(--sp-md) var(--sp-lg) 0;
+  }
+  .chart-wrap h3 {
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--rose-400);
+    margin: 0 0 var(--sp-sm);
+  }
+  .chart-svg { width: 100%; height: 140px; display: block; }
+  .chart-legend {
+    display: flex;
+    justify-content: center;
+    gap: var(--sp-md);
+    padding: var(--sp-xs) 0 var(--sp-md);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .chart-legend .lg-item { display: inline-flex; align-items: center; gap: 4px; }
+  .chart-legend .lg-swatch { width: 12px; height: 2px; }
+
+  /* Pulse on glyph appearance */
+  @keyframes pulseGlyph {
+    0%   { transform: scale(0.5); opacity: 0; }
+    60%  { transform: scale(1.15); opacity: 1; }
+    100% { transform: scale(1); }
+  }
+  .owned-glyph.pulse { animation: pulseGlyph var(--mo-base); }
+
+  /* Card SVG colour washes used in art rectangles */
+  .annotation {
+    color: #999; font-size: 12px; max-width: 720px; text-align: center;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+
+<div class="workspace-header">
+  <h1>Spec 018 · Card Catalogue Search</h1>
+  <p>Clickable wireframe — tokens from <code>apps/mobile/src/constants/theme.ts</code>, typography Cormorant Garamond + Inter</p>
+</div>
+
+<div class="demo-toolbar" id="toolbar">
+  <button data-action="go-binder">Binder tab</button>
+  <button data-action="go-catalogue">Catalogue tab</button>
+  <span class="toolbar-sep"></span>
+  <button data-action="open-search">Expand search</button>
+  <button data-action="open-filters">Open filters</button>
+  <button data-action="toggle-missing">Toggle "Missing only"</button>
+  <button data-action="show-detail">Open card detail</button>
+  <span class="toolbar-sep"></span>
+  <button data-action="show-skeleton">Show skeleton page</button>
+  <button data-action="show-empty">Show empty result</button>
+  <button data-action="show-refresh-hint">Show refresh hint</button>
+  <button data-action="reset">Reset state</button>
+</div>
+
+<p class="annotation">
+  Tap any pocket = open detail sheet · Tap <code>+</code> on a Catalogue pocket = add to binder ·
+  Tap <code>−</code> on a Binder pocket = remove · Tap search/filter buttons in header to expand.
+</p>
+
+<p class="annotation" style="color:#e0c891; max-width:680px; border:1px solid #3a3a3a; padding:12px 16px; border-radius:8px; background:#222;">
+  <strong style="color:#c9a86b;">Wireframe-only note — page navigation:</strong>
+  The dashed "swipe →" / "← swipe" pills on either side of the page indicator are <strong>not part
+  of the shipped UI</strong>. The real app navigates pages by horizontal swipe gesture on the binder
+  page; the canvas shows only the centred italic "N of M" indicator (matching the existing Binder
+  view). The dashed pills exist here purely so this static HTML is click-navigable. See spec
+  <code>FR-010</code> and the 2026-05-17 Clarifications entry.
+</p>
+
+<div class="phone">
+  <div class="phone-screen" id="screen">
+
+    <!-- Status bar (visual chrome) -->
+    <div class="status-bar">
+      <span>9:41</span>
+      <span class="status-right">
+        <svg viewBox="0 0 16 12" fill="currentColor"><path d="M0 8h2v4H0zM4 6h2v6H4zM8 3h2v9H8zM12 0h2v12h-2z"/></svg>
+        <span style="font-size: 11px;">100%</span>
+      </span>
+    </div>
+
+    <!-- MASTHEAD (shared component — FR-002) -->
+    <header class="masthead" id="masthead">
+      <div class="masthead-row">
+        <!-- Inline mark — binder + fanned cards -->
+        <svg class="masthead-icon" viewBox="0 0 48 48" fill="none">
+          <rect x="6" y="10" width="32" height="34" rx="2" stroke="currentColor" stroke-width="2.2"/>
+          <line x1="6" y1="17" x2="38" y2="17" stroke="currentColor" stroke-width="1.4"/>
+          <line x1="6" y1="37" x2="38" y2="37" stroke="currentColor" stroke-width="1.4"/>
+          <circle cx="9" cy="13.5" r="1" fill="currentColor"/>
+          <circle cx="9" cy="27" r="1" fill="currentColor"/>
+          <circle cx="9" cy="40.5" r="1" fill="currentColor"/>
+          <!-- fanned cards top-right -->
+          <g transform="translate(28 4) rotate(8)">
+            <rect width="12" height="16" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          </g>
+          <g transform="translate(31 2) rotate(18)">
+            <rect width="12" height="16" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          </g>
+        </svg>
+
+        <!-- Search prefix (only when searching) -->
+        <span class="search-prefix">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="6"/><path d="M20 20l-3.5-3.5"/></svg>
+        </span>
+
+        <div class="masthead-text">
+          <p class="masthead-overline">MY-BINDER</p>
+          <h1 class="masthead-title" id="mastheadTitle">Catalogue</h1>
+        </div>
+
+        <input class="search-input" id="searchInput" placeholder="Search the catalogue…" />
+
+        <div class="masthead-actions">
+          <button class="masthead-btn" id="btnSearch" title="Search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="6"/><path d="M20 20l-3.5-3.5"/></svg>
+          </button>
+          <button class="masthead-btn" id="btnProfile" title="Profile">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="9" r="3.6"/><path d="M5 20c1.6-3.5 4.4-5 7-5s5.4 1.5 7 5"/></svg>
+          </button>
+          <button class="masthead-btn" id="btnSearchClose" title="Close" style="display:none">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter chips bar (visible while searching OR when filters active) -->
+      <div class="filter-pill-bar" id="filterPills"></div>
+    </header>
+
+    <!-- Canvas + binder page -->
+    <main class="canvas" id="canvas">
+      <div class="summary-caption" id="summary"></div>
+
+      <div class="binder-page">
+        <div class="pocket-grid" id="grid"></div>
+        <div class="empty-canvas-msg" id="emptyMsg" style="display:none">
+          <p id="emptyText">No cards match these filters</p>
+          <button id="emptyClearBtn">CLEAR FILTERS</button>
+        </div>
+      </div>
+
+      <!--
+        Shipped UI: gesture-driven page turn. No flanking arrows.
+        Demo-only invisible tap zones provide click-through navigation for this
+        static wireframe — they are NOT part of the shipped surface.
+      -->
+      <div class="pager">
+        <button class="pager-zone" id="prevPage" title="(demo) prev — real app swipes right">swipe →</button>
+        <div class="pager-indicator" id="pageIndicator">1 of 48</div>
+        <button class="pager-zone" id="nextPage" title="(demo) next — real app swipes left">← swipe</button>
+      </div>
+
+      <!-- Refresh-hint banner (FR-031) -->
+      <div class="refresh-hint" id="refreshHint" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="23 4 23 10 17 10"/><path d="M20.5 14.5A8.5 8.5 0 1 1 19 8"/></svg>
+        Results out-of-date — tap to refresh
+      </div>
+    </main>
+
+    <!-- Bottom tab bar (spec 002) -->
+    <nav class="tabbar">
+      <button class="tab" data-tab="binder">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="14" height="16" rx="1"/><line x1="3" y1="8" x2="17" y2="8"/><line x1="3" y1="16" x2="17" y2="16"/><path d="M17 4l4 2v12l-4 2"/></svg>
+        <span>Binder</span>
+      </button>
+      <button class="tab" data-tab="catalogue">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="6"/><path d="M20 20l-3.5-3.5"/></svg>
+        <span>Search</span>
+      </button>
+      <button class="tab" data-tab="scan">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
+        <span>Scan</span>
+      </button>
+      <button class="tab" data-tab="profile">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="9" r="3.6"/><path d="M5 20c1.6-3.5 4.4-5 7-5s5.4 1.5 7 5"/></svg>
+        <span>Profile</span>
+      </button>
+    </nav>
+
+    <!-- Scrim shared between sheets -->
+    <div class="scrim" id="scrim"></div>
+
+    <!-- FILTER SHEET -->
+    <aside class="sheet" id="filterSheet">
+      <div class="sheet-grabber"></div>
+      <div class="sheet-header">
+        <h2>Refine catalogue</h2>
+        <button class="sheet-close" id="closeFilters" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="sheet-body">
+
+        <div class="toggle-row">
+          <div class="label-block">
+            <strong>Missing only</strong>
+            <small>Hide cards already in your binder</small>
+          </div>
+          <button class="toggle" id="toggleMissing" aria-label="Missing only"></button>
+        </div>
+
+        <div class="filter-row">
+          <p class="filter-label">Set</p>
+          <div class="chip-row" data-filter="set">
+            <button class="chip" data-val="M21">M21</button>
+            <button class="chip" data-val="MH3">MH3</button>
+            <button class="chip" data-val="LCI">LCI</button>
+            <button class="chip" data-val="WOE">WOE</button>
+            <button class="chip" data-val="DSK">DSK</button>
+            <button class="chip" data-val="more">+ more…</button>
+          </div>
+        </div>
+
+        <div class="filter-row">
+          <p class="filter-label">Format legality</p>
+          <div class="chip-row" data-filter="format">
+            <button class="chip" data-val="Standard">Standard</button>
+            <button class="chip" data-val="Modern">Modern</button>
+            <button class="chip" data-val="Legacy">Legacy</button>
+            <button class="chip" data-val="Vintage">Vintage</button>
+            <button class="chip" data-val="Commander">Commander</button>
+            <button class="chip" data-val="Pauper">Pauper</button>
+          </div>
+        </div>
+
+        <div class="filter-row">
+          <p class="filter-label">Card super type</p>
+          <div class="chip-row" data-filter="super">
+            <button class="chip" data-val="Legendary">Legendary</button>
+            <button class="chip" data-val="Basic">Basic</button>
+            <button class="chip" data-val="Snow">Snow</button>
+            <button class="chip" data-val="World">World</button>
+          </div>
+        </div>
+
+        <div class="filter-row">
+          <p class="filter-label">Card sub type</p>
+          <div class="chip-row" data-filter="sub">
+            <button class="chip" data-val="Equipment">Equipment</button>
+            <button class="chip" data-val="Aura">Aura</button>
+            <button class="chip" data-val="Saga">Saga</button>
+            <button class="chip" data-val="Vehicle">Vehicle</button>
+          </div>
+        </div>
+
+        <div class="filter-row">
+          <p class="filter-label">Creature type</p>
+          <div class="chip-row" data-filter="creature">
+            <button class="chip" data-val="Elf">Elf</button>
+            <button class="chip" data-val="Goblin">Goblin</button>
+            <button class="chip" data-val="Wizard">Wizard</button>
+            <button class="chip" data-val="Dragon">Dragon</button>
+            <button class="chip" data-val="Zombie">Zombie</button>
+            <button class="chip" data-val="more">+ more…</button>
+          </div>
+        </div>
+
+        <div class="filter-row">
+          <p class="filter-label">Converted mana cost</p>
+          <div class="cmc-range">
+            <input type="number" id="cmcMin" value="0" min="0" max="20" />
+            <span>to</span>
+            <input type="number" id="cmcMax" value="20" min="0" max="20" />
+          </div>
+        </div>
+
+        <div class="filter-row">
+          <p class="filter-label">Colour identity</p>
+          <div class="chip-row" data-filter="colors">
+            <button class="color-chip" data-val="W" data-color="W">W</button>
+            <button class="color-chip" data-val="U" data-color="U">U</button>
+            <button class="color-chip" data-val="B" data-color="B">B</button>
+            <button class="color-chip" data-val="R" data-color="R">R</button>
+            <button class="color-chip" data-val="G" data-color="G">G</button>
+            <button class="color-chip" data-val="C" data-color="C">C</button>
+          </div>
+        </div>
+
+      </div>
+      <div class="sheet-footer">
+        <button class="btn btn-ghost" id="clearAll">Clear all</button>
+        <button class="btn btn-primary" id="applyFilters">Apply</button>
+      </div>
+    </aside>
+
+    <!-- DETAIL SHEET -->
+    <aside class="sheet" id="detailSheet">
+      <div class="sheet-grabber"></div>
+      <div class="sheet-header">
+        <h2 id="detailHeader">Card detail</h2>
+        <button class="sheet-close" id="closeDetail" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="sheet-body" id="detailBody"></div>
+    </aside>
+
+  </div><!-- /.phone-screen -->
+</div><!-- /.phone -->
+
+<p class="annotation">
+  This wireframe demonstrates spec 018 across the Catalogue and Binder tabs. The masthead, canvas, pocket grid,
+  and pager are the shared visual contract from spec 016. Add / remove glyphs, owned-count badge, filter sheet,
+  detail sheet, and 30-day chart are scope additions from spec 018 (FR-005 through FR-031).
+</p>
+
+<script>
+  /* =====================================================================
+   *  Sample card data — 18 entries that roughly stand in for what the
+   *  catalogue endpoint would return. Mana / type / colours match
+   *  reality just well enough to demo filters and the per-printing badge.
+   * ===================================================================== */
+  const CARDS = [
+    { id: 'm21-lb',  name: 'Lightning Bolt',       set: 'M21', setCode: 'M21', type: 'Instant',                        cmc: 1, colors: ['R'], formats: ['Modern','Legacy','Commander','Pauper'], super: [], sub: [] },
+    { id: 'm21-ct',  name: 'Counterspell',         set: 'M21', setCode: 'M21', type: 'Instant',                        cmc: 2, colors: ['U'], formats: ['Modern','Legacy','Commander'], super: [], sub: [] },
+    { id: 'cmr-sr',  name: 'Sol Ring',             set: 'CMR', setCode: 'CMR', type: 'Artifact',                       cmc: 1, colors: [],    formats: ['Commander'],                 super: [], sub: [] },
+    { id: 'mh3-rg',  name: 'Ragavan, Nimble Pilferer', set: 'MH3', setCode: 'MH3', type: 'Legendary Creature — Monkey Pirate', cmc: 1, colors: ['R'], formats: ['Modern','Legacy','Commander'], super: ['Legendary'], sub: ['Monkey','Pirate'] },
+    { id: 'lci-rh',  name: 'Rakdos, Lord of Riots',    set: 'LCI', setCode: 'LCI', type: 'Legendary Creature — Demon',        cmc: 4, colors: ['B','R'], formats: ['Modern','Legacy','Commander'], super: ['Legendary'], sub: ['Demon'] },
+    { id: 'woe-en',  name: 'Eldrazi Conscription',     set: 'WOE', setCode: 'WOE', type: 'Tribal Enchantment — Eldrazi Aura',  cmc: 8, colors: [], formats: ['Legacy','Vintage','Commander'], super: [], sub: ['Aura'] },
+    { id: 'dsk-bg',  name: 'Birds of Paradise',        set: 'DSK', setCode: 'DSK', type: 'Creature — Bird',                    cmc: 1, colors: ['G'], formats: ['Modern','Legacy','Commander'], super: [], sub: ['Bird'] },
+    { id: 'mh3-ll',  name: 'Llanowar Elves',           set: 'MH3', setCode: 'MH3', type: 'Creature — Elf Druid',               cmc: 1, colors: ['G'], formats: ['Modern','Legacy','Commander','Pauper'], super: [], sub: ['Elf','Druid'] },
+    { id: 'm21-gp',  name: 'Goblin Piledriver',        set: 'M21', setCode: 'M21', type: 'Creature — Goblin Warrior',          cmc: 2, colors: ['R'], formats: ['Modern','Legacy','Commander'], super: [], sub: ['Goblin','Warrior'] },
+    { id: 'lci-wf',  name: 'Wandering Familiar',       set: 'LCI', setCode: 'LCI', type: 'Creature — Cat Wizard',              cmc: 2, colors: ['U'], formats: ['Standard','Modern','Commander'], super: [], sub: ['Cat','Wizard'] },
+    { id: 'mh3-sf',  name: 'Sword of Fire and Ice',    set: 'MH3', setCode: 'MH3', type: 'Artifact — Equipment',               cmc: 3, colors: [], formats: ['Modern','Legacy','Commander'], super: [], sub: ['Equipment'] },
+    { id: 'woe-sb',  name: 'Sagas of Bloom',           set: 'WOE', setCode: 'WOE', type: 'Enchantment — Saga',                 cmc: 4, colors: ['G'], formats: ['Standard','Modern','Commander'], super: [], sub: ['Saga'] },
+    { id: 'dsk-zr',  name: 'Zombie Renegade',          set: 'DSK', setCode: 'DSK', type: 'Creature — Zombie',                  cmc: 3, colors: ['B'], formats: ['Standard','Modern'], super: [], sub: ['Zombie'] },
+    { id: 'lci-dr',  name: 'Dragon Roost',             set: 'LCI', setCode: 'LCI', type: 'Enchantment',                        cmc: 6, colors: ['R'], formats: ['Modern','Commander'], super: [], sub: [] },
+    { id: 'mh3-fr',  name: 'Force of Will',            set: 'MH3', setCode: 'MH3', type: 'Instant',                            cmc: 5, colors: ['U'], formats: ['Legacy','Vintage','Commander'], super: [], sub: [] },
+    { id: 'dsk-sn',  name: 'Snow-Covered Plains',      set: 'DSK', setCode: 'DSK', type: 'Basic Snow Land — Plains',           cmc: 0, colors: [], formats: ['Standard','Modern','Legacy','Vintage','Commander'], super: ['Basic','Snow'], sub: [] },
+    { id: 'woe-fb',  name: 'Faithless Looting',        set: 'WOE', setCode: 'WOE', type: 'Sorcery',                            cmc: 1, colors: ['R'], formats: ['Legacy','Commander','Pauper'], super: [], sub: [] },
+    { id: 'lci-pl',  name: 'Polluted Delta',           set: 'LCI', setCode: 'LCI', type: 'Land',                               cmc: 0, colors: [], formats: ['Legacy','Vintage','Commander'], super: [], sub: [] },
+  ];
+
+  /* =====================================================================
+   *  App state
+   * ===================================================================== */
+  const state = {
+    tab: 'catalogue',          // 'catalogue' | 'binder'
+    searchOpen: false,
+    searchQuery: '',
+    filterSheetOpen: false,
+    detailSheetOpen: false,
+    detailCardId: null,
+    filters: {
+      set: [], format: [], super: [], sub: [], creature: [], colors: [],
+      cmcMin: 0, cmcMax: 20, missingOnly: false,
+    },
+    /** binder = { [cardId]: numberOwned } */
+    binder: { 'm21-lb': 3, 'mh3-ll': 1, 'cmr-sr': 1, 'dsk-bg': 2 },
+    /** Frozen result set used while user adds — see FR-031 defer-and-refresh */
+    catalogueResults: [],
+    /** Stale-flag for the "refresh" affordance */
+    showRefreshHint: false,
+    /** Overrides — toolbar-driven demo modes */
+    overrideMode: null,        // null | 'skeleton' | 'empty'
+    catPage: 1,
+    binPage: 1,
+  };
+
+  /* =====================================================================
+   *  Render-card SVG — drawn inline so the wireframe is self-contained
+   * ===================================================================== */
+  function colorWash(colors) {
+    if (colors.length === 0)        return ['#dcd2bf', '#a89878'];
+    if (colors.length > 1)          return ['#d4a85f', '#8b6a30'];
+    switch (colors[0]) {
+      case 'W': return ['#fff5cc', '#bca35a'];
+      case 'U': return ['#a9d2ff', '#1d4a7b'];
+      case 'B': return ['#4a3a3a', '#1c1414'];
+      case 'R': return ['#ff9a85', '#7a1f1a'];
+      case 'G': return ['#9fcf8a', '#2d6324'];
+    }
+    return ['#cccccc', '#666666'];
+  }
+
+  function pipText(colors, cmc) {
+    if (colors.length === 0 && cmc > 0)  return String(cmc);
+    if (colors.length === 0)             return '';
+    if (cmc <= colors.length)            return colors.join('');
+    return (cmc - colors.length) + colors.join('');
+  }
+
+  function cardSVG(card) {
+    const [topC, botC] = colorWash(card.colors);
+    const pip = pipText(card.colors, card.cmc);
+    const safeName = card.name.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    const safeType = card.type.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    return `
+      <svg class="pocket-card" viewBox="0 0 100 140" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="g-${card.id}" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stop-color="${topC}"/>
+            <stop offset="100%" stop-color="${botC}"/>
+          </linearGradient>
+          <linearGradient id="art-${card.id}" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0%" stop-color="${topC}" stop-opacity="0.4"/>
+            <stop offset="100%" stop-color="${botC}" stop-opacity="0.95"/>
+          </linearGradient>
+        </defs>
+        <!-- card body -->
+        <rect width="100" height="140" rx="6" fill="url(#g-${card.id})"/>
+        <!-- inner frame -->
+        <rect x="4" y="4" width="92" height="132" rx="4" fill="none" stroke="rgba(0,0,0,0.18)" stroke-width="0.6"/>
+        <!-- title bar -->
+        <rect x="6" y="6" width="88" height="11" rx="2" fill="rgba(0,0,0,0.55)"/>
+        <text x="9" y="14" fill="#f0e3c0" font-family="Cormorant Garamond, serif" font-style="italic" font-weight="700" font-size="6.4">${safeName}</text>
+        ${pip ? `<circle cx="89" cy="11.5" r="3.6" fill="rgba(255,255,255,0.92)"/>
+                 <text x="89" y="13.6" text-anchor="middle" font-family="Inter, sans-serif" font-size="4.4" font-weight="700" fill="#1a1a1a">${pip}</text>` : ''}
+        <!-- art rectangle -->
+        <rect x="6" y="19" width="88" height="68" fill="url(#art-${card.id})"/>
+        <!-- decorative -->
+        <circle cx="50" cy="53" r="14" fill="rgba(255,255,255,0.12)"/>
+        <path d="M30 75 L50 45 L70 75 Z" fill="rgba(0,0,0,0.18)"/>
+        <!-- type line -->
+        <rect x="6" y="88" width="88" height="9" rx="1.5" fill="rgba(0,0,0,0.55)"/>
+        <text x="9" y="94.5" fill="#f0e3c0" font-family="Inter, sans-serif" font-size="4.4" font-weight="500">${safeType}</text>
+        <!-- body box -->
+        <rect x="6" y="99" width="88" height="35" rx="2" fill="rgba(245,238,220,0.78)" stroke="rgba(0,0,0,0.15)" stroke-width="0.5"/>
+        <text x="50" y="120" text-anchor="middle" fill="rgba(0,0,0,0.45)" font-family="Inter, sans-serif" font-size="5" font-weight="600" letter-spacing="0.5">${card.setCode}</text>
+      </svg>
+    `;
+  }
+
+  /* =====================================================================
+   *  Filtering
+   * ===================================================================== */
+  function matches(card, query, f) {
+    if (query && query.trim()) {
+      const tokens = query.trim().toLowerCase().split(/\s+/);
+      const hay = (card.name + ' ' + card.set + ' ' + card.type).toLowerCase();
+      if (!tokens.every(t => hay.includes(t))) return false;
+    }
+    if (f.set.length         && !f.set.includes(card.setCode)) return false;
+    if (f.format.length      && !f.format.some(x => card.formats.includes(x))) return false;
+    if (f.super.length       && !f.super.some(x => card.super.includes(x))) return false;
+    if (f.sub.length         && !f.sub.some(x => card.sub.includes(x))) return false;
+    if (f.creature.length    && !f.creature.some(x => card.sub.includes(x))) return false;
+    if (f.colors.length      && !(
+      (f.colors.includes('C') && card.colors.length === 0) ||
+      f.colors.filter(c => c !== 'C').some(c => card.colors.includes(c))
+    )) return false;
+    if (card.cmc < f.cmcMin || card.cmc > f.cmcMax) return false;
+    if (f.missingOnly && (state.binder[card.id] ?? 0) > 0) return false;
+    return true;
+  }
+
+  function computeResults() {
+    if (state.tab === 'binder') {
+      return Object.entries(state.binder)
+        .filter(([, n]) => n > 0)
+        .map(([id]) => CARDS.find(c => c.id === id))
+        .filter(Boolean);
+    }
+    return CARDS.filter(c => matches(c, state.searchQuery, state.filters));
+  }
+
+  function pageOf(results, page, perPage = 9) {
+    const start = (page - 1) * perPage;
+    return results.slice(start, start + perPage);
+  }
+
+  function filterCount() {
+    const f = state.filters;
+    return f.set.length + f.format.length + f.super.length + f.sub.length +
+      f.creature.length + f.colors.length +
+      (f.cmcMin > 0 || f.cmcMax < 20 ? 1 : 0) + (f.missingOnly ? 1 : 0);
+  }
+
+  /* =====================================================================
+   *  Render
+   * ===================================================================== */
+  const $ = (sel) => document.querySelector(sel);
+
+  function render() {
+    // Tabs
+    document.querySelectorAll('.tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.tab === state.tab ||
+        (state.tab === 'catalogue' && t.dataset.tab === 'catalogue'));
+    });
+    // Masthead title
+    $('#mastheadTitle').textContent = state.tab === 'binder' ? 'My Binder' : 'Catalogue';
+    $('#searchInput').placeholder = state.tab === 'binder'
+      ? 'Search this binder…'
+      : 'Search the catalogue…';
+
+    // Masthead state
+    const m = $('#masthead');
+    m.classList.toggle('searching', state.searchOpen);
+    m.classList.toggle('has-filters', !state.searchOpen && filterCount() > 0 && state.tab === 'catalogue');
+    $('#btnSearch').style.display = state.searchOpen ? 'none' : '';
+    $('#btnProfile').style.display = state.searchOpen ? 'none' : '';
+    $('#btnSearchClose').style.display = state.searchOpen ? '' : 'none';
+    $('#btnSearch').classList.toggle('active', state.searchOpen);
+
+    // Filter pills
+    renderFilterPills();
+
+    // Results + paging
+    let results;
+    if (state.overrideMode === 'empty') {
+      results = [];
+    } else if (state.overrideMode === 'skeleton') {
+      results = null;
+    } else {
+      results = computeResults();
+    }
+
+    const page = state.tab === 'catalogue' ? state.catPage : state.binPage;
+    const perPage = 9;
+    const pageCards = results == null ? null : pageOf(results, page, perPage);
+
+    // Grid
+    const grid = $('#grid');
+    grid.innerHTML = '';
+    $('#emptyMsg').style.display = (results && results.length === 0) ? '' : 'none';
+
+    if (results == null) {
+      // skeleton — 9 shimmering pockets
+      for (let i = 0; i < 9; i++) {
+        const div = document.createElement('div');
+        div.className = 'pocket skeleton';
+        grid.appendChild(div);
+      }
+    } else {
+      for (let i = 0; i < perPage; i++) {
+        const card = pageCards[i];
+        if (!card) {
+          const div = document.createElement('div');
+          div.className = 'pocket empty';
+          grid.appendChild(div);
+        } else {
+          grid.appendChild(renderPocket(card));
+        }
+      }
+    }
+
+    // Summary caption
+    const summary = $('#summary');
+    if (state.overrideMode === 'skeleton') {
+      summary.innerHTML = '<span style="opacity:0.4">— CARDS<span class="dot">·</span>— PAGES</span>';
+    } else if (state.tab === 'binder') {
+      const n = results.length;
+      const pages = Math.max(1, Math.ceil(n / perPage));
+      summary.innerHTML = `${n} CARD${n === 1 ? '' : 'S'}<span class="dot">·</span>${pages} PAGE${pages === 1 ? '' : 'S'}`;
+    } else {
+      const n = results ? results.length : 0;
+      summary.innerHTML = `${n}+ MATCHES<span class="dot">·</span>9 PER PAGE`;
+    }
+
+    // Pager — small italic "N of M" indicator; no buttons in shipped UI.
+    const totalPages = results == null ? 1 : Math.max(1, Math.ceil(results.length / perPage));
+    const openEnded = state.tab === 'catalogue' && results && results.length > page * perPage;
+    if (openEnded) {
+      $('#pageIndicator').innerHTML = `${page} of <span class="many">many</span>`;
+    } else {
+      $('#pageIndicator').textContent = `${page} of ${totalPages}`;
+    }
+    $('#prevPage').disabled = page <= 1;
+    $('#nextPage').disabled = page >= totalPages;
+
+    // Refresh hint
+    $('#refreshHint').style.display = state.showRefreshHint ? '' : 'none';
+
+    // Sheets
+    $('#filterSheet').classList.toggle('open', state.filterSheetOpen);
+    $('#detailSheet').classList.toggle('open', state.detailSheetOpen);
+    $('#scrim').classList.toggle('open', state.filterSheetOpen || state.detailSheetOpen);
+    if (state.detailSheetOpen) renderDetailSheet();
+    renderFilterChips();
+  }
+
+  function renderPocket(card) {
+    const owned = state.binder[card.id] || 0;
+    const showGlyph = state.tab === 'catalogue' ? owned >= 1 : owned >= 2;
+    const action = state.tab === 'catalogue'
+      ? `<button class="pocket-action add" data-action="add" data-card="${card.id}" title="Add to binder">+</button>`
+      : `<button class="pocket-action remove" data-action="remove" data-card="${card.id}" title="Remove from binder">−</button>`;
+    const wrap = document.createElement('div');
+    wrap.className = 'pocket';
+    wrap.dataset.card = card.id;
+    wrap.innerHTML = `
+      ${cardSVG(card)}
+      ${showGlyph ? `<div class="owned-glyph"><span>×${owned}</span></div>` : ''}
+      ${action}
+    `;
+    return wrap;
+  }
+
+  function renderFilterPills() {
+    const bar = $('#filterPills');
+    bar.innerHTML = '';
+    if (state.tab !== 'catalogue') return;
+    const f = state.filters;
+    const add = (label, onRemove) => {
+      const span = document.createElement('span');
+      span.className = 'filter-pill';
+      span.innerHTML = `${label}<button>×</button>`;
+      span.querySelector('button').addEventListener('click', () => { onRemove(); render(); });
+      bar.appendChild(span);
+    };
+    f.set.forEach(v => add(`Set: ${v}`, () => f.set = f.set.filter(x => x !== v)));
+    f.format.forEach(v => add(`Format: ${v}`, () => f.format = f.format.filter(x => x !== v)));
+    f.super.forEach(v => add(`Super: ${v}`, () => f.super = f.super.filter(x => x !== v)));
+    f.sub.forEach(v => add(`Sub: ${v}`, () => f.sub = f.sub.filter(x => x !== v)));
+    f.creature.forEach(v => add(`Creature: ${v}`, () => f.creature = f.creature.filter(x => x !== v)));
+    f.colors.forEach(v => add(`Colour: ${v}`, () => f.colors = f.colors.filter(x => x !== v)));
+    if (f.cmcMin > 0 || f.cmcMax < 20) {
+      add(`CMC ${f.cmcMin}–${f.cmcMax}`, () => { f.cmcMin = 0; f.cmcMax = 20; });
+    }
+    if (f.missingOnly) add('Missing only', () => f.missingOnly = false);
+
+    if (bar.children.length > 0 || state.searchOpen) {
+      const open = document.createElement('button');
+      open.className = 'filter-pill open-filters';
+      open.innerHTML = '⌅ Filters';
+      open.addEventListener('click', () => { state.filterSheetOpen = true; render(); });
+      bar.appendChild(open);
+    }
+  }
+
+  function renderFilterChips() {
+    document.querySelectorAll('#filterSheet [data-filter]').forEach(group => {
+      const key = group.dataset.filter;
+      group.querySelectorAll('.chip, .color-chip').forEach(chip => {
+        const v = chip.dataset.val;
+        if (v === 'more') return;
+        chip.classList.toggle('selected', state.filters[key].includes(v));
+      });
+    });
+    $('#cmcMin').value = state.filters.cmcMin;
+    $('#cmcMax').value = state.filters.cmcMax;
+    $('#toggleMissing').classList.toggle('on', state.filters.missingOnly);
+  }
+
+  /* =====================================================================
+   *  Detail sheet
+   * ===================================================================== */
+  function genPriceSeries(seed, base) {
+    const series = [];
+    let v = base;
+    for (let i = 0; i < 30; i++) {
+      const drift = ((Math.sin((i + seed) * 0.7) + Math.cos((i + seed) * 0.3)) * base * 0.04);
+      v = base + drift;
+      series.push(Math.max(0.05, v));
+    }
+    return series;
+  }
+
+  function renderDetailSheet() {
+    const card = CARDS.find(c => c.id === state.detailCardId);
+    if (!card) return;
+    const owned = state.binder[card.id] || 0;
+    $('#detailHeader').textContent = card.name;
+
+    // Generate three price series — Card Kingdom / MTG Goldfish / TCG Player
+    const base = Math.max(0.5, (card.cmc + 1) * 1.6 + (card.formats.includes('Legacy') ? 8 : 0));
+    const ck = genPriceSeries(1, base * 1.08);
+    const gf = genPriceSeries(7, base * 0.94);
+    const tp = genPriceSeries(13, base * 1.02);
+    const fmt = (n) => `$${n.toFixed(2)}`;
+
+    const colors = {
+      ck: '#c9a86b',
+      gf: '#5c1d1f',
+      tp: '#a6797a',
+    };
+
+    // Chart svg — three lines on same axes
+    const w = 320, h = 130, padL = 28, padR = 8, padT = 8, padB = 22;
+    const all = [...ck, ...gf, ...tp];
+    const min = Math.floor(Math.min(...all) * 0.95);
+    const max = Math.ceil(Math.max(...all) * 1.05);
+    const xs = (i) => padL + (i / 29) * (w - padL - padR);
+    const ys = (v) => padT + (1 - (v - min) / (max - min)) * (h - padT - padB);
+    const line = (series) => 'M ' + series.map((v, i) => `${xs(i).toFixed(1)} ${ys(v).toFixed(1)}`).join(' L ');
+
+    $('#detailBody').innerHTML = `
+      <div class="detail-hero">
+        <div class="detail-art">${cardSVG(card)}</div>
+        <div class="detail-meta">
+          <h3 class="detail-name">${card.name}</h3>
+          <p class="detail-set">${card.setCode} · ${card.set}</p>
+          <p class="detail-type">${card.type}</p>
+          <p class="detail-oracle">An illustrative oracle blurb describing what this printing does within the rules of the game.</p>
+        </div>
+      </div>
+
+      <div class="stepper-row">
+        <div class="label">
+          In your binder
+          <small>${state.tab === 'catalogue' ? 'Catalogue → adds this printing' : 'Binder → remove copies'}</small>
+        </div>
+        <div class="stepper">
+          <button data-stepper="dec" ${owned <= 0 ? 'disabled' : ''}>−</button>
+          <span class="count">${owned}</span>
+          <button data-stepper="inc">+</button>
+        </div>
+      </div>
+
+      <div class="prices">
+        <h3>Prices · physical printing only</h3>
+        <div class="price-row">
+          <span class="price-source"><span class="price-swatch" style="background:${colors.ck}"></span><span class="price-name">Card Kingdom</span></span>
+          <span class="price-value">${fmt(ck[29])}</span>
+        </div>
+        <div class="price-row">
+          <span class="price-source"><span class="price-swatch" style="background:${colors.gf}"></span><span class="price-name">MTG Goldfish</span></span>
+          <span class="price-value">${fmt(gf[29])}</span>
+        </div>
+        <div class="price-row">
+          <span class="price-source"><span class="price-swatch" style="background:${colors.tp}"></span><span class="price-name">TCG Player</span></span>
+          <span class="price-value">${fmt(tp[29])}</span>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <h3>30-day price trend</h3>
+        <svg class="chart-svg" viewBox="0 0 ${w} ${h}">
+          <!-- axis -->
+          <line x1="${padL}" y1="${h - padB}" x2="${w - padR}" y2="${h - padB}" stroke="rgba(0,0,0,0.18)" stroke-width="1"/>
+          <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${h - padB}" stroke="rgba(0,0,0,0.18)" stroke-width="1"/>
+          <!-- y labels -->
+          <text x="${padL - 4}" y="${ys(max) + 3}" text-anchor="end" font-size="9" fill="#888">$${max.toFixed(0)}</text>
+          <text x="${padL - 4}" y="${ys(min) + 3}" text-anchor="end" font-size="9" fill="#888">$${min.toFixed(0)}</text>
+          <!-- x ticks -->
+          <text x="${padL}" y="${h - 6}" font-size="9" fill="#888">30d ago</text>
+          <text x="${w - padR - 16}" y="${h - 6}" font-size="9" fill="#888">today</text>
+          <!-- series -->
+          <path d="${line(ck)}" fill="none" stroke="${colors.ck}" stroke-width="2"/>
+          <path d="${line(gf)}" fill="none" stroke="${colors.gf}" stroke-width="2"/>
+          <path d="${line(tp)}" fill="none" stroke="${colors.tp}" stroke-width="2"/>
+        </svg>
+        <div class="chart-legend">
+          <span class="lg-item"><span class="lg-swatch" style="background:${colors.ck}"></span>Card Kingdom</span>
+          <span class="lg-item"><span class="lg-swatch" style="background:${colors.gf}"></span>MTG Goldfish</span>
+          <span class="lg-item"><span class="lg-swatch" style="background:${colors.tp}"></span>TCG Player</span>
+        </div>
+      </div>
+    `;
+
+    // Stepper handlers
+    $('#detailBody').querySelectorAll('[data-stepper]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.stepper === 'inc') addCard(card.id);
+        else removeCard(card.id);
+        renderDetailSheet();
+        render();
+      });
+    });
+  }
+
+  /* =====================================================================
+   *  Mutations
+   * ===================================================================== */
+  function addCard(id) {
+    state.binder[id] = (state.binder[id] || 0) + 1;
+    if (state.tab === 'catalogue' && (state.filters.missingOnly || filterCount() > 0)) {
+      state.showRefreshHint = true;
+    }
+    // glyph pulse handled via animation class on next render
+    setTimeout(() => {
+      document.querySelectorAll(`.pocket[data-card="${id}"] .owned-glyph`).forEach(g => {
+        g.classList.add('pulse');
+      });
+    }, 10);
+  }
+
+  function removeCard(id) {
+    const cur = state.binder[id] || 0;
+    if (cur <= 0) return;
+    if (cur === 1) delete state.binder[id]; else state.binder[id] = cur - 1;
+  }
+
+  /* =====================================================================
+   *  Event wiring
+   * ===================================================================== */
+  // Tab bar
+  document.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => {
+      const target = t.dataset.tab;
+      if (target === 'binder' || target === 'catalogue') {
+        state.tab = target;
+        state.searchOpen = false;
+        state.detailSheetOpen = false;
+        state.filterSheetOpen = false;
+        state.showRefreshHint = false;
+        state.overrideMode = null;
+        render();
+      }
+    });
+  });
+
+  // Pocket click — open detail; pocket action (+ / -)
+  $('#grid').addEventListener('click', (e) => {
+    const actionBtn = e.target.closest('.pocket-action');
+    if (actionBtn) {
+      e.stopPropagation();
+      const id = actionBtn.dataset.card;
+      if (actionBtn.dataset.action === 'add') addCard(id);
+      else removeCard(id);
+      render();
+      return;
+    }
+    const pocket = e.target.closest('.pocket');
+    if (pocket && !pocket.classList.contains('empty') && !pocket.classList.contains('skeleton')) {
+      state.detailCardId = pocket.dataset.card;
+      state.detailSheetOpen = true;
+      render();
+    }
+  });
+
+  // Masthead search toggle
+  $('#btnSearch').addEventListener('click', () => {
+    state.searchOpen = true;
+    render();
+    setTimeout(() => $('#searchInput').focus(), 50);
+  });
+  $('#btnSearchClose').addEventListener('click', () => {
+    state.searchOpen = false;
+    state.searchQuery = '';
+    $('#searchInput').value = '';
+    render();
+  });
+  $('#searchInput').addEventListener('input', (e) => {
+    state.searchQuery = e.target.value;
+    state.catPage = 1;
+    render();
+  });
+
+  // Profile (Demo no-op)
+  $('#btnProfile').addEventListener('click', () => {
+    alert('Profile shortcut — would route to the Profile tab.');
+  });
+
+  // Pager
+  $('#prevPage').addEventListener('click', () => {
+    if (state.tab === 'catalogue') state.catPage = Math.max(1, state.catPage - 1);
+    else state.binPage = Math.max(1, state.binPage - 1);
+    render();
+  });
+  $('#nextPage').addEventListener('click', () => {
+    if (state.tab === 'catalogue') state.catPage += 1;
+    else state.binPage += 1;
+    render();
+  });
+
+  // Filter sheet
+  $('#closeFilters').addEventListener('click', () => { state.filterSheetOpen = false; render(); });
+  $('#applyFilters').addEventListener('click', () => {
+    state.filterSheetOpen = false;
+    state.catPage = 1;
+    state.showRefreshHint = false;
+    render();
+  });
+  $('#clearAll').addEventListener('click', () => {
+    state.filters = { set:[], format:[], super:[], sub:[], creature:[], colors:[], cmcMin:0, cmcMax:20, missingOnly:false };
+    state.catPage = 1;
+    state.showRefreshHint = false;
+    render();
+  });
+  document.querySelectorAll('#filterSheet [data-filter]').forEach(group => {
+    const key = group.dataset.filter;
+    group.querySelectorAll('.chip, .color-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        if (chip.dataset.val === 'more') return;
+        const v = chip.dataset.val;
+        const arr = state.filters[key];
+        const idx = arr.indexOf(v);
+        if (idx >= 0) arr.splice(idx, 1); else arr.push(v);
+        renderFilterChips();
+      });
+    });
+  });
+  $('#cmcMin').addEventListener('change', (e) => { state.filters.cmcMin = +e.target.value || 0; });
+  $('#cmcMax').addEventListener('change', (e) => { state.filters.cmcMax = +e.target.value || 20; });
+  $('#toggleMissing').addEventListener('click', () => {
+    state.filters.missingOnly = !state.filters.missingOnly;
+    renderFilterChips();
+  });
+
+  // Detail sheet
+  $('#closeDetail').addEventListener('click', () => { state.detailSheetOpen = false; render(); });
+  $('#scrim').addEventListener('click', () => {
+    state.detailSheetOpen = false;
+    state.filterSheetOpen = false;
+    render();
+  });
+
+  // Empty state — clear filters affordance
+  $('#emptyClearBtn').addEventListener('click', () => {
+    state.filters = { set:[], format:[], super:[], sub:[], creature:[], colors:[], cmcMin:0, cmcMax:20, missingOnly:false };
+    state.searchQuery = '';
+    $('#searchInput').value = '';
+    state.overrideMode = null;
+    state.catPage = 1;
+    render();
+  });
+
+  // Refresh hint
+  $('#refreshHint').addEventListener('click', () => {
+    state.showRefreshHint = false;
+    state.catPage = 1;
+    render();
+  });
+
+  // Demo toolbar
+  $('#toolbar').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    const a = btn.dataset.action;
+    if (a === 'go-binder')         { state.tab = 'binder'; state.overrideMode = null; }
+    if (a === 'go-catalogue')      { state.tab = 'catalogue'; state.overrideMode = null; }
+    if (a === 'open-search')       { state.tab = 'catalogue'; state.searchOpen = true; }
+    if (a === 'open-filters')      { state.tab = 'catalogue'; state.filterSheetOpen = true; }
+    if (a === 'toggle-missing')    { state.filters.missingOnly = !state.filters.missingOnly; state.catPage = 1; }
+    if (a === 'show-detail')       {
+      state.detailCardId = state.tab === 'binder'
+        ? Object.keys(state.binder)[0] || 'm21-lb'
+        : 'mh3-rg';
+      state.detailSheetOpen = true;
+    }
+    if (a === 'show-skeleton')     { state.overrideMode = 'skeleton'; }
+    if (a === 'show-empty')        { state.overrideMode = 'empty'; }
+    if (a === 'show-refresh-hint') { state.tab = 'catalogue'; state.showRefreshHint = true; }
+    if (a === 'reset') {
+      state.tab = 'catalogue';
+      state.searchOpen = false; state.searchQuery = '';
+      state.filterSheetOpen = false; state.detailSheetOpen = false;
+      state.filters = { set:[], format:[], super:[], sub:[], creature:[], colors:[], cmcMin:0, cmcMax:20, missingOnly:false };
+      state.binder = { 'm21-lb': 3, 'mh3-ll': 1, 'cmr-sr': 1, 'dsk-bg': 2 };
+      state.showRefreshHint = false;
+      state.overrideMode = null;
+      state.catPage = 1; state.binPage = 1;
+      $('#searchInput').value = '';
+    }
+    setTimeout(() => render(), 0);
+  });
+
+  render();
+</script>
+
+</body>
+</html>

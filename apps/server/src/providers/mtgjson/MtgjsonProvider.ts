@@ -1,5 +1,13 @@
 import type { MtgjsonSDK, CardSet} from 'mtgjson-sdk';
-import type { CardDetails, CardImages, CardRecord, LegalityResult, SearchQuery } from '@my-binder/core';
+import type {
+  CardDetails,
+  CardImages,
+  CardPriceHistoryResponse,
+  CardPricesResponse,
+  CardRecord,
+  LegalityResult,
+  SearchQuery,
+} from '@my-binder/core';
 import type { CardProvider } from '@src/providers/interface';
 import mapCardSetToCardRecord  from './mapper';
 import buildScryfallImageUrls from './scryfallImages';
@@ -242,6 +250,41 @@ class MtgjsonProvider implements CardProvider {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Spec 018 / FR-017 — latest observation per source for a single printing.
+   *
+   * Stub: real implementation lands in spec 018 / US3 (task T057) and fans
+   * out to `sdk.prices.today` per source. Until then this method throws so
+   * the price routes (also gated on US3) fail loudly if wired prematurely.
+   *
+   * @param uuid - MTGJSON printing UUID.
+   * @returns the latest per-source `CardPricesResponse`.
+   *
+   * @example
+   *   const prices = await provider.getPrices('6ca7af0b-…');
+   */
+  async getPrices(uuid: string): Promise<CardPricesResponse> {
+    throw new Error(`MtgjsonProvider.getPrices not implemented (pending spec 018 US3) — uuid=${uuid}`);
+  }
+
+  /**
+   * Spec 018 / FR-018 — per-source 30-day price series for a single printing.
+   *
+   * Stub: real implementation lands in spec 018 / US3 (task T057).
+   *
+   * @param uuid - MTGJSON printing UUID.
+   * @param days - history window length in days (1..365).
+   * @returns the per-source `CardPriceHistoryResponse`.
+   *
+   * @example
+   *   const history = await provider.getPriceHistory('6ca7af0b-…', 30);
+   */
+  async getPriceHistory(uuid: string, days: number): Promise<CardPriceHistoryResponse> {
+    throw new Error(
+      `MtgjsonProvider.getPriceHistory not implemented (pending spec 018 US3) — uuid=${uuid} days=${days}`,
+    );
   }
 
   private async collectCards(cards: CardSet[]): Promise<CardRecord[]> {
