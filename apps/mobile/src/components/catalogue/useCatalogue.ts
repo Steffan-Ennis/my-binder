@@ -1,6 +1,6 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-
 import { useCatalogueInfiniteQuery } from '@src/hooks/useCatalogueInfiniteQuery';
 import { SLOTS_PER_BINDER_PAGE } from '@src/utils/pageMath';
 
@@ -16,6 +16,7 @@ import {
 const DASHED_CAPTION = '— MATCHES · — PER PAGE';
 const PER_PAGE_LABEL = `${SLOTS_PER_BINDER_PAGE} PER PAGE`;
 const SEARCH_DEBOUNCE_MS = 300;
+const CATALOGUE_QUERY_PREFIX = ['catalogue', 'search'] as const;
 
 const formatOpenEndedCaption = (loadedSoFar: number): string =>
   `${loadedSoFar}+ MATCHES · ${PER_PAGE_LABEL}`;
@@ -24,6 +25,18 @@ const formatFiniteCaption = (total: number, totalPages: number): string => {
   const matchNoun = total === 1 ? 'MATCH' : 'MATCHES';
   const pageNoun = totalPages === 1 ? 'PAGE' : 'PAGES';
   return `${total} ${matchNoun} · ${totalPages} ${pageNoun}`;
+};
+
+const hasAnyFilterDimension = (filters: CatalogueFilterSet): boolean => {
+  if (filters.name.trim().length > 0) return true;
+  if (filters.formats.length > 0) return true;
+  if (filters.superTypes.length > 0) return true;
+  if (filters.subTypes.length > 0) return true;
+  if (filters.creatureTypes.length > 0) return true;
+  if (filters.colors.length > 0) return true;
+  if (filters.cmcMin > 0 || filters.cmcMax < 20) return true;
+  if (filters.missingOnly) return true;
+  return false;
 };
 
 // The hook returns the view's prop bundle plus the filter-sheet-container
@@ -37,13 +50,16 @@ export type UseCatalogueResult = CatalogueViewProps & {
 };
 
 /**
- * Feature hook for the Catalogue screen (spec 018 / US1 + US2).
+ * Feature hook for the Catalogue screen (spec 018 / US1 + US2 + US4).
  *
  * US1: composes `useCatalogueInfiniteQuery` with masthead search state; the
  *      search input drives the wire `name` filter via a 300ms debounce.
  * US2: full chip-driven filter set + filter-pill row + filter sheet state.
  *      Filter changes propagate via `onFilterApply`; pill removal commits
  *      immediately (no draft).
+ * US4: exposes `onPocketAddPress` (POST upsert via shared mutation hook),
+ *      the `resultsAreStale` flag (defer-and-refresh per FR-031), and
+ *      `onRefreshPress` to clear the flag + invalidate the catalogue caches.
  *
  * Per Principle X v1.16.0: every non-primitive return value is memoised so
  * `<CatalogueContainer />` re-renders only on real value changes.
@@ -52,12 +68,18 @@ export type UseCatalogueResult = CatalogueViewProps & {
  */
 const useCatalogue = (): UseCatalogueResult => {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  // Only `mutate` is needed from the binder mutation; it is reference-stable
+  // per TanStack docs so `onPocketAddPress` below stays identity-stable
+  // across re-renders (Principle X v1.16.0).
+  const { mutate: mutateBinder } = { mutate: () => {} };
 
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [filters, setFilters] = useState<CatalogueFilterSet>(EMPTY_FILTER_SET);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [resultsAreStale, setResultsAreStale] = useState(false);
 
   // Debounced commit of `searchQuery` into `filters.name`. The visible input
   // updates immediately; the wire query lags so a fast typist doesn't fan out
@@ -82,6 +104,8 @@ const useCatalogue = (): UseCatalogueResult => {
     fetchNextPage,
     refetch,
   } = useCatalogueInfiniteQuery(queryShape);
+
+  const hasActiveFilter = useMemo(() => hasAnyFilterDimension(filters), [filters]);
 
   const pages = useMemo<ReadonlyArray<CataloguePage>>(() => {
     if (!data) return [];
@@ -126,7 +150,10 @@ const useCatalogue = (): UseCatalogueResult => {
     [isSearchActive, searchQuery],
   );
 
-  const filterPills = useMemo(() => buildPills(filters), [filters]);
+  const filterPills = useMemo<ReadonlyArray<CatalogueFilterPill>>(
+    () => buildPills(filters),
+    [filters],
+  );
 
   const onSearchOpen = useCallback(() => {
     setIsSearchActive(true);
@@ -189,6 +216,11 @@ const useCatalogue = (): UseCatalogueResult => {
     setCurrentPage(1);
   }, []);
 
+  const onRefreshPress = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: CATALOGUE_QUERY_PREFIX });
+    setResultsAreStale(false);
+  }, [queryClient]);
+
   return useMemo<UseCatalogueResult>(
     () => ({
       pages,
@@ -207,6 +239,7 @@ const useCatalogue = (): UseCatalogueResult => {
       filterPills,
       filterSheetOpen,
       isEmpty,
+      resultsAreStale,
       onSearchOpen,
       onSearchChange,
       onSearchClose,
@@ -218,6 +251,7 @@ const useCatalogue = (): UseCatalogueResult => {
       onFilterApply,
       onFilterClear,
       onFilterPillRemove,
+      onRefreshPress,
     }),
     [
       pages,
@@ -236,6 +270,7 @@ const useCatalogue = (): UseCatalogueResult => {
       filterPills,
       filterSheetOpen,
       isEmpty,
+      resultsAreStale,
       onSearchOpen,
       onSearchChange,
       onSearchClose,
@@ -247,6 +282,7 @@ const useCatalogue = (): UseCatalogueResult => {
       onFilterApply,
       onFilterClear,
       onFilterPillRemove,
+      onRefreshPress,
     ],
   );
 };

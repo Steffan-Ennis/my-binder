@@ -1,4 +1,4 @@
-import type { CardRecord, SearchQuery, SearchResult } from '@my-binder/core';
+import type {Card, CardRecord, SearchQuery, SearchResult } from '@my-binder/core';
 import { useInfiniteQuery, type UseInfiniteQueryResult } from '@tanstack/react-query';
 
 import { apiClient } from '@src/services/api/apiClient';
@@ -45,7 +45,7 @@ export const useCatalogueInfiniteQuery = (
   return useInfiniteQuery<
     SearchResult,
     ApiError,
-    { pages: ReadonlyArray<SearchResult>; pageParams: ReadonlyArray<number> },
+    { pages: Array<SearchResult>; pageParams: ReadonlyArray<number> },
     readonly ['catalogue', 'search', CatalogueQueryShape],
     number
   >({

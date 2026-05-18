@@ -2,13 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import type { FC } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import PagerView, { type PagerViewProps } from 'react-native-pager-view';
-
-import { Card as CardSlot } from '@src/components/card';
 import Masthead from '@src/components/masthead/Masthead';
-import { SLOTS_PER_BINDER_PAGE } from '@src/utils/pageMath';
-
 import useStyles, { type CatalogueViewStyles } from './CatalogueView.theme';
 import type { CatalogueFilterPill, CatalogueViewProps } from './types';
+import BinderPage from "@src/components/binder-page/BinderPage";
 
 const RING_COUNT = 3;
 const SEARCH_PLACEHOLDER = 'Search the catalogue';
@@ -61,6 +58,7 @@ const CatalogueView: FC<CatalogueViewProps> = ({
   searchQuery,
   hasActiveQuery,
   filterPills,
+  resultsAreStale,
   onSearchOpen,
   onSearchChange,
   onSearchClose,
@@ -70,6 +68,7 @@ const CatalogueView: FC<CatalogueViewProps> = ({
   onFilterSheetOpen,
   onFilterClear,
   onFilterPillRemove,
+  onRefreshPress,
 }) => {
   const styles = useStyles();
 
@@ -118,6 +117,20 @@ const CatalogueView: FC<CatalogueViewProps> = ({
       <View style={styles.canvas}>
         <Text style={styles.summaryCaption}>{summaryCaption}</Text>
 
+        {resultsAreStale ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Refresh catalogue results"
+            onPress={onRefreshPress}
+            style={styles.refreshHint}
+            testID="catalogue-refresh-hint"
+          >
+            <Text style={styles.refreshHintLabel}>
+              Results out of date — tap to refresh
+            </Text>
+          </Pressable>
+        ) : null}
+
         <View style={styles.binderPage} testID="catalogue-page-surface">
           <View style={styles.ringColumn} pointerEvents="none">
             {Array.from({ length: RING_COUNT }).map((_, i) => (
@@ -152,15 +165,7 @@ const CatalogueView: FC<CatalogueViewProps> = ({
               </Pressable>
             </View>
           ) : isLoading || pages.length === 0 ? (
-            <View style={styles.grid}>
-              {Array.from({ length: SLOTS_PER_BINDER_PAGE }).map((_, slot) => (
-                <View
-                  key={slot}
-                  style={[styles.pocket, styles.pocketSkeleton]}
-                  testID="catalogue-skeleton-pocket"
-                />
-              ))}
-            </View>
+             <BinderPage pageIndex={0} cards={[]} isLoading={true} />
           ) : (
             <PagerView
               style={styles.pager}
@@ -168,32 +173,8 @@ const CatalogueView: FC<CatalogueViewProps> = ({
               offscreenPageLimit={1}
               onPageSelected={handlePageSelected}
             >
-              {pages.map((page) => (
-                <View
-                  key={page.pageNumber}
-                  style={styles.grid}
-                  testID={`catalogue-page-${page.pageNumber}`}
-                >
-                  {Array.from({ length: SLOTS_PER_BINDER_PAGE }).map((_, slot) => {
-                    const card = page.cards[slot];
-                    if (card === undefined) {
-                      return (
-                        <View
-                          key={slot}
-                          style={[styles.pocket, styles.pocketEmpty]}
-                          testID="catalogue-pocket-empty"
-                        />
-                      );
-                    }
-                    return (
-                      <CardSlot
-                        key={card.id}
-                        id={card.id}
-                        footprint="pocket"
-                      />
-                    );
-                  })}
-                </View>
+              {pages.map((page, pageIndex) => (
+                <BinderPage pageIndex={pageIndex} cards={page.cards} isLoading={isLoading} />
               ))}
             </PagerView>
           )}

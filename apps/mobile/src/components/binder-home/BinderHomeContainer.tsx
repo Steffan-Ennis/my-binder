@@ -15,13 +15,10 @@ const BinderHomeContainer: FC = () => {
     isError,
     isSearchActive,
     searchQuery,
-    onSearchOpen,
-    onSearchChange,
-    onSearchClear,
-    onProfilePress,
-    onRetryPress,
-    handlePagerSelected,
     hasActiveQuery,
+    onRetryPress,
+    mastheadProps,
+    handlePagerSelected,
   } = useBinderHome();
 
   return (
@@ -36,13 +33,10 @@ const BinderHomeContainer: FC = () => {
       isError={isError}
       isSearchActive={isSearchActive}
       searchQuery={searchQuery}
-      onSearchOpen={onSearchOpen}
-      onSearchChange={onSearchChange}
-      onSearchClear={onSearchClear}
-      handlePagerSelected={handlePagerSelected}
       hasActiveQuery={hasActiveQuery}
-      onProfilePress={onProfilePress}
       onRetryPress={onRetryPress}
+      mastheadProps={mastheadProps}
+      handlePagerSelected={handlePagerSelected}
     />
   );
 };

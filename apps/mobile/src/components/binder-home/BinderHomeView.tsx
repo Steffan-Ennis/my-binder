@@ -1,20 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { Card } from '@my-binder/core';
 import type { FC } from 'react';
-import {
-  Pressable,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import PagerView, {PagerViewProps} from 'react-native-pager-view';
+import { Pressable, Text, View } from 'react-native';
+import PagerView, { PagerViewProps } from 'react-native-pager-view';
 
-import { Colors } from '@src/constants/theme';
+import Masthead from '@src/components/masthead/Masthead';
+import type { MastheadProps } from '@src/components/masthead/types';
+import { Card as CardSlot } from '@src/components/card';
 import { SLOTS_PER_BINDER_PAGE } from '@src/utils/pageMath';
 
-import useStyles from './BinderHomeView.theme';
-import IconSmall from "@src/components/icons/IconSmall";
-import BinderPage from "@src/components/binder-page/BinderPage";
+import useStyles, { type BinderHomeViewStyles } from './BinderHomeView.theme';
+import BinderPage from '@src/components/binder-page/BinderPage';
 
 const RING_COUNT = 3;
 
@@ -29,13 +25,10 @@ export type BinderHomeViewProps = {
   isError: boolean;
   isSearchActive: boolean;
   searchQuery: string;
-  onSearchOpen: () => void;
-  onSearchChange: (text: string) => void;
-  onSearchClear: () => void;
-  onProfilePress: () => void;
-  onRetryPress: () => void;
   hasActiveQuery: boolean;
-  handlePagerSelected: Required<PagerViewProps>['onPageSelected']
+  onRetryPress: () => void;
+  mastheadProps: MastheadProps;
+  handlePagerSelected: Required<PagerViewProps>['onPageSelected'];
 };
 
 const BinderHomeView: FC<BinderHomeViewProps> = ({
@@ -46,89 +39,14 @@ const BinderHomeView: FC<BinderHomeViewProps> = ({
   noMatches,
   isLoading,
   isError,
-  isSearchActive,
-  searchQuery,
-  onSearchOpen,
-  onSearchChange,
-  onSearchClear,
-  onProfilePress,
   onRetryPress,
-  hasActiveQuery,
-  handlePagerSelected
+  mastheadProps,
+  handlePagerSelected,
 }) => {
   const styles = useStyles();
   return (
     <View style={styles.root} testID="binder-home-root">
-      <View style={styles.headerBar}>
-        {isSearchActive ? (
-          <View style={styles.searchInputRow}>
-            <Ionicons
-              name="search"
-              size={20}
-              color={Colors.dark.accentSoft}
-              style={styles.mastheadIcon}
-            />
-            <TextInput
-              accessibilityLabel="Search this binder"
-              autoFocus
-              value={searchQuery}
-              onChangeText={onSearchChange}
-              placeholder="Search this binder"
-              placeholderTextColor={Colors.dark.textMuted}
-              style={styles.searchInput}
-            />
-            {hasActiveQuery ? (
-              <View
-                style={styles.activeIndicator}
-                testID="binder-search-active-indicator"
-              />
-            ) : null}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Clear search"
-              onPress={onSearchClear}
-              style={styles.iconButton}
-              hitSlop={8}
-            >
-              <Ionicons name="close" size={22} color={Colors.dark.accentSoft} />
-            </Pressable>
-          </View>
-        ) : (
-          <>
-            <View style={styles.mastheadGroup}>
-              <IconSmall />
-              <View style={styles.mastheadText}>
-                <Text style={styles.overline}>MY-BINDER</Text>
-                <Text style={styles.title}>Binder</Text>
-              </View>
-            </View>
-            <View style={styles.headerActions}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Search the binder"
-                onPress={onSearchOpen}
-                style={styles.iconButton}
-                hitSlop={8}
-              >
-                <Ionicons name="search" size={22} color={Colors.dark.accentSoft} />
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Open profile"
-                onPress={onProfilePress}
-                style={styles.iconButton}
-                hitSlop={8}
-              >
-                <Ionicons
-                  name="person-circle-outline"
-                  size={22}
-                  color={Colors.dark.accentSoft}
-                />
-              </Pressable>
-            </View>
-          </>
-        )}
-      </View>
+      <Masthead {...mastheadProps} />
 
       <View style={styles.canvas}>
         <Text style={styles.summaryCaption}>{summaryCaption}</Text>

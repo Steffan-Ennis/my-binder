@@ -110,6 +110,57 @@ export type CatalogueViewStyles = {
     Pick<TextStyle, 'fontFamily' | 'fontSize' | 'color' | 'fontWeight'>
   >;
   filterOpenerIcon: Required<Pick<TextStyle, 'color'>>;
+  // Pocket overlay layer (US4) — wraps Card so the glyph buttons sit on top.
+  pocketWrapper: Required<
+    Pick<ViewStyle, 'width' | 'aspectRatio' | 'marginBottom' | 'position'>
+  >;
+  pocketActionAdd: Required<
+    Pick<
+      ViewStyle,
+      | 'position'
+      | 'bottom'
+      | 'right'
+      | 'width'
+      | 'height'
+      | 'borderRadius'
+      | 'backgroundColor'
+      | 'alignItems'
+      | 'justifyContent'
+    >
+  >;
+  pocketActionAddIcon: Required<Pick<TextStyle, 'color'>>;
+  pocketOwnedGlyph: Required<
+    Pick<
+      ViewStyle,
+      | 'position'
+      | 'top'
+      | 'right'
+      | 'paddingHorizontal'
+      | 'paddingVertical'
+      | 'borderRadius'
+      | 'backgroundColor'
+    >
+  >;
+  pocketOwnedGlyphLabel: Required<
+    Pick<TextStyle, 'fontFamily' | 'fontSize' | 'color' | 'fontWeight'>
+  >;
+  refreshHint: Required<
+    Pick<
+      ViewStyle,
+      | 'marginBottom'
+      | 'paddingHorizontal'
+      | 'paddingVertical'
+      | 'borderRadius'
+      | 'borderWidth'
+      | 'borderColor'
+      | 'backgroundColor'
+      | 'alignItems'
+      | 'justifyContent'
+    >
+  >;
+  refreshHintLabel: Required<
+    Pick<TextStyle, 'fontFamily' | 'fontSize' | 'color' | 'fontWeight' | 'textAlign'>
+  >;
 };
 
 const styles = StyleSheet.create<CatalogueViewStyles>({
@@ -271,6 +322,59 @@ const styles = StyleSheet.create<CatalogueViewStyles>({
   },
   filterOpenerIcon: {
     color: Colors.dark.accentSoft,
+  },
+  pocketWrapper: {
+    width: '32%',
+    aspectRatio: 5 / 7,
+    marginBottom: Spacing.xs,
+    position: 'relative',
+  },
+  pocketActionAdd: {
+    position: 'absolute',
+    bottom: Spacing.xs,
+    right: Spacing.xs,
+    width: 28,
+    height: 28,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.dark.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pocketActionAddIcon: {
+    color: Colors.dark.textOnAccent,
+  },
+  pocketOwnedGlyph: {
+    position: 'absolute',
+    top: Spacing.xs,
+    right: Spacing.xs,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  pocketOwnedGlyphLabel: {
+    fontFamily: Type.bodyStrong.font,
+    fontSize: 11,
+    color: Colors.dark.text,
+    fontWeight: Type.bodyStrong.weight,
+  },
+  refreshHint: {
+    marginBottom: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.dark.accentSoft,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  refreshHintLabel: {
+    fontFamily: Type.bodyStrong.font,
+    fontSize: 13,
+    color: Colors.dark.accentSoft,
+    fontWeight: Type.bodyStrong.weight,
+    textAlign: 'center',
   },
 });
 

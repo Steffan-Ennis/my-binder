@@ -5,10 +5,12 @@ import { useCallback, useMemo, useReducer } from 'react';
 import { useCardsInfiniteQuery } from '@src/hooks/useCardsInfiniteQuery';
 import { binderSearch } from '@src/utils/binderSearch';
 import { pageCount } from '@src/utils/pageMath';
+import type { MastheadProps } from '@src/components/masthead/types';
 import {BinderHomeViewProps} from "@src/components/binder-home/BinderHomeView";
 
 const DASHED_CAPTION = '— CARDS · — PAGE';
 const INITIAL_PAGE = 1;
+const SEARCH_PLACEHOLDER = 'Search this binder';
 
 type BinderHomeState = {
   currentPage: number;
@@ -90,11 +92,8 @@ export type UseBinderHomeResult = Pick<
   'isError' |
   'isSearchActive' |
   'searchQuery' |
-  'onSearchOpen' |
-  'onSearchChange' |
-  'onSearchClear' |
-  'onProfilePress' |
-  'onRetryPress'
+  'onRetryPress' |
+  'mastheadProps'
 >;
 
 /**
@@ -107,10 +106,6 @@ export type UseBinderHomeResult = Pick<
  *
  * Reducer state survives only as long as the screen — it does not need to
  * persist across app restarts, and the only consumer is this screen.
- *
- * The hook integrates two sources:
- * 1. `useCardsInfiniteQuery` — fetches the user's collection from `/cards`.
- * 2. `binderSearch` — pure token-AND filter over the cards by name/set/type.
  *
  * Loading and error states surface the dashed caption (`— CARDS · — PAGE`)
  * and an `isError` flag the view uses to render an inline retry affordance.
@@ -162,7 +157,7 @@ const useBinderHome = (): UseBinderHomeResult => {
     dispatch({ type: 'SEARCH_CHANGED', text });
   }, []);
 
-  const onSearchClear = useCallback(() => {
+  const onSearchClose = useCallback(() => {
     dispatch({ type: 'SEARCH_CLEARED', totalPagesUnfiltered: pageCount(cards.length) });
   }, [cards.length]);
 
@@ -173,6 +168,21 @@ const useBinderHome = (): UseBinderHomeResult => {
   const handlePagerSelected = useCallback<BinderHomeViewProps['handlePagerSelected']>((event) => {
     dispatch({ type: 'PAGE_SELECTED', position: event.nativeEvent.position, totalPages });
   }, [totalPages]);
+
+  const mastheadProps = useMemo<MastheadProps>(
+    () => ({
+      subtitle: 'Binder',
+      searchPlaceholder: SEARCH_PLACEHOLDER,
+      isSearchActive,
+      searchQuery,
+      hasActiveQuery,
+      onSearchOpen,
+      onSearchChange,
+      onSearchClose,
+      onProfilePress,
+    }),
+    [isSearchActive, searchQuery, hasActiveQuery, onSearchOpen, onSearchChange, onSearchClose, onProfilePress],
+  );
 
 
   return useMemo<UseBinderHomeResult>(
@@ -187,13 +197,10 @@ const useBinderHome = (): UseBinderHomeResult => {
       isError,
       isSearchActive,
       searchQuery,
-      onSearchOpen,
       hasActiveQuery,
-      onSearchChange,
-      onSearchClear,
-      onProfilePress,
       onRetryPress,
-      handlePagerSelected
+      handlePagerSelected,
+      mastheadProps,
     }),
     [
       cards,
@@ -206,13 +213,11 @@ const useBinderHome = (): UseBinderHomeResult => {
       isError,
       isSearchActive,
       searchQuery,
-      onSearchOpen,
-      onSearchChange,
-      onSearchClear,
-      onProfilePress,
+      hasActiveQuery,
       onRetryPress,
       handlePagerSelected,
-      hasActiveQuery
+      hasActiveQuery,
+      mastheadProps,
     ],
   );
 };

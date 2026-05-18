@@ -61,6 +61,7 @@ describe('CatalogueContainer — named-props bridge', () => {
     onFilterApply: jest.fn(),
     onFilterClear: jest.fn(),
     onFilterPillRemove: jest.fn(),
+    onRefreshPress: jest.fn(),
   });
 
   it('wires every documented view-prop field to <CatalogueView /> by name (no spread)', () => {
@@ -83,6 +84,7 @@ describe('CatalogueContainer — named-props bridge', () => {
       filters: EMPTY_FILTER_SET,
       filterPills: [],
       filterSheetOpen: false,
+      resultsAreStale: false,
       ...cb,
     });
 
@@ -104,6 +106,7 @@ describe('CatalogueContainer — named-props bridge', () => {
       searchQuery: '',
       hasActiveQuery: false,
       filterPills: [],
+      resultsAreStale: false,
       onSearchOpen: cb.onSearchOpen,
       onSearchChange: cb.onSearchChange,
       onSearchClose: cb.onSearchClose,
@@ -113,6 +116,7 @@ describe('CatalogueContainer — named-props bridge', () => {
       onFilterSheetOpen: cb.onFilterSheetOpen,
       onFilterClear: cb.onFilterClear,
       onFilterPillRemove: cb.onFilterPillRemove,
+      onRefreshPress: cb.onRefreshPress,
     });
   });
 
@@ -134,6 +138,7 @@ describe('CatalogueContainer — named-props bridge', () => {
       filters: EMPTY_FILTER_SET,
       filterPills: [],
       filterSheetOpen: true,
+      resultsAreStale: false,
       ...callbacks(),
     });
 

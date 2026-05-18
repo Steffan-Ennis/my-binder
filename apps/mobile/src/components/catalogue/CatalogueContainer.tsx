@@ -23,6 +23,7 @@ const CatalogueContainer: FC = () => {
     filters,
     filterPills,
     filterSheetOpen,
+    resultsAreStale,
     onSearchOpen,
     onSearchChange,
     onSearchClose,
@@ -34,6 +35,7 @@ const CatalogueContainer: FC = () => {
     onFilterApply,
     onFilterClear,
     onFilterPillRemove,
+    onRefreshPress,
   } = useCatalogue();
 
   return (
@@ -53,6 +55,7 @@ const CatalogueContainer: FC = () => {
         searchQuery={searchQuery}
         hasActiveQuery={hasActiveQuery}
         filterPills={filterPills}
+        resultsAreStale={resultsAreStale}
         onSearchOpen={onSearchOpen}
         onSearchChange={onSearchChange}
         onSearchClose={onSearchClose}
@@ -62,6 +65,7 @@ const CatalogueContainer: FC = () => {
         onFilterSheetOpen={onFilterSheetOpen}
         onFilterClear={onFilterClear}
         onFilterPillRemove={onFilterPillRemove}
+        onRefreshPress={onRefreshPress}
       />
       <CatalogueFilterSheetContainer
         open={filterSheetOpen}

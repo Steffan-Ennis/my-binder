@@ -5,7 +5,7 @@ import { View } from "react-native";
 import type { Card } from "@my-binder/core";
 
 export type CardPocketProps = {
-  card?: Card,
+  card?: Pick<Card, 'id'>,
   slotIndex: number,
   isLoading: boolean
 }

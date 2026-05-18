@@ -36,7 +36,6 @@ const useStyles = (): CardPocketStyles => {
       height: '100%',
     },
   }
-
 };
 
 export default useStyles;
