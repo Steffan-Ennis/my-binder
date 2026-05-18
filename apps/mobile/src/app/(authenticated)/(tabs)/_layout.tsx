@@ -26,6 +26,9 @@ const TabsLayout: FC = () => (
     <Tabs.Screen
       name="search"
       options={{
+        // Spec 018 / contracts/ui.md §1.1 — Catalogue renders its own crimson
+        // masthead edge-to-edge; the tab navigator MUST NOT inject a header.
+        headerShown: false,
         tabBarLabel: 'Search',
         tabBarIcon: ({ color, size }) => <Ionicons name="search" size={size} color={color} />,
       }}

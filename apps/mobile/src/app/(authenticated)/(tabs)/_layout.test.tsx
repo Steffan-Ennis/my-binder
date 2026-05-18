@@ -31,7 +31,7 @@ describe('(tabs) layout', () => {
     }
   });
 
-  it('opts the binder tab out of the default header but leaves other tabs unchanged', () => {
+  it('opts the binder and search tabs out of the default header (spec 016 + spec 018)', () => {
     type ScreenOptions = NonNullable<ComponentProps<typeof Tabs.Screen>['options']>;
     const captured: Record<string, ScreenOptions> = {};
     const spy = jest.fn((props: ComponentProps<typeof Tabs.Screen>) => {
@@ -44,7 +44,8 @@ describe('(tabs) layout', () => {
     try {
       render(<TabsLayout />);
       expect((captured.binder as { headerShown?: boolean }).headerShown).toBe(false);
-      expect((captured.search as { headerShown?: boolean }).headerShown).toBeUndefined();
+      // Spec 018 T033 — Catalogue renders its own crimson masthead edge-to-edge.
+      expect((captured.search as { headerShown?: boolean }).headerShown).toBe(false);
       expect((captured.scan as { headerShown?: boolean }).headerShown).toBeUndefined();
       expect((captured.profile as { headerShown?: boolean }).headerShown).toBeUndefined();
     } finally {

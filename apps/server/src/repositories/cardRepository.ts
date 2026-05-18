@@ -8,6 +8,7 @@ function toCard(entity: CardEntity): Card {
     name: entity.name,
     createdAt: entity.createdAt.toISOString(),
     updatedAt: entity.updatedAt.toISOString(),
+    numberOwned: entity.numberOwned,
   };
 }
 

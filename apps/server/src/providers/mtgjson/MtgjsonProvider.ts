@@ -12,6 +12,40 @@ import type { CardProvider } from '@src/providers/interface';
 import mapCardSetToCardRecord  from './mapper';
 import buildScryfallImageUrls from './scryfallImages';
 
+// Spec 018 / FR-005 — post-fetch filter for the catalogue's new dimensions.
+// Implemented as post-filters because mtgjson-sdk@0.1.1's `cards.search`
+// surface does not accept supertype/subtype/legality array params. The SDK
+// returns paginated parquet rows; we pull the page and trim against the
+// filter set in-process before enrichment.
+const isCreature = (card: CardSet): boolean =>
+  (card.types ?? []).some((t) => t.toLowerCase() === 'creature');
+
+const matchesFormats = (card: CardSet, formats: ReadonlyArray<string>): boolean => {
+  const legalities = (card.legalities ?? {}) as Record<string, string | undefined>;
+  return formats.some((format) => legalities[format.toLowerCase()] === 'Legal');
+};
+
+const matchesSupertypes = (card: CardSet, requested: ReadonlyArray<string>): boolean =>
+  requested.some((value) => (card.supertypes ?? []).includes(value));
+
+const matchesSubtypes = (card: CardSet, requested: ReadonlyArray<string>): boolean =>
+  requested.some((value) => (card.subtypes ?? []).includes(value));
+
+const matchesCreatureTypes = (card: CardSet, requested: ReadonlyArray<string>): boolean =>
+  isCreature(card) && requested.some((value) => (card.subtypes ?? []).includes(value));
+
+const applyCatalogueFilters = (cards: CardSet[], query: SearchQuery): CardSet[] => {
+  return cards.filter((card) => {
+    // FR-021 — paper printings only.
+    if (!card.availability.includes('paper')) return false;
+    if (query.formats?.length && !matchesFormats(card, query.formats)) return false;
+    if (query.superTypes?.length && !matchesSupertypes(card, query.superTypes)) return false;
+    if (query.subTypes?.length && !matchesSubtypes(card, query.subTypes)) return false;
+    if (query.creatureTypes?.length && !matchesCreatureTypes(card, query.creatureTypes)) return false;
+    return true;
+  });
+};
+
 class MtgjsonProvider implements CardProvider {
   private readonly sdk: MtgjsonSDK;
 
@@ -163,7 +197,7 @@ class MtgjsonProvider implements CardProvider {
       availability: 'paper',
     });
 
-    return this.collectCards(cards);
+    return this.collectCards(applyCatalogueFilters(cards, query));
   }
   /**
    * Resolve a single printing by its MTGJSON UUID and return display-ready

@@ -266,4 +266,67 @@ describe('Cards API', () => {
     expect(r.statusCode).toBe(400);
     expect(r.json<{ error: string }>().error).toBe('MISSING_FILTER');
   });
+
+  // ─── Spec 018 / FR-005 — catalogue filter dimensions ──────────────────────
+
+  test('GET /cards/search accepts formats= and treats it as a valid filter', async () => {
+    const r = await fastify.inject({ method: 'GET', url: '/cards/search?formats=Modern' });
+    expect(r.statusCode).toBe(200);
+  });
+
+  test('GET /cards/search accepts super_types= and creature_types=', async () => {
+    const r = await fastify.inject({
+      method: 'GET',
+      url: '/cards/search?super_types=Legendary&creature_types=Elf',
+    });
+    expect(r.statusCode).toBe(200);
+  });
+
+  test('GET /cards/search with missing_only=true and no auth returns 401 AUTH_INVALID_TOKEN', async () => {
+    const r = await fastify.inject({
+      method: 'GET',
+      url: '/cards/search?missing_only=true',
+    });
+    expect(r.statusCode).toBe(401);
+    expect(r.json<{ error: string }>().error).toBe('AUTH_INVALID_TOKEN');
+  });
+
+  test('GET /cards/search with missing_only=true and Bearer auth returns 200', async () => {
+    const r = await fastify.inject({
+      method: 'GET',
+      url: '/cards/search?missing_only=true&name=lightning',
+      headers: authHeaders(),
+    });
+    expect(r.statusCode).toBe(200);
+  });
+
+  test('GET /cards/search authenticated returns numberOwned on every row', async () => {
+    await aCard()
+      .forUser(testUser)
+      .withId(M11_BOLT_UUID)
+      .withName('Lightning Bolt')
+      .persist(dataSource);
+
+    const r = await fastify.inject({
+      method: 'GET',
+      url: '/cards/search?name=lightning+bolt&set=M11',
+      headers: authHeaders(),
+    });
+    expect(r.statusCode).toBe(200);
+    const body = r.json<{ cards: Array<{ id: string; numberOwned?: number }> }>();
+    const bolt = body.cards.find((c) => c.id === M11_BOLT_UUID);
+    expect(bolt?.numberOwned).toBeGreaterThanOrEqual(1);
+  });
+
+  test('GET /cards/search unauthenticated omits numberOwned on every row', async () => {
+    const r = await fastify.inject({
+      method: 'GET',
+      url: '/cards/search?name=lightning+bolt&set=M11',
+    });
+    expect(r.statusCode).toBe(200);
+    const body = r.json<{ cards: Array<{ id: string; numberOwned?: number }> }>();
+    for (const card of body.cards) {
+      expect(card.numberOwned).toBeUndefined();
+    }
+  });
 });

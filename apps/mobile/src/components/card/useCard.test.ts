@@ -137,7 +137,11 @@ describe('useCard — view-prop derivation (FR-009, FR-005, FR-006)', () => {
     }
     await waitFor(() => expect(result.current.error).not.toBeNull());
     const initialCalls = spy.mock.calls.length;
-    await result.current.onRetry();
+    // Fire-and-forget: refetch returns a promise that only settles after the
+    // full retry budget (5 attempts × back-off delays) has elapsed. Awaiting
+    // it deadlocks the test because the back-off delays are fake timers we
+    // can only advance after this synchronous call returns control.
+    void result.current.onRetry();
     for (let index = 0; index < 6; index += 1) {
       await jest.runAllTimersAsync();
     }

@@ -1,5 +1,5 @@
 import type {
-  Card, CardList, CreateCardBody,
+  Card, CardList, CardRecord, CreateCardBody,
   UpdateCardBody, LegalityResult,
   SearchQuery, SearchResult, CardImages,
 } from '@my-binder/core';
@@ -317,9 +317,33 @@ export async function searchCards(query: SearchQuery): Promise<SearchResult> {
   }
 
   const allCards = await activeProvider.search(query)
-  const total = allCards.length;
+
+  // Spec 018 / FR-024 — LEFT JOIN against the user's binder:
+  //   numberOwned = COALESCE(cards.number_owned, 0) per printing.
+  // When userId is absent (anonymous catalogue browse) the field is omitted.
+  let joined: CardRecord[] = allCards;
+  if (query.userId !== undefined) {
+    const userId = query.userId;
+    const ownedRows = await getRepositories().card.findAll(userId);
+    const ownedById = new Map<string, number>();
+    for (const row of ownedRows) {
+      ownedById.set(row.id, row.numberOwned ?? 0);
+    }
+    joined = allCards.map((card) => ({
+      ...card,
+      numberOwned: ownedById.get(card.id) ?? 0,
+    }));
+
+    // FR-005 clarification — `missingOnly` filters AFTER the join so we can
+    // drop owned printings (numberOwned > 0).
+    if (query.missingOnly === true) {
+      joined = joined.filter((card) => (card.numberOwned ?? 0) === 0);
+    }
+  }
+
+  const total = joined.length;
   const offset = (page - 1) * limit;
-  const cards = allCards.slice(offset, offset + limit);
+  const cards = joined.slice(offset, offset + limit);
 
   return {
     cards,

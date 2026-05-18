@@ -14,7 +14,7 @@ import {
   CardNotFoundError,
   ProviderUnavailableError,
 } from './cardService';
-import type { CardImages, CardRecord } from '@my-binder/core';
+import type { CardImages, CardRecord, SearchQuery } from '@my-binder/core';
 
 import { connectTestDatabase, disconnectTestDatabase } from '@root/testing/testDatabase';
 import { aUser } from '@root/testing/userEntityBuilder';
@@ -277,6 +277,75 @@ describe('cardService — provider-backed functions', () => {
       registry.register('search-broken', makeProvider({ search: async () => { throw error; } }));
       await registry.setActive('search-broken');
       await expect(() => searchCards({ name: 'x' })).rejects.toThrow(error);
+    });
+
+    test('forwards new filter dimensions through to the provider (FR-005)', async () => {
+      const calls: SearchQuery[] = [];
+      registry.register('search-forward', makeProvider({
+        search: async (q) => {
+          calls.push(q);
+          return [];
+        },
+      }));
+      await registry.setActive('search-forward');
+
+      await searchCards({
+        name: 'x',
+        formats: ['Modern'],
+        superTypes: ['Legendary'],
+        creatureTypes: ['Elf'],
+        missingOnly: false,
+      });
+
+      expect(calls.length).toBe(1);
+      expect(calls[0]?.formats).toEqual(['Modern']);
+      expect(calls[0]?.superTypes).toEqual(['Legendary']);
+      expect(calls[0]?.creatureTypes).toEqual(['Elf']);
+    });
+
+    test('projects numberOwned per row when userId is supplied (LEFT JOIN semantics)', async () => {
+      const providerCards: CardRecord[] = [
+        { ...LIGHTNING_BOLT, id: UUID_BOLT },
+        { ...SOL_RING, id: UUID_SOL },
+      ];
+      registry.register('search-with-user', makeProvider({ search: async () => providerCards }));
+      await registry.setActive('search-with-user');
+
+      // userA owns only Lightning Bolt (numberOwned defaults to 1 via the entity)
+      await aCard().forUser(userA).withId(UUID_BOLT).withName('Lightning Bolt').persist(dataSource);
+
+      const result = await searchCards({ name: 'any', userId: userA.id });
+
+      const bolt = result.cards.find((c) => c.id === UUID_BOLT);
+      const sol = result.cards.find((c) => c.id === UUID_SOL);
+      expect(bolt?.numberOwned).toBe(1);
+      expect(sol?.numberOwned).toBe(0);
+    });
+
+    test('omits numberOwned when no userId is supplied', async () => {
+      registry.register('search-no-user', makeProvider({
+        search: async () => [{ ...LIGHTNING_BOLT, id: UUID_BOLT }],
+      }));
+      await registry.setActive('search-no-user');
+
+      const result = await searchCards({ name: 'any' });
+      expect(result.cards[0]?.numberOwned).toBeUndefined();
+    });
+
+    test('missingOnly: drops printings whose numberOwned > 0 (FR-005)', async () => {
+      const providerCards: CardRecord[] = [
+        { ...LIGHTNING_BOLT, id: UUID_BOLT },
+        { ...SOL_RING, id: UUID_SOL },
+      ];
+      registry.register('search-missing-only', makeProvider({ search: async () => providerCards }));
+      await registry.setActive('search-missing-only');
+
+      await aCard().forUser(userA).withId(UUID_BOLT).withName('Lightning Bolt').persist(dataSource);
+
+      const result = await searchCards({ name: 'any', userId: userA.id, missingOnly: true });
+
+      expect(result.cards.map((c) => c.id)).toEqual([UUID_SOL]);
+      expect(result.cards[0]?.numberOwned).toBe(0);
     });
   });
 

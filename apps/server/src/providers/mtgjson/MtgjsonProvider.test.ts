@@ -91,3 +91,184 @@ describe('MtgjsonProvider.getCardImages', () => {
     expect(images).toBeNull();
   });
 });
+
+// ─── Spec 018 / FR-005, FR-021 — catalogue filter dimensions ──────────────
+// These tests stub `sdk.cards.search` so we can assert deterministic input/output
+// behaviour for the new filter dimensions without depending on the offline cache
+// containing exhaustive coverage. The provider's enrichment chain
+// (identifiers + legalities) is also stubbed because we only care about the
+// filtering contract here.
+
+type MutableCardSet = {
+  uuid: string;
+  name: string;
+  setCode: string;
+  number: string;
+  manaCost?: string;
+  colorIdentity: string[];
+  availability: string[];
+  supertypes: string[];
+  subtypes: string[];
+  types: string[];
+  legalities: Record<string, string>;
+};
+
+const makeCard = (overrides: Partial<MutableCardSet> = {}): MutableCardSet => ({
+  uuid: '00000000-0000-0000-0000-000000000001',
+  name: 'Test Card',
+  setCode: 'TST',
+  number: '1',
+  manaCost: '{1}',
+  colorIdentity: [],
+  availability: ['paper'],
+  supertypes: [],
+  subtypes: [],
+  types: ['Creature'],
+  legalities: {},
+  ...overrides,
+});
+
+const stubProvider = (cards: ReadonlyArray<MutableCardSet>): {
+  provider: MtgjsonProvider;
+  searchSpy: jest.Mock;
+} => {
+  const searchSpy = jest.fn(async () => cards);
+  const fakeSdk = {
+    cards: { search: searchSpy },
+    identifiers: { getIdentifiers: async () => ({ scryfallId: null }) },
+    legalities: { isLegal: async () => true },
+  };
+  return {
+    provider: new MtgjsonProvider(fakeSdk as unknown as MtgjsonSDK),
+    searchSpy,
+  };
+};
+
+describe('MtgjsonProvider.search — paper-only filter (FR-021)', () => {
+  test('excludes printings whose availability does not include "paper"', async () => {
+    const { provider } = stubProvider([
+      makeCard({ uuid: 'aaaaaaaa-0000-0000-0000-000000000001', availability: ['paper'] }),
+      makeCard({ uuid: 'aaaaaaaa-0000-0000-0000-000000000002', availability: ['mtgo'] }),
+      makeCard({ uuid: 'aaaaaaaa-0000-0000-0000-000000000003', availability: ['paper', 'arena'] }),
+    ]);
+
+    const results = await provider.search({ name: 'anything' });
+
+    const ids = results.map((r) => r.id);
+    expect(ids).toContain('aaaaaaaa-0000-0000-0000-000000000001');
+    expect(ids).toContain('aaaaaaaa-0000-0000-0000-000000000003');
+    expect(ids).not.toContain('aaaaaaaa-0000-0000-0000-000000000002');
+  });
+});
+
+describe('MtgjsonProvider.search — format filter (FR-005)', () => {
+  test('only returns printings legal in at least one requested format (OR-within-dimension)', async () => {
+    const { provider } = stubProvider([
+      makeCard({
+        uuid: 'bbbbbbbb-0000-0000-0000-000000000001',
+        legalities: { modern: 'Legal', legacy: 'Banned' },
+      }),
+      makeCard({
+        uuid: 'bbbbbbbb-0000-0000-0000-000000000002',
+        legalities: { modern: 'Banned', legacy: 'Legal' },
+      }),
+      makeCard({
+        uuid: 'bbbbbbbb-0000-0000-0000-000000000003',
+        legalities: { modern: 'Banned', legacy: 'Banned' },
+      }),
+    ]);
+
+    const results = await provider.search({ name: 'x', formats: ['Modern', 'Legacy'] });
+
+    const ids = results.map((r) => r.id);
+    expect(ids).toContain('bbbbbbbb-0000-0000-0000-000000000001');
+    expect(ids).toContain('bbbbbbbb-0000-0000-0000-000000000002');
+    expect(ids).not.toContain('bbbbbbbb-0000-0000-0000-000000000003');
+  });
+
+  test('treats absent legality entries as not legal', async () => {
+    const { provider } = stubProvider([
+      makeCard({ uuid: 'cccccccc-0000-0000-0000-000000000001', legalities: {} }),
+    ]);
+
+    const results = await provider.search({ name: 'x', formats: ['Standard'] });
+    expect(results).toEqual([]);
+  });
+});
+
+describe('MtgjsonProvider.search — super/sub/creature type filters (FR-005)', () => {
+  test('superTypes: keeps printings whose supertypes intersect (OR-within-dimension)', async () => {
+    const { provider } = stubProvider([
+      makeCard({ uuid: 'dddddddd-0000-0000-0000-000000000001', supertypes: ['Legendary'] }),
+      makeCard({ uuid: 'dddddddd-0000-0000-0000-000000000002', supertypes: ['Basic'] }),
+      makeCard({ uuid: 'dddddddd-0000-0000-0000-000000000003', supertypes: [] }),
+    ]);
+
+    const results = await provider.search({ name: 'x', superTypes: ['Legendary'] });
+
+    expect(results.map((r) => r.id)).toEqual(['dddddddd-0000-0000-0000-000000000001']);
+  });
+
+  test('subTypes: keeps printings whose subtypes intersect', async () => {
+    const { provider } = stubProvider([
+      makeCard({ uuid: 'eeeeeeee-0000-0000-0000-000000000001', subtypes: ['Equipment'] }),
+      makeCard({ uuid: 'eeeeeeee-0000-0000-0000-000000000002', subtypes: ['Aura'] }),
+    ]);
+
+    const results = await provider.search({ name: 'x', subTypes: ['Equipment'] });
+
+    expect(results.map((r) => r.id)).toEqual(['eeeeeeee-0000-0000-0000-000000000001']);
+  });
+
+  test('creatureTypes: keeps only Creatures whose subtypes intersect with the requested set', async () => {
+    const { provider } = stubProvider([
+      makeCard({
+        uuid: 'ffffffff-0000-0000-0000-000000000001',
+        types: ['Creature'],
+        subtypes: ['Elf', 'Warrior'],
+      }),
+      makeCard({
+        uuid: 'ffffffff-0000-0000-0000-000000000002',
+        types: ['Creature'],
+        subtypes: ['Goblin'],
+      }),
+      makeCard({
+        uuid: 'ffffffff-0000-0000-0000-000000000003',
+        types: ['Sorcery'],
+        subtypes: ['Elf'],
+      }),
+    ]);
+
+    const results = await provider.search({ name: 'x', creatureTypes: ['Elf'] });
+
+    expect(results.map((r) => r.id)).toEqual(['ffffffff-0000-0000-0000-000000000001']);
+  });
+
+  test('AND-across-dimensions: a card must satisfy every supplied dimension', async () => {
+    const { provider } = stubProvider([
+      makeCard({
+        uuid: 'aaaa1111-0000-0000-0000-000000000001',
+        supertypes: ['Legendary'],
+        subtypes: ['Elf'],
+        types: ['Creature'],
+        legalities: { modern: 'Legal' },
+      }),
+      makeCard({
+        uuid: 'aaaa1111-0000-0000-0000-000000000002',
+        supertypes: ['Legendary'],
+        subtypes: ['Goblin'],
+        types: ['Creature'],
+        legalities: { modern: 'Legal' },
+      }),
+    ]);
+
+    const results = await provider.search({
+      name: 'x',
+      formats: ['Modern'],
+      superTypes: ['Legendary'],
+      creatureTypes: ['Elf'],
+    });
+
+    expect(results.map((r) => r.id)).toEqual(['aaaa1111-0000-0000-0000-000000000001']);
+  });
+});

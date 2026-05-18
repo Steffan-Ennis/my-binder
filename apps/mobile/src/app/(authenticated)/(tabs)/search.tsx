@@ -1,6 +1,6 @@
 import type { FC } from 'react';
 
-import { ComingSoonContainer } from '@src/components/coming-soon/ComingSoonContainer';
+import { CatalogueContainer } from '@src/components/catalogue/CatalogueContainer';
 
-const Search: FC = () => <ComingSoonContainer feature="search" />;
+const Search: FC = () => <CatalogueContainer />;
 export default Search;

@@ -7,16 +7,17 @@ import type { DataSource } from 'typeorm';
 const USER_A = 'user-a-uuid';
 const USER_B = 'user-b-uuid';
 
-const makeCard = (id: string, name: string, userId: string) => ({
+const makeCard = (id: string, name: string, userId: string, numberOwned = 1) => ({
   id,
   name,
   userId,
+  numberOwned,
   createdAt: new Date('2024-01-01'),
   updatedAt: new Date('2024-01-01'),
 });
 
-const storeA = [makeCard('card-1', 'Lightning Bolt', USER_A)];
-const storeB = [makeCard('card-2', 'Sol Ring', USER_B)];
+const storeA = [makeCard('card-1', 'Lightning Bolt', USER_A, 3)];
+const storeB = [makeCard('card-2', 'Sol Ring', USER_B, 1)];
 const store = [...storeA, ...storeB];
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
@@ -31,6 +32,7 @@ const mockSave = jest.fn(async (entity: { id: string; name: string; userId: stri
   id: entity.id,
   name: entity.name,
   userId: entity.userId,
+  numberOwned: 1,
   createdAt: new Date(),
   updatedAt: new Date(),
 }));
@@ -60,6 +62,14 @@ describe('cardRepository', () => {
     const cards = await repo.findAll(USER_B);
     expect(cards.length).toBe(1);
     expect(cards[0]?.name).toBe('Sol Ring');
+  });
+
+  test('findAll projects numberOwned on every row (spec 018 / FR-023)', async () => {
+    const cards = await repo.findAll(USER_A);
+    expect(cards[0]?.numberOwned).toBe(3);
+
+    const otherUserCards = await repo.findAll(USER_B);
+    expect(otherUserCards[0]?.numberOwned).toBe(1);
   });
 
   test('findById returns card when it belongs to user', async () => {
