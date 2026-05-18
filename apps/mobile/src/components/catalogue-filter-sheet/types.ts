@@ -2,7 +2,10 @@
 // Per Principle X v1.26.0 sub-rule #7, feature-local types live with the
 // feature directory.
 
-import type { CatalogueFilterSet } from '@src/components/catalogue/types';
+import type { BottomSheetModal } from '@gorhom/bottom-sheet';
+import type { RefObject } from 'react';
+
+import type { CatalogueFilterSet, ColorChip } from '@src/components/catalogue/types';
 
 // Hook options — the sheet edits a *working draft* of the filter set so chip
 // taps don't re-run the underlying catalogue query on every keystroke. The
@@ -15,31 +18,31 @@ export type UseCatalogueFilterSheetOptions = {
   onClose: () => void;                    // dismiss without applying
 };
 
-// Closure of all chip-bearing array dimensions on the filter set — used to
-// type the generic `toggleChip(dimension, value)` callback.
-export type ChipDimension =
-  | 'sets'
-  | 'formats'
-  | 'superTypes'
-  | 'subTypes'
-  | 'creatureTypes';
-
-export type ColorChip = 'W' | 'U' | 'B' | 'R' | 'G' | 'C';
+// Re-export `ColorChip` so consumers inside this feature don't have to import
+// from `@src/components/catalogue/types` (Principle IX — one type, one home).
+export type { ColorChip };
 
 // View props (mirrors contracts/ui.md §4.2). The container threads the hook's
 // derived state + callbacks down via NAMED props (no spread) per Principle X.
+// The sheet ref is constructed in the hook (Data-fetching Rule 4 — effects in
+// the hook, not the view) and threaded through as a stable handle.
 export type CatalogueFilterSheetViewProps = {
-  // Visibility — the sheet imperative present/dismiss is driven by `open`.
-  open: boolean;
+  // Stable handle owned by the hook — view attaches it to <BottomSheetModal>.
+  sheetRef: RefObject<BottomSheetModal | null>;
 
   // Working draft (sheet edits this in place via the toggle/setCmcRange
   // callbacks; commits via onApply).
   draft: CatalogueFilterSet;
 
-  // Chip toggles
-  onToggleChip: (dimension: ChipDimension, value: string) => void;
+  // Per-dimension chip toggles — constructed in the hook so the view stays
+  // free of `useCallback`/`useMemo` (Data-fetching Rule 4 + Layer rules table).
+  toggleFormat: (value: string) => void;
+  toggleSuperType: (value: string) => void;
+  toggleSubType: (value: string) => void;
+  toggleCreatureType: (value: string) => void;
   onToggleColor: (value: ColorChip) => void;
-  onSetCmcRange: (min: number, max: number) => void;
+  onChangeMin: (text: string) => void;
+  onChangeMax: (text: string) => void;
   onToggleMissingOnly: () => void;
 
   // Footer + sheet lifecycle

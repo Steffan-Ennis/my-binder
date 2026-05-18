@@ -5,7 +5,6 @@ import {
   BottomSheetScrollView,
 } from '@gorhom/bottom-sheet';
 import type { FC } from 'react';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { Colors } from '@src/constants/theme';
@@ -18,7 +17,6 @@ import {
   SUB_TYPE_OPTIONS,
   SUPER_TYPE_OPTIONS,
   type CatalogueFilterSheetViewProps,
-  type ChipDimension,
   type ColorChip,
 } from './types';
 
@@ -80,12 +78,7 @@ const IOSToggle: FC<{ value: boolean; onPress: () => void }> = ({ value, onPress
       hitSlop={4}
       testID="missing-only-toggle"
     >
-      <View
-        style={[
-          styles.toggleThumb,
-          value && { alignSelf: 'flex-end' as const },
-        ]}
-      />
+      <View style={[styles.toggleThumb, value && styles.toggleThumbOn]} />
     </Pressable>
   );
 };
@@ -117,52 +110,21 @@ const Section: FC<{
 };
 
 const CatalogueFilterSheetView: FC<CatalogueFilterSheetViewProps> = ({
-  open,
+  sheetRef,
   draft,
-  onToggleChip,
+  toggleFormat,
+  toggleSuperType,
+  toggleSubType,
+  toggleCreatureType,
   onToggleColor,
-  onSetCmcRange,
+  onChangeMin,
+  onChangeMax,
   onToggleMissingOnly,
   onApply,
   onClearAll,
   onClose,
 }) => {
   const styles = useStyles();
-  const sheetRef = useRef<BottomSheetModal>(null);
-
-  useEffect(() => {
-    if (open) sheetRef.current?.present();
-    else sheetRef.current?.dismiss();
-  }, [open]);
-
-  const makeChipToggle = useCallback(
-    (dimension: ChipDimension) => (value: string) => onToggleChip(dimension, value),
-    [onToggleChip],
-  );
-
-  const toggleSet = useMemo(() => makeChipToggle('sets'), [makeChipToggle]);
-  const toggleFormat = useMemo(() => makeChipToggle('formats'), [makeChipToggle]);
-  const toggleSuperType = useMemo(() => makeChipToggle('superTypes'), [makeChipToggle]);
-  const toggleSubType = useMemo(() => makeChipToggle('subTypes'), [makeChipToggle]);
-  const toggleCreatureType = useMemo(
-    () => makeChipToggle('creatureTypes'),
-    [makeChipToggle],
-  );
-
-  const onChangeMin = useCallback(
-    (text: string) => {
-      const n = Number.parseInt(text, 10);
-      onSetCmcRange(Number.isFinite(n) ? n : 0, draft.cmcMax);
-    },
-    [draft.cmcMax, onSetCmcRange],
-  );
-  const onChangeMax = useCallback(
-    (text: string) => {
-      const n = Number.parseInt(text, 10);
-      onSetCmcRange(draft.cmcMin, Number.isFinite(n) ? n : 0);
-    },
-    [draft.cmcMin, onSetCmcRange],
-  );
 
   return (
     <BottomSheetModal
@@ -203,13 +165,6 @@ const CatalogueFilterSheetView: FC<CatalogueFilterSheetViewProps> = ({
             <IOSToggle value={draft.missingOnly} onPress={onToggleMissingOnly} />
           </View>
 
-          <Section
-            label="SET"
-            options={draft.sets}
-            selected={draft.sets}
-            onToggle={toggleSet}
-            testID="filter-section-sets"
-          />
           <Section
             label="FORMAT LEGALITY"
             options={FORMAT_OPTIONS}

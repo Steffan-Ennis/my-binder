@@ -1,5 +1,7 @@
 import type { FC } from 'react';
 
+import { CatalogueFilterSheetContainer } from '@src/components/catalogue-filter-sheet/CatalogueFilterSheetContainer';
+
 import CatalogueView from './CatalogueView';
 import { useCatalogue } from './useCatalogue';
 
@@ -9,6 +11,7 @@ const CatalogueContainer: FC = () => {
     currentPage,
     totalPages,
     summaryCaption,
+    error,
     hasNextPage,
     isLoading,
     isFetchingNextPage,
@@ -34,34 +37,40 @@ const CatalogueContainer: FC = () => {
   } = useCatalogue();
 
   return (
-    <CatalogueView
-      pages={pages}
-      currentPage={currentPage}
-      totalPages={totalPages}
-      summaryCaption={summaryCaption}
-      hasNextPage={hasNextPage}
-      isLoading={isLoading}
-      isFetchingNextPage={isFetchingNextPage}
-      isError={isError}
-      isEmpty={isEmpty}
-      isSearchActive={isSearchActive}
-      searchQuery={searchQuery}
-      hasActiveQuery={hasActiveQuery}
-      filters={filters}
-      filterPills={filterPills}
-      filterSheetOpen={filterSheetOpen}
-      onSearchOpen={onSearchOpen}
-      onSearchChange={onSearchChange}
-      onSearchClose={onSearchClose}
-      onProfilePress={onProfilePress}
-      onPagerSelected={onPagerSelected}
-      onRetryPress={onRetryPress}
-      onFilterSheetOpen={onFilterSheetOpen}
-      onFilterSheetClose={onFilterSheetClose}
-      onFilterApply={onFilterApply}
-      onFilterClear={onFilterClear}
-      onFilterPillRemove={onFilterPillRemove}
-    />
+    <>
+      <CatalogueView
+        pages={pages}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        summaryCaption={summaryCaption}
+        error={error}
+        hasNextPage={hasNextPage}
+        isLoading={isLoading}
+        isFetchingNextPage={isFetchingNextPage}
+        isError={isError}
+        isEmpty={isEmpty}
+        isSearchActive={isSearchActive}
+        searchQuery={searchQuery}
+        hasActiveQuery={hasActiveQuery}
+        filterPills={filterPills}
+        onSearchOpen={onSearchOpen}
+        onSearchChange={onSearchChange}
+        onSearchClose={onSearchClose}
+        onProfilePress={onProfilePress}
+        onPagerSelected={onPagerSelected}
+        onRetryPress={onRetryPress}
+        onFilterSheetOpen={onFilterSheetOpen}
+        onFilterClear={onFilterClear}
+        onFilterPillRemove={onFilterPillRemove}
+      />
+      <CatalogueFilterSheetContainer
+        open={filterSheetOpen}
+        committed={filters}
+        onApply={onFilterApply}
+        onClear={onFilterClear}
+        onClose={onFilterSheetClose}
+      />
+    </>
   );
 };
 

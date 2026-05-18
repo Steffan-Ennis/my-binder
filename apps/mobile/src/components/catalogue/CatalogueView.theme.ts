@@ -70,6 +70,46 @@ export type CatalogueViewStyles = {
     >
   >;
   retryLabel: Required<Pick<TextStyle, 'fontFamily' | 'fontSize' | 'color' | 'fontWeight'>>;
+  // Filter-pill row in the masthead slot.
+  filterPillRow: Required<
+    Pick<ViewStyle, 'flexDirection' | 'flexWrap' | 'gap' | 'paddingHorizontal' | 'paddingBottom'>
+  >;
+  filterPillRowSingle: Required<
+    Pick<ViewStyle, 'flexDirection' | 'paddingHorizontal' | 'paddingBottom'>
+  >;
+  filterPill: Required<
+    Pick<
+      ViewStyle,
+      | 'paddingHorizontal'
+      | 'paddingVertical'
+      | 'borderRadius'
+      | 'backgroundColor'
+      | 'flexDirection'
+      | 'alignItems'
+      | 'gap'
+    >
+  >;
+  filterPillLabel: Required<
+    Pick<TextStyle, 'fontFamily' | 'fontSize' | 'color' | 'fontWeight'>
+  >;
+  filterPillIcon: Required<Pick<TextStyle, 'color'>>;
+  filterOpenerPill: Required<
+    Pick<
+      ViewStyle,
+      | 'paddingHorizontal'
+      | 'paddingVertical'
+      | 'borderRadius'
+      | 'borderWidth'
+      | 'borderColor'
+      | 'flexDirection'
+      | 'alignItems'
+      | 'gap'
+    >
+  >;
+  filterOpenerLabel: Required<
+    Pick<TextStyle, 'fontFamily' | 'fontSize' | 'color' | 'fontWeight'>
+  >;
+  filterOpenerIcon: Required<Pick<TextStyle, 'color'>>;
 };
 
 const styles = StyleSheet.create<CatalogueViewStyles>({
@@ -182,6 +222,55 @@ const styles = StyleSheet.create<CatalogueViewStyles>({
     fontSize: Type.bodyStrong.size,
     color: Colors.dark.accent,
     fontWeight: Type.bodyStrong.weight,
+  },
+  filterPillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.xxs,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xs,
+  },
+  filterPillRowSingle: {
+    flexDirection: 'row',
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xs,
+  },
+  filterPill: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xxs,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.dark.accent,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xxs,
+  },
+  filterPillLabel: {
+    fontFamily: Type.body.font,
+    fontSize: 12,
+    color: Colors.dark.textOnAccent,
+    fontWeight: Type.bodyStrong.weight,
+  },
+  filterPillIcon: {
+    color: Colors.dark.textOnAccent,
+  },
+  filterOpenerPill: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xxs,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Colors.dark.accentSoft,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xxs,
+  },
+  filterOpenerLabel: {
+    fontFamily: Type.body.font,
+    fontSize: 12,
+    color: Colors.dark.accentSoft,
+    fontWeight: Type.bodyStrong.weight,
+  },
+  filterOpenerIcon: {
+    color: Colors.dark.accentSoft,
   },
 });
 

@@ -78,6 +78,7 @@ export type CatalogueFilterSheetViewStyles = {
   toggleThumb: Required<
     Pick<ViewStyle, 'width' | 'height' | 'borderRadius' | 'backgroundColor' | 'alignSelf'>
   >;
+  toggleThumbOn: Required<Pick<ViewStyle, 'alignSelf'>>;
 };
 
 const CHIP_HEIGHT = 32;
@@ -265,6 +266,9 @@ const styles = StyleSheet.create<CatalogueFilterSheetViewStyles>({
     borderRadius: TOGGLE_THUMB / 2,
     backgroundColor: Colors.dark.textOnAccent,
     alignSelf: 'flex-start',
+  },
+  toggleThumbOn: {
+    alignSelf: 'flex-end',
   },
 });
 

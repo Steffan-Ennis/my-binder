@@ -167,6 +167,61 @@ the `×` on a pill drops just that dimension.
 
 ---
 
+## Phase 4.5: Principle X Compliance Sweep (Catalogue + Filter Sheet) 🛑 BLOCKING
+
+**Status**: Inserted 2026-05-18 after the US2 commit (445c943) hit a runtime
+context error (`BottomSheetModal` requires `BottomSheetModalProvider` at the
+tree root) and a paired audit surfaced multiple Principle X violations
+introduced in commits da9a60b (US1) and 445c943 (US2).
+
+**Purpose**: Bring the spec 018 Catalogue + Filter Sheet code into
+compliance with `.specify/memory/constitution.md` §X (Component
+Architecture, Mobile), the Style co-location rule, and the
+Data-fetching hook composition rule (v1.26.0). No new feature work
+lands until every task in this phase passes.
+
+**⚠️ CRITICAL**: Phase 5 (US4) MUST NOT begin until Phase 4.5 is complete
+and the validation gate at the end of this phase is green.
+
+### Audit findings (from the 2026-05-18 review)
+
+| Tag | File | Rule violated | Issue |
+|---|---|---|---|
+| A1 | `apps/mobile/src/app/_layout.tsx` | Runtime / library contract | `@gorhom/bottom-sheet` requires `<BottomSheetModalProvider>` (under `<GestureHandlerRootView>`) above any `BottomSheetModal`. Never mounted in the live app — only in `jest.setup.ts`. Root cause of the context error. |
+| B1 | `catalogue-filter-sheet/CatalogueFilterSheetView.tsx` lines 8, 131, 133-136 | Layer rules — View Forbidden (`useState`, `useEffect`, `useReducer`); Data-fetching Rule 4 (effects in hook) | View uses `useRef<BottomSheetModal>` + `useEffect` to imperatively `present()`/`dismiss()`. View-layer effects are prohibited. |
+| B2 | `catalogue-filter-sheet/CatalogueFilterSheetView.tsx` lines 138-165 | Hook return-value memoisation rule; Data-fetching Rule 4 | View builds per-dimension chip-toggle callbacks (`makeChipToggle`, `toggleSet`, `toggleFormat`, …, `onChangeMin`, `onChangeMax`) with `useCallback`/`useMemo`. Belongs in the hook. |
+| B3 | `catalogue/CatalogueView.tsx` line 7 (import) + lines 255-262 (JSX) | Layer rules — view must not own sibling-feature container wiring; Principle IV Single Responsibility | View imports & mounts `CatalogueFilterSheetContainer`. Currently commented out by the user as a workaround for A1. |
+| B4 | `catalogue/CatalogueView.tsx` lines 18-50, 52-82, 122-150 | Style co-location rule | `FilterPill`, `FilterOpenerPill`, and the `pillsSlot` wrapper use inline `style={{ paddingHorizontal: …, borderRadius: … }}` literal objects instead of theme entries consumed via `useStyles()`. |
+| B5 | `catalogue-filter-sheet/CatalogueFilterSheetView.tsx` line 86 | Style co-location rule (precise-Pick typed entries) | `style={[styles.toggleThumb, value && { alignSelf: 'flex-end' as const }]}` has an inline literal style branch. Should be a `toggleThumbOn` theme entry. |
+| B6 | `catalogue/types.ts` lines 67-70 | Data-fetching Rule 5 (`Pick<UseXxxQueryResult, …>`); Rule 3 (don't redeclare `error`) | `CatalogueViewProps` redeclares `hasNextPage`, `isLoading`, `isFetchingNextPage`, `isError` instead of `Pick`ing from `UseInfiniteQueryResult<…, ApiError>`. `error` is missing entirely from the view-props shape. |
+| B7 | `catalogue/useCatalogue.ts` lines 52-58 | Code quality (dead code) | `const dimensionLabels: Record<…> = {} as never;` + `void dimensionLabels;` — vestigial. |
+| C1 | `catalogue/useCatalogue.ts` | Code quality (testability + hook size) | Pure helpers `filtersToQuery`, `buildPills`, `removePillFromFilters` live in the hook file. Extract to a sibling `catalogueFilters.ts` pure module + unit test. |
+| C2 | `catalogue/useCatalogue.ts` line 38 | Code quality (silent data loss) | `if (filters.sets.length > 0) query.set = filters.sets[0];` drops every set after the first. Drop the `sets` dimension from `CatalogueFilterSet` until a future spec adds multi-set wire support. |
+| C3 | `catalogue/types.ts` + `catalogue-filter-sheet/types.ts` | Code quality (DRY) | `ColorChip` union declared twice. Consolidate in `catalogue/types.ts`, re-export from `catalogue-filter-sheet/types.ts`. |
+
+### Tasks
+
+- [X] T083 Mount `<GestureHandlerRootView style={{ flex: 1 }}>` → `<BottomSheetModalProvider>` inside the root `<QueryClientProvider>` in `apps/mobile/src/app/_layout.tsx`. Verify the app boots; verify the (still-commented-out) filter sheet would no longer hit the missing-context error. Fixes A1.
+- [X] T084 Lift the sheet `ref` + open/dismiss effect from `CatalogueFilterSheetView.tsx` into `useCatalogueFilterSheet.ts`. The hook owns `useRef<BottomSheetModal>(null)` and a `useEffect([open])` that calls `present()`/`dismiss()`; it returns `sheetRef` on its result. The view receives `sheetRef` via props, deletes its own `useRef`/`useEffect`, and passes `ref={sheetRef}` to `<BottomSheetModal>`. Update `useCatalogueFilterSheet.test.ts` for the new ref + effect; update `CatalogueFilterSheetView.test.tsx` to pass a stub ref. Fixes B1.
+- [X] T085 Lift per-dimension chip-toggle callbacks (`toggleFormat`, `toggleSuperType`, `toggleSubType`, `toggleCreatureType`, `toggleSet`, `onChangeMin`, `onChangeMax`) from `CatalogueFilterSheetView.tsx` into `useCatalogueFilterSheet.ts` (each `useCallback`). Extend `UseCatalogueFilterSheetResult` + `CatalogueFilterSheetViewProps` to surface them; drop the now-unused `onToggleChip` + `ChipDimension` from the view props (the hook owns the dimension mapping). View deletes every `useCallback`/`useMemo`. Update both tests. Fixes B2.
+- [X] T086 Move the `<CatalogueFilterSheetContainer />` mount out of `CatalogueView.tsx` and into `CatalogueContainer.tsx`. Both children read from a single `useCatalogue()` call inside the container; the container renders `<CatalogueView … />` and `<CatalogueFilterSheetContainer open={filterSheetOpen} committed={filters} onApply={onFilterApply} onClear={onFilterClear} onClose={onFilterSheetClose} />` as siblings. Delete the import (line 7) and the JSX block (lines 255-262, currently commented out) from `CatalogueView.tsx`. Update `CatalogueView.test.tsx` (drop the `CatalogueFilterSheetContainer` mock + the "mounts the CatalogueFilterSheetContainer reflecting filterSheetOpen" assertion). Add a sibling-mount assertion to `CatalogueContainer.test.tsx`. Fixes B3.
+- [X] T087 Route every `CatalogueView.tsx` inline literal style through `CatalogueView.theme.ts`. Add typed entries `filterPill`, `filterPillLabel`, `filterPillIcon`, `filterOpenerPill`, `filterOpenerLabel`, `filterPillRow`, `filterPillRowSingle` (each `Required<Pick<…>>` matching the constitution's Style co-location rule). The two in-file sub-FCs (`FilterPill`, `FilterOpenerPill`) call `useStyles()` and consume those entries exclusively — no inline literal style objects remain in the file. Fixes B4.
+- [X] T088 Add a `toggleThumbOn: Required<Pick<ViewStyle, 'alignSelf'>>` entry to `CatalogueFilterSheetView.theme.ts` and replace line 86's inline `{ alignSelf: 'flex-end' as const }` with `value && styles.toggleThumbOn`. Fixes B5.
+- [X] T089 Make `CatalogueViewProps` (`catalogue/types.ts`) compose from `UseInfiniteQueryResult<CatalogueInfiniteData, ApiError>` via `Pick<…, 'error' \| 'isLoading' \| 'isFetchingNextPage' \| 'isError' \| 'hasNextPage'>` and delete those five redeclared fields from the `& { … }` half. Cascade through `useCatalogue.ts` `UseCatalogueResult` Pick, `CatalogueView.tsx` destructure, and the test defaults (`error: null` added to `CatalogueView.test.tsx` and `CatalogueContainer.test.tsx`). Fixes B6.
+- [X] T090 Code-quality sweep: delete `dimensionLabels` dead code from `useCatalogue.ts` (B7); extract `filtersToQuery`, `buildPills`, `removePillFromFilters` to a new `catalogue/catalogueFilters.ts` pure module + add `catalogue/catalogueFilters.test.ts` (C1); drop the `sets` dimension from `CatalogueFilterSet` and every consumer until a future spec adds multi-set wire support (C2); consolidate `ColorChip` in `catalogue/types.ts` and re-export from `catalogue-filter-sheet/types.ts` (C3).
+- [X] T091 Full validation gate. Run `pnpm turbo test typecheck --filter=@my-binder/core --filter=@my-binder/server --filter=@my-binder/mobile`. Both MUST exit 0 with 100% Jest pass rate. Boot the app and confirm: (a) no `BottomSheetModalProvider` context error; (b) tapping the Filters opener pill mounts the sheet; (c) chip taps stay in draft; (d) Apply commits + closes; (e) pill removal works; (f) Clear all resets. Commit as `fix:018 Principle X compliance sweep` referencing this phase.
+
+**Checkpoint**: Catalogue + filter sheet compliant with Principle X and the
+runtime context error is resolved. Phase 5 (US4) may now begin.
+
+> **Phase completion validation gate (Constitution Principle III + IV +
+> Principle X).** Both `turbo test` and `turbo typecheck` MUST exit 0
+> with 100% Jest pass rate across all three workspaces, AND a manual
+> smoke of the filter sheet must work end-to-end. `.skip` / `.todo` /
+> quarantine / retry-until-green are prohibited.
+
+---
+
 ## Phase 5: User Story 4 - Add Cards From Catalogue, Remove From Binder (Priority: P1)
 
 **Goal**: Inline `+` glyph-button on every Catalogue pocket and inline `−`
@@ -290,8 +345,9 @@ final sweep over the new code for constitution compliance.
 - **Foundational (Phase 2)**: Depends on Setup completion — BLOCKS all user stories
 - **User Story 1 (Phase 3, P1)**: Depends on Foundational completion
 - **User Story 2 (Phase 4, P1)**: Depends on Foundational; lightly extends US1's `useCatalogue` + `CatalogueView` files but adds the filter sheet as a fresh feature directory. Can begin in parallel with US4 once US1 has landed.
-- **User Story 4 (Phase 5, P1)**: Depends on Foundational; extends US1's `useCatalogue` + `CatalogueView`; ships the cross-feature mutation hook and the Binder refactor. Server-side it adds endpoints that US3 does NOT depend on. Can begin in parallel with US2 once US1 has landed.
-- **User Story 3 (Phase 6, P2)**: Depends on Foundational and on US4 (the stepper inside the detail sheet shares `useUpdateBinderEntryMutation` with the inline `+`/`−` glyphs from US4). US3 also extends US1's `useCatalogue` to open the sheet — so US1 must be complete.
+- **Principle X Compliance Sweep (Phase 4.5, BLOCKING)**: Depends on US1 + US2 commits being on the branch. Fixes the runtime `BottomSheetModalProvider` context error and the Principle X violations introduced by US1/US2 (view-layer effects, cross-feature container imports in views, inline styles, view-props that redeclare query-result fields). **MUST complete before Phase 5 (US4) starts** — the violations compound if US4 layers more wiring on top of the broken pattern.
+- **User Story 4 (Phase 5, P1)**: Depends on Foundational AND Phase 4.5 compliance sweep; extends US1's `useCatalogue` + `CatalogueView`; ships the cross-feature mutation hook and the Binder refactor. Server-side it adds endpoints that US3 does NOT depend on.
+- **User Story 3 (Phase 6, P2)**: Depends on Foundational, Phase 4.5, and on US4 (the stepper inside the detail sheet shares `useUpdateBinderEntryMutation` with the inline `+`/`−` glyphs from US4). US3 also extends US1's `useCatalogue` to open the sheet — so US1 must be complete.
 - **Polish (Phase 7)**: Depends on all user stories being complete.
 
 ### User Story Dependencies
@@ -302,13 +358,21 @@ Foundational (Phase 2)
         ▼
    User Story 1 (P1) — MVP
         │
-        ├─────────────► User Story 2 (P1)  ─────┐
-        │                                        ▼
-        └─────────────► User Story 4 (P1)  ─► User Story 3 (P2) ─► Polish
+        ▼
+   User Story 2 (P1)
+        │
+        ▼
+ ┌──────────────────────────────────────┐
+ │ Phase 4.5 — Principle X Compliance   │  🛑 BLOCKING
+ │   (T083–T091)                        │
+ └──────────────────────────────────────┘
+        │
+        ▼
+   User Story 4 (P1)  ─► User Story 3 (P2) ─► Polish
 ```
 
 - **US1** is the strict MVP — every later story extends files US1 creates.
-- **US2** and **US4** can be implemented in parallel by two developers once US1 lands; they touch disjoint feature directories on top of US1's `useCatalogue`/`CatalogueView`.
+- **US2** and **US4** were originally planned to run in parallel after US1, but the 2026-05-18 audit found Principle X violations in the US1/US2 code that compound when US4 layers on top. **Phase 4.5 MUST land before US4 begins.**
 - **US3** is sequenced after US4 because the detail-sheet stepper consumes the same `useUpdateBinderEntryMutation` hook US4 owns, and the sheet's open/close lifecycle is layered on top of US1's `useCatalogue` state.
 
 ### Within Each User Story
@@ -361,9 +425,10 @@ Task: "T031 CatalogueContainer.test.tsx"
 1. Setup + Foundational → Foundation ready
 2. US1 → demo browse-only Catalogue (MVP)
 3. US2 → demo filtered Catalogue
-4. US4 → demo `+`/`−` glyphs + Binder masthead + defer-and-refresh
-5. US3 → demo detail sheet with prices and chart
-6. Polish → final acceptance + constitution sweep
+4. **Phase 4.5** → Principle X compliance sweep (BLOCKING gate before US4)
+5. US4 → demo `+`/`−` glyphs + Binder masthead + defer-and-refresh
+6. US3 → demo detail sheet with prices and chart
+7. Polish → final acceptance + constitution sweep
 
 ### Parallel Team Strategy
 

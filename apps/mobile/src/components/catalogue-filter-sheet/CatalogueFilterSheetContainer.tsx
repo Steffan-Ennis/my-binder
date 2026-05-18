@@ -21,11 +21,15 @@ const CatalogueFilterSheetContainer: FC<CatalogueFilterSheetContainerProps> = ({
   onClose,
 }) => {
   const {
-    open: sheetOpen,
+    sheetRef,
     draft,
-    onToggleChip,
+    toggleFormat,
+    toggleSuperType,
+    toggleSubType,
+    toggleCreatureType,
     onToggleColor,
-    onSetCmcRange,
+    onChangeMin,
+    onChangeMax,
     onToggleMissingOnly,
     onApply: handleApply,
     onClearAll,
@@ -34,11 +38,15 @@ const CatalogueFilterSheetContainer: FC<CatalogueFilterSheetContainerProps> = ({
 
   return (
     <CatalogueFilterSheetView
-      open={sheetOpen}
+      sheetRef={sheetRef}
       draft={draft}
-      onToggleChip={onToggleChip}
+      toggleFormat={toggleFormat}
+      toggleSuperType={toggleSuperType}
+      toggleSubType={toggleSubType}
+      toggleCreatureType={toggleCreatureType}
       onToggleColor={onToggleColor}
-      onSetCmcRange={onSetCmcRange}
+      onChangeMin={onChangeMin}
+      onChangeMax={onChangeMax}
       onToggleMissingOnly={onToggleMissingOnly}
       onApply={handleApply}
       onClearAll={onClearAll}

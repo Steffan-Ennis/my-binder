@@ -1,12 +1,10 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import {
-  useCatalogueInfiniteQuery,
-  type CatalogueQueryShape,
-} from '@src/hooks/useCatalogueInfiniteQuery';
+import { useCatalogueInfiniteQuery } from '@src/hooks/useCatalogueInfiniteQuery';
 import { SLOTS_PER_BINDER_PAGE } from '@src/utils/pageMath';
 
+import { buildPills, filtersToQuery, removePillFromFilters } from './catalogueFilters';
 import {
   EMPTY_FILTER_SET,
   type CatalogueFilterPill,
@@ -28,111 +26,14 @@ const formatFiniteCaption = (total: number, totalPages: number): string => {
   return `${total} ${matchNoun} · ${totalPages} ${pageNoun}`;
 };
 
-// Translate the local filter set into the wire shape consumed by
-// `useCatalogueInfiniteQuery`. Empty arrays + sentinel CMC bounds collapse
-// to undefined so the query key stays stable across no-op filter toggles.
-const filtersToQuery = (filters: CatalogueFilterSet): CatalogueQueryShape => {
-  const trimmedName = filters.name.trim();
-  const query: CatalogueQueryShape = {};
-  if (trimmedName.length > 0) query.name = trimmedName;
-  if (filters.sets.length > 0) query.set = filters.sets[0];
-  if (filters.formats.length > 0) query.formats = [...filters.formats];
-  if (filters.superTypes.length > 0) query.superTypes = [...filters.superTypes];
-  if (filters.subTypes.length > 0) query.subTypes = [...filters.subTypes];
-  if (filters.creatureTypes.length > 0) query.creatureTypes = [...filters.creatureTypes];
-  if (filters.colors.length > 0) {
-    query.colorIdentity = filters.colors.map((c) => String(c));
-  }
-  if (filters.cmcMin > 0) query.cmcMin = filters.cmcMin;
-  if (filters.cmcMax < 20) query.cmcMax = filters.cmcMax;
-  if (filters.missingOnly) query.missingOnly = true;
-  return query;
-};
-
-const dimensionLabels: Record<
-  Exclude<keyof CatalogueFilterPill, 'id' | 'label'>,
-  string
-> = {} as never;
-
-const buildPills = (filters: CatalogueFilterSet): ReadonlyArray<CatalogueFilterPill> => {
-  void dimensionLabels;
-  const pills: CatalogueFilterPill[] = [];
-  for (const v of filters.formats) pills.push({ id: `format:${v}`, label: `Format: ${v}` });
-  for (const v of filters.superTypes) pills.push({ id: `superType:${v}`, label: `Super: ${v}` });
-  for (const v of filters.subTypes) pills.push({ id: `subType:${v}`, label: `Sub: ${v}` });
-  for (const v of filters.creatureTypes) pills.push({ id: `creatureType:${v}`, label: `Creature: ${v}` });
-  for (const v of filters.sets) pills.push({ id: `set:${v}`, label: `Set: ${v}` });
-  for (const v of filters.colors) pills.push({ id: `color:${v}`, label: `Colour: ${v}` });
-  if (filters.cmcMin > 0 || filters.cmcMax < 20) {
-    pills.push({ id: 'cmc', label: `CMC: ${filters.cmcMin}–${filters.cmcMax}` });
-  }
-  if (filters.missingOnly) {
-    pills.push({ id: 'missingOnly', label: 'Missing only' });
-  }
-  return pills;
-};
-
-const removePillFromFilters = (
-  filters: CatalogueFilterSet,
-  pillId: string,
-): CatalogueFilterSet => {
-  if (pillId === 'cmc') return { ...filters, cmcMin: 0, cmcMax: 20 };
-  if (pillId === 'missingOnly') return { ...filters, missingOnly: false };
-  const sep = pillId.indexOf(':');
-  if (sep === -1) return filters;
-  const dim = pillId.slice(0, sep);
-  const value = pillId.slice(sep + 1);
-  switch (dim) {
-    case 'format':
-      return { ...filters, formats: filters.formats.filter((v) => v !== value) };
-    case 'superType':
-      return { ...filters, superTypes: filters.superTypes.filter((v) => v !== value) };
-    case 'subType':
-      return { ...filters, subTypes: filters.subTypes.filter((v) => v !== value) };
-    case 'creatureType':
-      return { ...filters, creatureTypes: filters.creatureTypes.filter((v) => v !== value) };
-    case 'set':
-      return { ...filters, sets: filters.sets.filter((v) => v !== value) };
-    case 'color':
-      return {
-        ...filters,
-        colors: filters.colors.filter((v) => v !== (value as typeof filters.colors[number])),
-      };
-    default:
-      return filters;
-  }
-};
-
-export type UseCatalogueResult = Pick<
-  CatalogueViewProps,
-  | 'pages'
-  | 'currentPage'
-  | 'totalPages'
-  | 'summaryCaption'
-  | 'hasNextPage'
-  | 'isLoading'
-  | 'isFetchingNextPage'
-  | 'isError'
-  | 'isSearchActive'
-  | 'searchQuery'
-  | 'hasActiveQuery'
-  | 'onSearchOpen'
-  | 'onSearchChange'
-  | 'onSearchClose'
-  | 'onProfilePress'
-  | 'onPagerSelected'
-  | 'onRetryPress'
-> & {
-  // US2 additions
+// The hook returns the view's prop bundle plus the filter-sheet-container
+// inputs (`filters`, `filterSheetOpen`, `onFilterApply`, `onFilterSheetClose`)
+// that `<CatalogueContainer />` threads to the sibling sheet container.
+export type UseCatalogueResult = CatalogueViewProps & {
   filters: CatalogueFilterSet;
-  filterPills: ReadonlyArray<CatalogueFilterPill>;
   filterSheetOpen: boolean;
-  isEmpty: boolean;
-  onFilterSheetOpen: () => void;
   onFilterSheetClose: () => void;
   onFilterApply: (next: CatalogueFilterSet) => void;
-  onFilterClear: () => void;
-  onFilterPillRemove: (pillId: string) => void;
 };
 
 /**
@@ -163,22 +64,33 @@ const useCatalogue = (): UseCatalogueResult => {
   // a request per keystroke.
   useEffect(() => {
     const handle = setTimeout(() => {
-      setFilters((prev) => (prev.name === searchQuery ? prev : { ...prev, name: searchQuery }));
+      setFilters((prev) =>
+        prev.name === searchQuery ? prev : { ...prev, name: searchQuery },
+      );
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(handle);
   }, [searchQuery]);
 
   const queryShape = useMemo(() => filtersToQuery(filters), [filters]);
-  const query = useCatalogueInfiniteQuery(queryShape);
+  const {
+    data,
+    error,
+    isLoading,
+    isFetchingNextPage,
+    isError,
+    hasNextPage,
+    fetchNextPage,
+    refetch,
+  } = useCatalogueInfiniteQuery(queryShape);
 
   const pages = useMemo<ReadonlyArray<CataloguePage>>(() => {
-    if (!query.data) return [];
-    return query.data.pages.map((p) => ({
+    if (!data) return [];
+    return data.pages.map((p) => ({
       pageNumber: p.page,
       cards: p.cards,
       isPlaceholder: false,
     }));
-  }, [query.data]);
+  }, [data]);
 
   const totalLoaded = useMemo(
     () => pages.reduce((acc, p) => acc + p.cards.length, 0),
@@ -186,35 +98,27 @@ const useCatalogue = (): UseCatalogueResult => {
   );
 
   const totalPages = useMemo<number | null>(() => {
-    if (!query.data) return null;
-    const last = query.data.pages[query.data.pages.length - 1];
+    if (!data) return null;
+    const last = data.pages[data.pages.length - 1];
     if (last === undefined) return null;
-    return query.hasNextPage ? null : last.totalPages;
-  }, [query.data, query.hasNextPage]);
+    return hasNextPage ? null : last.totalPages;
+  }, [data, hasNextPage]);
 
   const finalTotal = useMemo(() => {
-    if (!query.data) return 0;
-    const last = query.data.pages[query.data.pages.length - 1];
+    if (!data) return 0;
+    const last = data.pages[data.pages.length - 1];
     return last?.total ?? 0;
-  }, [query.data]);
+  }, [data]);
 
   const summaryCaption = useMemo(() => {
-    if (query.isLoading || query.isError || !query.data) return DASHED_CAPTION;
-    if (query.hasNextPage) return formatOpenEndedCaption(totalLoaded);
+    if (isLoading || isError || !data) return DASHED_CAPTION;
+    if (hasNextPage) return formatOpenEndedCaption(totalLoaded);
     return formatFiniteCaption(finalTotal, totalPages ?? 0);
-  }, [
-    query.isLoading,
-    query.isError,
-    query.data,
-    query.hasNextPage,
-    totalLoaded,
-    finalTotal,
-    totalPages,
-  ]);
+  }, [isLoading, isError, data, hasNextPage, totalLoaded, finalTotal, totalPages]);
 
   const isEmpty = useMemo(
-    () => !query.isLoading && !query.isError && query.data !== undefined && totalLoaded === 0,
-    [query.isLoading, query.isError, query.data, totalLoaded],
+    () => !isLoading && !isError && data !== undefined && totalLoaded === 0,
+    [isLoading, isError, data, totalLoaded],
   );
 
   const hasActiveQuery = useMemo(
@@ -245,20 +149,20 @@ const useCatalogue = (): UseCatalogueResult => {
     (pageNumber: number) => {
       setCurrentPage(pageNumber);
       if (
-        query.hasNextPage &&
-        !query.isFetchingNextPage &&
+        hasNextPage &&
+        !isFetchingNextPage &&
         pages.length > 0 &&
         pageNumber >= pages[pages.length - 1]!.pageNumber
       ) {
-        void query.fetchNextPage();
+        void fetchNextPage();
       }
     },
-    [query, pages],
+    [hasNextPage, isFetchingNextPage, pages, fetchNextPage],
   );
 
   const onRetryPress = useCallback(() => {
-    void query.refetch();
-  }, [query]);
+    void refetch();
+  }, [refetch]);
 
   const onFilterSheetOpen = useCallback(() => {
     setFilterSheetOpen(true);
@@ -291,10 +195,11 @@ const useCatalogue = (): UseCatalogueResult => {
       currentPage,
       totalPages,
       summaryCaption,
-      hasNextPage: query.hasNextPage,
-      isLoading: query.isLoading,
-      isFetchingNextPage: query.isFetchingNextPage,
-      isError: query.isError,
+      error,
+      hasNextPage,
+      isLoading,
+      isFetchingNextPage,
+      isError,
       isSearchActive,
       searchQuery,
       hasActiveQuery,
@@ -319,10 +224,11 @@ const useCatalogue = (): UseCatalogueResult => {
       currentPage,
       totalPages,
       summaryCaption,
-      query.hasNextPage,
-      query.isLoading,
-      query.isFetchingNextPage,
-      query.isError,
+      error,
+      hasNextPage,
+      isLoading,
+      isFetchingNextPage,
+      isError,
       isSearchActive,
       searchQuery,
       hasActiveQuery,

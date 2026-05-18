@@ -2,8 +2,6 @@ import type { CardRecord } from '@my-binder/core';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import type { FC } from 'react';
 
-import { EMPTY_FILTER_SET } from './types';
-
 import CatalogueView from './CatalogueView';
 import type { CataloguePage, CatalogueViewProps } from './types';
 
@@ -16,20 +14,6 @@ jest.mock('@src/components/card', () => {
     React.createElement(View, { testID: `card-pocket-${id}` });
   return { Card };
 });
-
-jest.mock(
-  '@src/components/catalogue-filter-sheet/CatalogueFilterSheetContainer',
-  () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const React = require('react') as typeof import('react');
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { View } = require('react-native') as typeof import('react-native');
-    return {
-      CatalogueFilterSheetContainer: ({ open }: { open: boolean }) =>
-        React.createElement(View, { testID: `filter-sheet-${open ? 'open' : 'closed'}` }),
-    };
-  },
-);
 
 const makeCard = (id: string, name: string): CardRecord => ({
   id,
@@ -51,6 +35,7 @@ const defaults: CatalogueViewProps = {
   currentPage: 1,
   totalPages: null,
   summaryCaption: '— MATCHES · — PER PAGE',
+  error: null,
   hasNextPage: false,
   isLoading: false,
   isFetchingNextPage: false,
@@ -59,9 +44,7 @@ const defaults: CatalogueViewProps = {
   isSearchActive: false,
   searchQuery: '',
   hasActiveQuery: false,
-  filters: EMPTY_FILTER_SET,
   filterPills: [],
-  filterSheetOpen: false,
   onSearchOpen: jest.fn(),
   onSearchChange: jest.fn(),
   onSearchClose: jest.fn(),
@@ -69,8 +52,6 @@ const defaults: CatalogueViewProps = {
   onPagerSelected: jest.fn(),
   onRetryPress: jest.fn(),
   onFilterSheetOpen: jest.fn(),
-  onFilterSheetClose: jest.fn(),
-  onFilterApply: jest.fn(),
   onFilterClear: jest.fn(),
   onFilterPillRemove: jest.fn(),
 };
@@ -199,13 +180,6 @@ describe('CatalogueView — filter pills + sheet (US2)', () => {
     render(<CatalogueViewWithDefaults onFilterSheetOpen={onFilterSheetOpen} />);
     fireEvent.press(screen.getByTestId('filter-opener-pill'));
     expect(onFilterSheetOpen).toHaveBeenCalledTimes(1);
-  });
-
-  it('mounts the CatalogueFilterSheetContainer reflecting filterSheetOpen', () => {
-    const { rerender } = render(<CatalogueViewWithDefaults filterSheetOpen={false} />);
-    expect(screen.getByTestId('filter-sheet-closed')).toBeOnTheScreen();
-    rerender(<CatalogueViewWithDefaults filterSheetOpen />);
-    expect(screen.getByTestId('filter-sheet-open')).toBeOnTheScreen();
   });
 
   it('renders the empty state with Clear filters affordance when isEmpty (FR-015)', () => {

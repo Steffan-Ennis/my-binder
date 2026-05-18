@@ -4,20 +4,27 @@
 
 import type { CardRecord } from '@my-binder/core';
 
+import type { UseCatalogueInfiniteQueryResult } from '@src/hooks/useCatalogueInfiniteQuery';
+
+// Colour identity letters consumed by both the catalogue filter sheet and the
+// chip-row inside the catalogue view (Principle IV — one type, one home; C3
+// consolidation from the 2026-05-18 audit).
+export type ColorChip = 'W' | 'U' | 'B' | 'R' | 'G' | 'C';
+
 // Spec 018 / FR-005 — the full filter set the Catalogue can apply.
-// Owned end-to-end by `useCatalogue` (`useReducer`); the filter sheet works
-// against a draft copy until the user commits via Apply.
+// Owned end-to-end by `useCatalogue`; the filter sheet works against a draft
+// copy until the user commits via Apply.
+//
+// Note: multi-set wire support is deferred (audit finding C2 from 2026-05-18);
+// the `sets` dimension is intentionally absent here until a follow-up spec
+// adds the corresponding server-side support.
 export type CatalogueFilterSet = {
-  // Free-form search input (debounced into the wire `name` field).
   name: string;
-  // OR-within-dimension, AND-across-dimension chip selections.
-  sets: ReadonlyArray<string>;
   formats: ReadonlyArray<string>;
   superTypes: ReadonlyArray<string>;
   subTypes: ReadonlyArray<string>;
   creatureTypes: ReadonlyArray<string>;
-  // Colour identity letters (W/U/B/R/G/C).
-  colors: ReadonlyArray<'W' | 'U' | 'B' | 'R' | 'G' | 'C'>;
+  colors: ReadonlyArray<ColorChip>;
   // Inclusive CMC bounds. `[0, 20]` is treated as "unconstrained".
   cmcMin: number;
   cmcMax: number;
@@ -27,7 +34,6 @@ export type CatalogueFilterSet = {
 
 export const EMPTY_FILTER_SET: CatalogueFilterSet = {
   name: '',
-  sets: [],
   formats: [],
   superTypes: [],
   subTypes: [],
@@ -57,17 +63,19 @@ export type CatalogueSurface = 'catalogue';
 
 // Props supplied by `useCatalogue` to `<CatalogueContainer />` and threaded
 // to `<CatalogueView />` via named props (no spread, per Principle X v1.24.0).
-// Extended for US2 (filter sheet + pills + empty state).
-export type CatalogueViewProps = {
+//
+// Composes `Pick<UseCatalogueInfiniteQueryResult, ...>` so the view inherits
+// the query library's authoritative types for `error`/`isLoading`/etc. (Data-
+// fetching Rule 5 — never redeclare fields TanStack already types).
+export type CatalogueViewProps = Pick<
+  UseCatalogueInfiniteQueryResult,
+  'error' | 'isLoading' | 'isFetchingNextPage' | 'isError' | 'hasNextPage'
+> & {
   // Display state
   pages: ReadonlyArray<CataloguePage>;
   currentPage: number;
   totalPages: number | null;   // null when result set is still open-ended
   summaryCaption: string;
-  hasNextPage: boolean;
-  isLoading: boolean;
-  isFetchingNextPage: boolean;
-  isError: boolean;
   // US2 — true when the filter set yields zero results (post-load).
   isEmpty: boolean;
 
@@ -76,10 +84,9 @@ export type CatalogueViewProps = {
   searchQuery: string;
   hasActiveQuery: boolean;
 
-  // US2 — filter surface
-  filters: CatalogueFilterSet;
+  // US2 — filter surface (the view renders the pill row; the sheet is mounted
+  // by `<CatalogueContainer />` as a sibling).
   filterPills: ReadonlyArray<CatalogueFilterPill>;
-  filterSheetOpen: boolean;
 
   // Callbacks
   onSearchOpen: () => void;
@@ -88,16 +95,14 @@ export type CatalogueViewProps = {
   onProfilePress: () => void;
   onPagerSelected: (pageNumber: number) => void;
   onRetryPress: () => void;
-  // US2 — filter sheet lifecycle and chip-row interactions
+  // US2 — filter pill row + zero-match empty state. The sheet container owns
+  // open/close + apply; the view only knows about clear (empty-state) +
+  // single-pill removal + sheet open.
   onFilterSheetOpen: () => void;
-  onFilterSheetClose: () => void;
-  onFilterApply: (next: CatalogueFilterSet) => void;
   onFilterClear: () => void;
   onFilterPillRemove: (pillId: string) => void;
 };
 
 // Options accepted by `useCatalogue`. US1 uses the default empty filter set;
 // later stories extend this with surface-specific entries.
-export type UseCatalogueOptions = {
-  // Reserved for future use; US1 takes no input.
-};
+export type UseCatalogueOptions = Record<string, never>;

@@ -80,16 +80,19 @@ jest.mock('@gorhom/bottom-sheet', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { View, Pressable } = require('react-native') as typeof import('react-native');
 
+  // View tests render the sheet's content directly — the hook owns the
+  // present()/dismiss() effect, so the mock unconditionally renders children
+  // and exposes a typed ref. Open/dismiss semantics are covered in the hook
+  // test by spying on the ref's imperative methods.
   const BottomSheetModal = React.forwardRef<
     { present: () => void; dismiss: () => void },
     { children?: React.ReactNode }
   >(({ children }, ref) => {
-    const [visible, setVisible] = React.useState(false);
     React.useImperativeHandle(ref, () => ({
-      present: () => setVisible(true),
-      dismiss: () => setVisible(false),
+      present: () => {},
+      dismiss: () => {},
     }));
-    return visible ? React.createElement(View, { testID: 'bottom-sheet' }, children) : null;
+    return React.createElement(View, { testID: 'bottom-sheet' }, children);
   });
 
   const BottomSheetModalProvider = ({ children }: { children?: React.ReactNode }) =>

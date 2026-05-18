@@ -1,5 +1,6 @@
+import type { BottomSheetModal } from '@gorhom/bottom-sheet';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import type { FC } from 'react';
+import { createRef, type FC, type RefObject } from 'react';
 
 import { EMPTY_FILTER_SET, type CatalogueFilterSet } from '@src/components/catalogue/types';
 
@@ -13,12 +14,19 @@ const SEEDED_DRAFT: CatalogueFilterSet = {
   missingOnly: true,
 };
 
+const stubRef = (): RefObject<BottomSheetModal | null> =>
+  createRef<BottomSheetModal | null>();
+
 const defaults: CatalogueFilterSheetViewProps = {
-  open: true,
+  sheetRef: stubRef(),
   draft: EMPTY_FILTER_SET,
-  onToggleChip: jest.fn(),
+  toggleFormat: jest.fn(),
+  toggleSuperType: jest.fn(),
+  toggleSubType: jest.fn(),
+  toggleCreatureType: jest.fn(),
   onToggleColor: jest.fn(),
-  onSetCmcRange: jest.fn(),
+  onChangeMin: jest.fn(),
+  onChangeMax: jest.fn(),
   onToggleMissingOnly: jest.fn(),
   onApply: jest.fn(),
   onClearAll: jest.fn(),
@@ -26,7 +34,7 @@ const defaults: CatalogueFilterSheetViewProps = {
 };
 
 const ViewWithDefaults: FC<Partial<CatalogueFilterSheetViewProps>> = (overrides) => (
-  <CatalogueFilterSheetView {...defaults} {...overrides} />
+  <CatalogueFilterSheetView {...defaults} sheetRef={stubRef()} {...overrides} />
 );
 
 describe('CatalogueFilterSheetView — render contract (US2 / FR-005)', () => {
@@ -91,11 +99,18 @@ describe('CatalogueFilterSheetView — selected state styling', () => {
 });
 
 describe('CatalogueFilterSheetView — callbacks', () => {
-  it('tapping a chip fires onToggleChip with (dimension, value)', () => {
-    const onToggleChip = jest.fn();
-    render(<ViewWithDefaults onToggleChip={onToggleChip} />);
+  it('tapping a format chip fires toggleFormat with the value', () => {
+    const toggleFormat = jest.fn();
+    render(<ViewWithDefaults toggleFormat={toggleFormat} />);
     fireEvent.press(screen.getByTestId('filter-section-formats-chip-Modern'));
-    expect(onToggleChip).toHaveBeenCalledWith('formats', 'Modern');
+    expect(toggleFormat).toHaveBeenCalledWith('Modern');
+  });
+
+  it('tapping a super-type chip fires toggleSuperType with the value', () => {
+    const toggleSuperType = jest.fn();
+    render(<ViewWithDefaults toggleSuperType={toggleSuperType} />);
+    fireEvent.press(screen.getByTestId('filter-section-super-types-chip-Legendary'));
+    expect(toggleSuperType).toHaveBeenCalledWith('Legendary');
   });
 
   it('tapping a colour chip fires onToggleColor with the letter', () => {
@@ -110,6 +125,13 @@ describe('CatalogueFilterSheetView — callbacks', () => {
     render(<ViewWithDefaults onToggleMissingOnly={onToggleMissingOnly} />);
     fireEvent.press(screen.getByTestId('missing-only-toggle'));
     expect(onToggleMissingOnly).toHaveBeenCalledTimes(1);
+  });
+
+  it('changing the CMC min input fires onChangeMin', () => {
+    const onChangeMin = jest.fn();
+    render(<ViewWithDefaults onChangeMin={onChangeMin} />);
+    fireEvent.changeText(screen.getByTestId('cmc-min-input'), '3');
+    expect(onChangeMin).toHaveBeenCalledWith('3');
   });
 
   it('tapping Apply fires onApply', () => {

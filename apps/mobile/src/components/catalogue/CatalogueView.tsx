@@ -4,80 +4,47 @@ import { Pressable, Text, View } from 'react-native';
 import PagerView, { type PagerViewProps } from 'react-native-pager-view';
 
 import { Card as CardSlot } from '@src/components/card';
-import { CatalogueFilterSheetContainer } from '@src/components/catalogue-filter-sheet/CatalogueFilterSheetContainer';
 import Masthead from '@src/components/masthead/Masthead';
-import { Colors, Radius, Spacing, Type } from '@src/constants/theme';
 import { SLOTS_PER_BINDER_PAGE } from '@src/utils/pageMath';
 
-import useStyles from './CatalogueView.theme';
+import useStyles, { type CatalogueViewStyles } from './CatalogueView.theme';
 import type { CatalogueFilterPill, CatalogueViewProps } from './types';
 
 const RING_COUNT = 3;
 const SEARCH_PLACEHOLDER = 'Search the catalogue';
 
-const FilterPill: FC<{ pill: CatalogueFilterPill; onRemove: (id: string) => void }> = ({
-  pill,
-  onRemove,
-}) => (
+const FilterPill: FC<{
+  pill: CatalogueFilterPill;
+  styles: CatalogueViewStyles;
+  onRemove: (id: string) => void;
+}> = ({ pill, styles, onRemove }) => (
   <Pressable
     accessibilityRole="button"
     accessibilityLabel={`Remove ${pill.label}`}
     onPress={() => onRemove(pill.id)}
     hitSlop={6}
     testID={`filter-pill-${pill.id}`}
-    style={{
-      paddingHorizontal: Spacing.sm,
-      paddingVertical: Spacing.xxs,
-      borderRadius: Radius.pill,
-      backgroundColor: Colors.dark.accent,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: Spacing.xxs,
-    }}
+    style={styles.filterPill}
   >
-    <Text
-      style={{
-        fontFamily: Type.body.font,
-        fontSize: 12,
-        color: Colors.dark.textOnAccent,
-        fontWeight: Type.bodyStrong.weight,
-      }}
-    >
-      {pill.label}
-    </Text>
-    <Ionicons name="close" size={14} color={Colors.dark.textOnAccent} />
+    <Text style={styles.filterPillLabel}>{pill.label}</Text>
+    <Ionicons name="close" size={14} style={styles.filterPillIcon} />
   </Pressable>
 );
 
-const FilterOpenerPill: FC<{ onPress: () => void }> = ({ onPress }) => (
+const FilterOpenerPill: FC<{
+  styles: CatalogueViewStyles;
+  onPress: () => void;
+}> = ({ styles, onPress }) => (
   <Pressable
     accessibilityRole="button"
     accessibilityLabel="Open filters"
     onPress={onPress}
     hitSlop={6}
     testID="filter-opener-pill"
-    style={{
-      paddingHorizontal: Spacing.sm,
-      paddingVertical: Spacing.xxs,
-      borderRadius: Radius.pill,
-      borderWidth: 1,
-      borderColor: Colors.dark.accentSoft,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: Spacing.xxs,
-    }}
+    style={styles.filterOpenerPill}
   >
-    <Ionicons name="options-outline" size={14} color={Colors.dark.accentSoft} />
-    <Text
-      style={{
-        fontFamily: Type.body.font,
-        fontSize: 12,
-        color: Colors.dark.accentSoft,
-        fontWeight: Type.bodyStrong.weight,
-      }}
-    >
-      Filters
-    </Text>
+    <Ionicons name="options-outline" size={14} style={styles.filterOpenerIcon} />
+    <Text style={styles.filterOpenerLabel}>Filters</Text>
   </Pressable>
 );
 
@@ -93,9 +60,7 @@ const CatalogueView: FC<CatalogueViewProps> = ({
   isSearchActive,
   searchQuery,
   hasActiveQuery,
-  filters,
   filterPills,
-  filterSheetOpen,
   onSearchOpen,
   onSearchChange,
   onSearchClose,
@@ -103,8 +68,6 @@ const CatalogueView: FC<CatalogueViewProps> = ({
   onPagerSelected,
   onRetryPress,
   onFilterSheetOpen,
-  onFilterSheetClose,
-  onFilterApply,
   onFilterClear,
   onFilterPillRemove,
 }) => {
@@ -119,35 +82,23 @@ const CatalogueView: FC<CatalogueViewProps> = ({
     onPagerSelected(event.nativeEvent.position + 1);
   };
 
-  const pillsSlot =
-    filterPills.length > 0 || isSearchActive ? (
-      <View
-        style={{
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          gap: Spacing.xxs,
-          paddingHorizontal: Spacing.lg,
-          paddingBottom: Spacing.xs,
-        }}
-        testID="catalogue-filter-pill-row"
-      >
-        <FilterOpenerPill onPress={onFilterSheetOpen} />
-        {filterPills.map((pill) => (
-          <FilterPill key={pill.id} pill={pill} onRemove={onFilterPillRemove} />
-        ))}
-      </View>
-    ) : (
-      <View
-        style={{
-          flexDirection: 'row',
-          paddingHorizontal: Spacing.lg,
-          paddingBottom: Spacing.xs,
-        }}
-        testID="catalogue-filter-pill-row"
-      >
-        <FilterOpenerPill onPress={onFilterSheetOpen} />
-      </View>
-    );
+  const pillRowHasContent = filterPills.length > 0 || isSearchActive;
+  const pillsSlot = (
+    <View
+      style={pillRowHasContent ? styles.filterPillRow : styles.filterPillRowSingle}
+      testID="catalogue-filter-pill-row"
+    >
+      <FilterOpenerPill styles={styles} onPress={onFilterSheetOpen} />
+      {filterPills.map((pill) => (
+        <FilterPill
+          key={pill.id}
+          pill={pill}
+          styles={styles}
+          onRemove={onFilterPillRemove}
+        />
+      ))}
+    </View>
+  );
 
   return (
     <View style={styles.root} testID="catalogue-root">
@@ -254,14 +205,6 @@ const CatalogueView: FC<CatalogueViewProps> = ({
           </Text>
         </View>
       </View>
-
-      <CatalogueFilterSheetContainer
-        open={filterSheetOpen}
-        committed={filters}
-        onApply={onFilterApply}
-        onClear={onFilterClear}
-        onClose={onFilterSheetClose}
-      />
     </View>
   );
 };
