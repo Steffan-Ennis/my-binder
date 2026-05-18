@@ -14,7 +14,7 @@ import { SLOTS_PER_BINDER_PAGE } from '@src/utils/pageMath';
 
 import useStyles from './BinderHomeView.theme';
 import IconSmall from "@src/components/icons/IconSmall";
-import CardPocket from "@src/components/card-pocket/CardPocket";
+import BinderPage from "@src/components/binder-page/BinderPage";
 
 const RING_COUNT = 3;
 
@@ -159,11 +159,7 @@ const BinderHomeView: FC<BinderHomeViewProps> = ({
               <Text style={styles.errorMessage}>no matches in your binder</Text>
             </View>
           ) : isLoading || matchedCards.length === 0 ? (
-            <View style={styles.grid}>
-              {Array.from({ length: SLOTS_PER_BINDER_PAGE }).map((_, slot) =>
-                <CardPocket slotIndex={0} isLoading={true} />,
-              )}
-            </View>
+            <BinderPage pageIndex={0} cards={[]} isLoading={true} />
           ) : (
             <PagerView
               style={styles.pager}
@@ -177,15 +173,9 @@ const BinderHomeView: FC<BinderHomeViewProps> = ({
                   start,
                   start + SLOTS_PER_BINDER_PAGE,
                 );
-                return (
-                  <View key={pageIdx} style={styles.grid} testID={`binder-page-${pageIdx + 1}`}>
-                    {((pageIdx + 1 === currentPage || pageIdx == currentPage + 2) &&
-                      Array.from({ length: SLOTS_PER_BINDER_PAGE }).map((_, slot) =>
-                        <CardPocket slotIndex={slot} isLoading={isLoading} card={pageCards[slot]} />
-                      )
-                    )}
-                  </View>
-                );
+                return (pageIdx + 1 === currentPage)
+                  ? <BinderPage pageIndex={pageIdx} cards={pageCards} isLoading={isLoading} />
+                  : <></>
               })}
             </PagerView>
           )}

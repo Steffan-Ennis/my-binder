@@ -76,12 +76,6 @@ export type BinderHomeViewStyles = {
     >
   >;
   ring: Required<Pick<ViewStyle, 'width' | 'height' | 'borderRadius' | 'backgroundColor'>>;
-  grid: Required<
-    Pick<
-      ViewStyle,
-      'flex' | 'flexDirection' | 'flexWrap' | 'justifyContent' | 'alignContent'
-    >
-  >;
   errorState: Required<Pick<ViewStyle, 'flex' | 'alignItems' | 'justifyContent' | 'gap'>>;
   errorMessage: Required<
     Pick<TextStyle, 'fontFamily' | 'fontSize' | 'lineHeight' | 'color' | 'textAlign'>
@@ -221,13 +215,6 @@ const styles = StyleSheet.create<BinderHomeViewStyles>({
     height: Spacing.sm,
     borderRadius: Radius.pill,
     backgroundColor: Colors.dark.border,
-  },
-  grid: {
-    flex: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    alignContent: 'space-between',
   },
   errorState: {
     flex: 1,
