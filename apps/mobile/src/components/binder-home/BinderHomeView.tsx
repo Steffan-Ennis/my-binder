@@ -9,12 +9,12 @@ import {
 } from 'react-native';
 import PagerView, {PagerViewProps} from 'react-native-pager-view';
 
-import { Card as CardSlot } from '@src/components/card';
 import { Colors } from '@src/constants/theme';
 import { SLOTS_PER_BINDER_PAGE } from '@src/utils/pageMath';
 
 import useStyles from './BinderHomeView.theme';
 import IconSmall from "@src/components/icons/IconSmall";
+import CardPocket from "@src/components/card-pocket/CardPocket";
 
 const RING_COUNT = 3;
 
@@ -36,26 +36,6 @@ export type BinderHomeViewProps = {
   onRetryPress: () => void;
   hasActiveQuery: boolean;
   handlePagerSelected: Required<PagerViewProps>['onPageSelected']
-};
-
-export type CardPocketProps = {
-  card?: Card,
-  slotIndex: number,
-  isLoading: boolean
-}
-
-const CardPocket: FC<CardPocketProps> = ({ card, isLoading, slotIndex }) => {
-  const styles = useStyles();
-  if (!isLoading && card) {
-    return <CardSlot key={card.id} id={card.id} footprint="pocket" />;
-  }
-  return (
-    <View
-      key={slotIndex}
-      style={[styles.pocket, styles.pocketEmpty]}
-      testID="pocket-empty"
-    />
-  );
 };
 
 const BinderHomeView: FC<BinderHomeViewProps> = ({
@@ -199,8 +179,10 @@ const BinderHomeView: FC<BinderHomeViewProps> = ({
                 );
                 return (
                   <View key={pageIdx} style={styles.grid} testID={`binder-page-${pageIdx + 1}`}>
-                    {Array.from({ length: SLOTS_PER_BINDER_PAGE }).map((_, slot) =>
-                     <CardPocket slotIndex={slot} isLoading={isLoading} card={pageCards[slot]} />
+                    {((pageIdx + 1 === currentPage || pageIdx == currentPage + 2) &&
+                      Array.from({ length: SLOTS_PER_BINDER_PAGE }).map((_, slot) =>
+                        <CardPocket slotIndex={slot} isLoading={isLoading} card={pageCards[slot]} />
+                      )
                     )}
                   </View>
                 );

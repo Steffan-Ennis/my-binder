@@ -82,16 +82,6 @@ export type BinderHomeViewStyles = {
       'flex' | 'flexDirection' | 'flexWrap' | 'justifyContent' | 'alignContent'
     >
   >;
-  pocket: Required<
-    Pick<
-      ViewStyle,
-      'width' | 'height' | 'aspectRatio' | 'borderRadius' | 'overflow' | 'marginBottom'
-    >
-  >;
-  pocketEmpty: Required<
-    Pick<ViewStyle, 'borderWidth' | 'borderStyle' | 'borderColor' | 'backgroundColor'>
-  >;
-  pocketImage: Required<Pick<ImageStyle, 'width' | 'height'>>;
   errorState: Required<Pick<ViewStyle, 'flex' | 'alignItems' | 'justifyContent' | 'gap'>>;
   errorMessage: Required<
     Pick<TextStyle, 'fontFamily' | 'fontSize' | 'lineHeight' | 'color' | 'textAlign'>
@@ -113,18 +103,6 @@ export type BinderHomeViewStyles = {
   pageNavigator: Required<
     Pick<ViewStyle, 'flexDirection' | 'alignItems' | 'justifyContent' | 'paddingTop'>
   >;
-  pillButton: Required<
-    Pick<
-      ViewStyle,
-      | 'width'
-      | 'height'
-      | 'borderRadius'
-      | 'backgroundColor'
-      | 'alignItems'
-      | 'justifyContent'
-    >
-  >;
-  pillButtonDisabled: Required<Pick<ViewStyle, 'opacity'>>;
   pager: Required<Pick<ViewStyle, 'flex'>>;
   pageNumber: Required<
     Pick<
@@ -251,24 +229,6 @@ const styles = StyleSheet.create<BinderHomeViewStyles>({
     justifyContent: 'space-between',
     alignContent: 'space-between',
   },
-  pocket: {
-    width: '32%',
-    height: '100%',
-    aspectRatio: 5 / 7,
-    borderRadius: Radius.md,
-    overflow: 'hidden',
-    marginBottom: Spacing.xs,
-  },
-  pocketEmpty: {
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: Colors.dark.pocketEmpty,
-    backgroundColor: 'transparent',
-  },
-  pocketImage: {
-    width: '100%',
-    height: '100%',
-  },
   errorState: {
     flex: 1,
     alignItems: 'center',
@@ -301,17 +261,6 @@ const styles = StyleSheet.create<BinderHomeViewStyles>({
     alignItems: 'center',
     justifyContent: 'center',
     paddingTop: Spacing.md,
-  },
-  pillButton: {
-    width: Touch.buttonHeight,
-    height: Touch.buttonHeight,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.dark.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pillButtonDisabled: {
-    opacity: 0.4,
   },
   pager: {
     flex: 1,

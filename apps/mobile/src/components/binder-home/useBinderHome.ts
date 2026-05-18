@@ -126,8 +126,7 @@ const useBinderHome = (): UseBinderHomeResult => {
     [cardsQuery.data],
   );
 
-  const [state, dispatch] = useReducer(binderHomeReducer, INITIAL_STATE);
-  const { currentPage, isSearchActive, searchQuery } = state;
+  const [{ currentPage, isSearchActive, searchQuery }, dispatch] = useReducer(binderHomeReducer, INITIAL_STATE);
 
   const matchedCards = useMemo(
     () => binderSearch(cards, searchQuery),
