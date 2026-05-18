@@ -180,6 +180,99 @@ describe('useCatalogue — view-prop derivation (US1)', () => {
   });
 });
 
+describe('useCatalogue — filter sheet + pills (US2)', () => {
+  it('filterPills derives one pill per active dimension', async () => {
+    jest
+      .spyOn(apiModule.apiClient, 'searchCards')
+      .mockResolvedValue(makePage(1, [], 1, 0));
+    const { result } = renderHook(() => useCatalogue(), { wrapper });
+    expect(result.current.filterPills).toEqual([]);
+
+    act(() =>
+      result.current.onFilterApply({
+        ...result.current.filters,
+        formats: ['Modern'],
+        colors: ['R'],
+      }),
+    );
+    expect(result.current.filterPills).toEqual([
+      { id: 'format:Modern', label: 'Format: Modern' },
+      { id: 'color:R', label: 'Colour: R' },
+    ]);
+  });
+
+  it('onFilterPillRemove drops one dimension only (FR-008)', () => {
+    jest
+      .spyOn(apiModule.apiClient, 'searchCards')
+      .mockResolvedValue(makePage(1, [], 1, 0));
+    const { result } = renderHook(() => useCatalogue(), { wrapper });
+
+    act(() =>
+      result.current.onFilterApply({
+        ...result.current.filters,
+        formats: ['Modern', 'Legacy'],
+        colors: ['R'],
+      }),
+    );
+    act(() => result.current.onFilterPillRemove('format:Modern'));
+
+    expect(result.current.filters.formats).toEqual(['Legacy']);
+    expect(result.current.filters.colors).toEqual(['R']);
+  });
+
+  it('onFilterPillRemove on "cmc" pill resets the CMC range', () => {
+    jest
+      .spyOn(apiModule.apiClient, 'searchCards')
+      .mockResolvedValue(makePage(1, [], 1, 0));
+    const { result } = renderHook(() => useCatalogue(), { wrapper });
+
+    act(() =>
+      result.current.onFilterApply({
+        ...result.current.filters,
+        cmcMin: 2,
+        cmcMax: 5,
+      }),
+    );
+    expect(result.current.filterPills.some((p) => p.id === 'cmc')).toBe(true);
+    act(() => result.current.onFilterPillRemove('cmc'));
+    expect(result.current.filters.cmcMin).toBe(0);
+    expect(result.current.filters.cmcMax).toBe(20);
+  });
+
+  it('onFilterClear resets every dimension to EMPTY_FILTER_SET', () => {
+    jest
+      .spyOn(apiModule.apiClient, 'searchCards')
+      .mockResolvedValue(makePage(1, [], 1, 0));
+    const { result } = renderHook(() => useCatalogue(), { wrapper });
+
+    act(() =>
+      result.current.onFilterApply({
+        ...result.current.filters,
+        formats: ['Modern'],
+        missingOnly: true,
+      }),
+    );
+    act(() => result.current.onFilterClear());
+
+    expect(result.current.filters.formats).toEqual([]);
+    expect(result.current.filters.missingOnly).toBe(false);
+    expect(result.current.filterPills).toEqual([]);
+  });
+
+  it('onFilterSheetOpen / onFilterSheetClose toggle the sheet flag', () => {
+    jest
+      .spyOn(apiModule.apiClient, 'searchCards')
+      .mockResolvedValue(makePage(1, [], 1, 0));
+    const { result } = renderHook(() => useCatalogue(), { wrapper });
+
+    expect(result.current.filterSheetOpen).toBe(false);
+    act(() => result.current.onFilterSheetOpen());
+    expect(result.current.filterSheetOpen).toBe(true);
+    act(() => result.current.onFilterSheetClose());
+    expect(result.current.filterSheetOpen).toBe(false);
+  });
+});
+
 describe('useCatalogue — return-value reference stability (constitution v1.16.0)', () => {
   it('returns identity-stable callbacks across re-renders with no input change', async () => {
     jest

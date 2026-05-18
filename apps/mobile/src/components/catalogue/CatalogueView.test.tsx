@@ -2,6 +2,8 @@ import type { CardRecord } from '@my-binder/core';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import type { FC } from 'react';
 
+import { EMPTY_FILTER_SET } from './types';
+
 import CatalogueView from './CatalogueView';
 import type { CataloguePage, CatalogueViewProps } from './types';
 
@@ -14,6 +16,20 @@ jest.mock('@src/components/card', () => {
     React.createElement(View, { testID: `card-pocket-${id}` });
   return { Card };
 });
+
+jest.mock(
+  '@src/components/catalogue-filter-sheet/CatalogueFilterSheetContainer',
+  () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const React = require('react') as typeof import('react');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { View } = require('react-native') as typeof import('react-native');
+    return {
+      CatalogueFilterSheetContainer: ({ open }: { open: boolean }) =>
+        React.createElement(View, { testID: `filter-sheet-${open ? 'open' : 'closed'}` }),
+    };
+  },
+);
 
 const makeCard = (id: string, name: string): CardRecord => ({
   id,
@@ -39,15 +55,24 @@ const defaults: CatalogueViewProps = {
   isLoading: false,
   isFetchingNextPage: false,
   isError: false,
+  isEmpty: false,
   isSearchActive: false,
   searchQuery: '',
   hasActiveQuery: false,
+  filters: EMPTY_FILTER_SET,
+  filterPills: [],
+  filterSheetOpen: false,
   onSearchOpen: jest.fn(),
   onSearchChange: jest.fn(),
   onSearchClose: jest.fn(),
   onProfilePress: jest.fn(),
   onPagerSelected: jest.fn(),
   onRetryPress: jest.fn(),
+  onFilterSheetOpen: jest.fn(),
+  onFilterSheetClose: jest.fn(),
+  onFilterApply: jest.fn(),
+  onFilterClear: jest.fn(),
+  onFilterPillRemove: jest.fn(),
 };
 
 const CatalogueViewWithDefaults: FC<Partial<CatalogueViewProps>> = (overrides) => (
@@ -134,5 +159,67 @@ describe('CatalogueView — error state', () => {
     expect(screen.getByText(/couldn.+t load the catalogue/i)).toBeOnTheScreen();
     fireEvent.press(screen.getByRole('button', { name: /retry loading the catalogue/i }));
     expect(onRetryPress).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('CatalogueView — filter pills + sheet (US2)', () => {
+  it('renders the filter pill row with the Filters opener', () => {
+    render(<CatalogueViewWithDefaults />);
+    expect(screen.getByTestId('catalogue-filter-pill-row')).toBeOnTheScreen();
+    expect(screen.getByTestId('filter-opener-pill')).toBeOnTheScreen();
+  });
+
+  it('renders one pill per active filter dimension', () => {
+    render(
+      <CatalogueViewWithDefaults
+        filterPills={[
+          { id: 'format:Modern', label: 'Format: Modern' },
+          { id: 'color:R', label: 'Colour: R' },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId('filter-pill-format:Modern')).toBeOnTheScreen();
+    expect(screen.getByTestId('filter-pill-color:R')).toBeOnTheScreen();
+  });
+
+  it('tapping a pill fires onFilterPillRemove with the pill id', () => {
+    const onFilterPillRemove = jest.fn();
+    render(
+      <CatalogueViewWithDefaults
+        filterPills={[{ id: 'format:Modern', label: 'Format: Modern' }]}
+        onFilterPillRemove={onFilterPillRemove}
+      />,
+    );
+    fireEvent.press(screen.getByTestId('filter-pill-format:Modern'));
+    expect(onFilterPillRemove).toHaveBeenCalledWith('format:Modern');
+  });
+
+  it('tapping the Filters opener fires onFilterSheetOpen', () => {
+    const onFilterSheetOpen = jest.fn();
+    render(<CatalogueViewWithDefaults onFilterSheetOpen={onFilterSheetOpen} />);
+    fireEvent.press(screen.getByTestId('filter-opener-pill'));
+    expect(onFilterSheetOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it('mounts the CatalogueFilterSheetContainer reflecting filterSheetOpen', () => {
+    const { rerender } = render(<CatalogueViewWithDefaults filterSheetOpen={false} />);
+    expect(screen.getByTestId('filter-sheet-closed')).toBeOnTheScreen();
+    rerender(<CatalogueViewWithDefaults filterSheetOpen />);
+    expect(screen.getByTestId('filter-sheet-open')).toBeOnTheScreen();
+  });
+
+  it('renders the empty state with Clear filters affordance when isEmpty (FR-015)', () => {
+    const onFilterClear = jest.fn();
+    render(
+      <CatalogueViewWithDefaults
+        isEmpty
+        filterPills={[{ id: 'format:Modern', label: 'Format: Modern' }]}
+        onFilterClear={onFilterClear}
+      />,
+    );
+    expect(screen.getByTestId('catalogue-empty-state')).toBeOnTheScreen();
+    expect(screen.getByText(/no cards match these filters/i)).toBeOnTheScreen();
+    fireEvent.press(screen.getByRole('button', { name: /clear filters/i }));
+    expect(onFilterClear).toHaveBeenCalledTimes(1);
   });
 });

@@ -13,15 +13,24 @@ const CatalogueContainer: FC = () => {
     isLoading,
     isFetchingNextPage,
     isError,
+    isEmpty,
     isSearchActive,
     searchQuery,
     hasActiveQuery,
+    filters,
+    filterPills,
+    filterSheetOpen,
     onSearchOpen,
     onSearchChange,
     onSearchClose,
     onProfilePress,
     onPagerSelected,
     onRetryPress,
+    onFilterSheetOpen,
+    onFilterSheetClose,
+    onFilterApply,
+    onFilterClear,
+    onFilterPillRemove,
   } = useCatalogue();
 
   return (
@@ -34,15 +43,24 @@ const CatalogueContainer: FC = () => {
       isLoading={isLoading}
       isFetchingNextPage={isFetchingNextPage}
       isError={isError}
+      isEmpty={isEmpty}
       isSearchActive={isSearchActive}
       searchQuery={searchQuery}
       hasActiveQuery={hasActiveQuery}
+      filters={filters}
+      filterPills={filterPills}
+      filterSheetOpen={filterSheetOpen}
       onSearchOpen={onSearchOpen}
       onSearchChange={onSearchChange}
       onSearchClose={onSearchClose}
       onProfilePress={onProfilePress}
       onPagerSelected={onPagerSelected}
       onRetryPress={onRetryPress}
+      onFilterSheetOpen={onFilterSheetOpen}
+      onFilterSheetClose={onFilterSheetClose}
+      onFilterApply={onFilterApply}
+      onFilterClear={onFilterClear}
+      onFilterPillRemove={onFilterPillRemove}
     />
   );
 };

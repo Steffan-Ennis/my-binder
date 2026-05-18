@@ -57,7 +57,7 @@ export type CatalogueSurface = 'catalogue';
 
 // Props supplied by `useCatalogue` to `<CatalogueContainer />` and threaded
 // to `<CatalogueView />` via named props (no spread, per Principle X v1.24.0).
-// US1 subset — US2 and US4 will extend this type additively.
+// Extended for US2 (filter sheet + pills + empty state).
 export type CatalogueViewProps = {
   // Display state
   pages: ReadonlyArray<CataloguePage>;
@@ -68,11 +68,18 @@ export type CatalogueViewProps = {
   isLoading: boolean;
   isFetchingNextPage: boolean;
   isError: boolean;
+  // US2 — true when the filter set yields zero results (post-load).
+  isEmpty: boolean;
 
   // Masthead surface
   isSearchActive: boolean;
   searchQuery: string;
   hasActiveQuery: boolean;
+
+  // US2 — filter surface
+  filters: CatalogueFilterSet;
+  filterPills: ReadonlyArray<CatalogueFilterPill>;
+  filterSheetOpen: boolean;
 
   // Callbacks
   onSearchOpen: () => void;
@@ -81,6 +88,12 @@ export type CatalogueViewProps = {
   onProfilePress: () => void;
   onPagerSelected: (pageNumber: number) => void;
   onRetryPress: () => void;
+  // US2 — filter sheet lifecycle and chip-row interactions
+  onFilterSheetOpen: () => void;
+  onFilterSheetClose: () => void;
+  onFilterApply: (next: CatalogueFilterSet) => void;
+  onFilterClear: () => void;
+  onFilterPillRemove: (pillId: string) => void;
 };
 
 // Options accepted by `useCatalogue`. US1 uses the default empty filter set;

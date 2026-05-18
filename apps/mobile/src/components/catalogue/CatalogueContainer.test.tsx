@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react-native';
 
 import CatalogueContainer from './CatalogueContainer';
-import type { CatalogueViewProps } from './types';
+import { EMPTY_FILTER_SET, type CatalogueViewProps } from './types';
 
 const mockUseCatalogue = jest.fn();
 jest.mock('./useCatalogue', () => ({
@@ -30,12 +30,19 @@ beforeEach(() => {
 
 describe('CatalogueContainer — named-props bridge', () => {
   it('wires every documented hook return field to <CatalogueView /> by name (no spread)', () => {
-    const onSearchOpen = jest.fn();
-    const onSearchChange = jest.fn();
-    const onSearchClose = jest.fn();
-    const onProfilePress = jest.fn();
-    const onPagerSelected = jest.fn();
-    const onRetryPress = jest.fn();
+    const callbacks = {
+      onSearchOpen: jest.fn(),
+      onSearchChange: jest.fn(),
+      onSearchClose: jest.fn(),
+      onProfilePress: jest.fn(),
+      onPagerSelected: jest.fn(),
+      onRetryPress: jest.fn(),
+      onFilterSheetOpen: jest.fn(),
+      onFilterSheetClose: jest.fn(),
+      onFilterApply: jest.fn(),
+      onFilterClear: jest.fn(),
+      onFilterPillRemove: jest.fn(),
+    };
 
     mockUseCatalogue.mockReturnValue({
       pages: [],
@@ -46,15 +53,14 @@ describe('CatalogueContainer — named-props bridge', () => {
       isLoading: false,
       isFetchingNextPage: false,
       isError: false,
+      isEmpty: false,
       isSearchActive: false,
       searchQuery: '',
       hasActiveQuery: false,
-      onSearchOpen,
-      onSearchChange,
-      onSearchClose,
-      onProfilePress,
-      onPagerSelected,
-      onRetryPress,
+      filters: EMPTY_FILTER_SET,
+      filterPills: [],
+      filterSheetOpen: false,
+      ...callbacks,
     });
 
     render(<CatalogueContainer />);
@@ -69,15 +75,14 @@ describe('CatalogueContainer — named-props bridge', () => {
       isLoading: false,
       isFetchingNextPage: false,
       isError: false,
+      isEmpty: false,
       isSearchActive: false,
       searchQuery: '',
       hasActiveQuery: false,
-      onSearchOpen,
-      onSearchChange,
-      onSearchClose,
-      onProfilePress,
-      onPagerSelected,
-      onRetryPress,
+      filters: EMPTY_FILTER_SET,
+      filterPills: [],
+      filterSheetOpen: false,
+      ...callbacks,
     });
   });
 });
