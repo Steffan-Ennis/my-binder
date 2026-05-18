@@ -187,17 +187,37 @@ class MtgjsonProvider implements CardProvider {
    * const m11Set = await provider.search({ set: 'M11' });
    * ```
    */
-  async search(query: SearchQuery): Promise<CardRecord[]> {
+  async search({
+  name,
+  cmcMax,
+  cmcMin,
+  limit = 15,
+  colorIdentity,
+  page = 1,
+  set,
+  ...rest
+}: SearchQuery): Promise<CardRecord[]> {
     const cards = await this.sdk.cards.search({
-      ...(query.name !== undefined && { fuzzyName: query.name }),
-      ...(query.set !== undefined && { setCode: query.set }),
-      ...(query.cmcMin !== undefined && { manaValueGte: query.cmcMin }),
-      ...(query.cmcMax !== undefined && { manaValueLte: query.cmcMax }),
-      ...(query.colorIdentity !== undefined) && { colorIdentity: query.colorIdentity },
+      ...(name !== undefined && { fuzzyName: name }),
+      ...(set !== undefined && { setCode: set }),
+      ...(cmcMin !== undefined && { manaValueGte: cmcMin }),
+      ...(cmcMax !== undefined && { manaValueLte: cmcMax }),
+      ...(colorIdentity !== undefined) && { colorIdentity: colorIdentity },
       availability: 'paper',
+      limit,
+      offset: page * limit
     });
 
-    return this.collectCards(applyCatalogueFilters(cards, query));
+    return this.collectCards(applyCatalogueFilters(cards, {
+      name,
+      cmcMax,
+      cmcMin,
+      limit,
+      colorIdentity,
+      page,
+      set,
+      ...rest
+    }));
   }
   /**
    * Resolve a single printing by its MTGJSON UUID and return display-ready
