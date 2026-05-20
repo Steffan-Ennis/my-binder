@@ -1,10 +1,6 @@
 // Spec 018 / US2 — mobile-only types for the catalogue filter sheet.
 // Per Principle X v1.26.0 sub-rule #7, feature-local types live with the
 // feature directory.
-
-import type { BottomSheetModal } from '@gorhom/bottom-sheet';
-import type { RefObject } from 'react';
-
 import type { CatalogueFilterSet, ColorChip } from '@src/components/catalogue/types';
 
 // Hook options — the sheet edits a *working draft* of the filter set so chip
@@ -27,9 +23,6 @@ export type { ColorChip };
 // The sheet ref is constructed in the hook (Data-fetching Rule 4 — effects in
 // the hook, not the view) and threaded through as a stable handle.
 export type CatalogueFilterSheetViewProps = {
-  // Stable handle owned by the hook — view attaches it to <BottomSheetModal>.
-  sheetRef: RefObject<BottomSheetModal | null>;
-
   // Working draft (sheet edits this in place via the toggle/setCmcRange
   // callbacks; commits via onApply).
   draft: CatalogueFilterSet;
@@ -48,13 +41,13 @@ export type CatalogueFilterSheetViewProps = {
   // Footer + sheet lifecycle
   onApply: () => void;
   onClearAll: () => void;
-  onClose: () => void;
 };
 
 // Concrete chip suggestion sets (contracts/ui.md §4.2). Set chips come from the
 // loaded catalogue's distinct sets at runtime; this constant holds the static
 // suggestion list for the other dimensions so the view renders a stable surface
 // before any catalogue results arrive.
+// TODO these should be fetch from the backend using MTGJSON
 export const FORMAT_OPTIONS: ReadonlyArray<string> = [
   'Standard',
   'Modern',

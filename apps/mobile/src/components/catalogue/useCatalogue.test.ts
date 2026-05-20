@@ -8,7 +8,7 @@ import * as apiModule from '@src/services/api/apiClient';
 import { useSessionStore } from '@src/stores/sessionStore';
 import { SLOTS_PER_BINDER_PAGE } from '@src/utils/pageMath';
 
-import { useCatalogue } from './useCatalogue';
+import useCatalogue from './useCatalogue';
 
 const mockNavigate = jest.fn();
 jest.mock('expo-router', () => {

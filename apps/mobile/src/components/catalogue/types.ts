@@ -2,7 +2,7 @@
 // Per Principle X v1.26.0 sub-rule #7, feature-local types live with the
 // feature and MUST NOT be re-declared in `@my-binder/core`.
 
-import type { CardRecord } from '@my-binder/core';
+import type {Card, CardRecord} from '@my-binder/core';
 
 import type { UseCatalogueInfiniteQueryResult } from '@src/hooks/useCatalogueInfiniteQuery';
 
@@ -47,7 +47,7 @@ export const EMPTY_FILTER_SET: CatalogueFilterSet = {
 // One page of catalogue results (matches the 3×3 binder-page surface).
 export type CataloguePage = {
   pageNumber: number;
-  cards: ReadonlyArray<CardRecord>;
+  cards: CardRecord[];
   isPlaceholder: boolean;
 };
 
@@ -88,6 +88,11 @@ export type CatalogueViewProps = Pick<
   // by `<CatalogueContainer />` as a sibling).
   filterPills: ReadonlyArray<CatalogueFilterPill>;
 
+  // US4 — true when a binder mutation landed while at least one filter
+  // dimension is active. The view renders the gold-bordered "results out of
+  // date" banner (FR-031); tapping the banner fires `onRefreshPress`.
+  resultsAreStale: boolean;
+
   // Callbacks
   onSearchOpen: () => void;
   onSearchChange: (text: string) => void;
@@ -101,6 +106,8 @@ export type CatalogueViewProps = Pick<
   onFilterSheetOpen: () => void;
   onFilterClear: () => void;
   onFilterPillRemove: (pillId: string) => void;
+  // US4 — clears the stale flag AND invalidates the catalogue caches.
+  onRefreshPress: () => void;
 };
 
 // Options accepted by `useCatalogue`. US1 uses the default empty filter set;

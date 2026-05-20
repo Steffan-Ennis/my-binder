@@ -1,5 +1,5 @@
 import type { BottomSheetModal } from '@gorhom/bottom-sheet';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import {
   EMPTY_FILTER_SET,
@@ -9,7 +9,6 @@ import {
 
 import type {
   CatalogueFilterSheetViewProps,
-  UseCatalogueFilterSheetOptions,
 } from './types';
 
 const toggleArray = <T>(arr: ReadonlyArray<T>, value: T): ReadonlyArray<T> =>
@@ -17,7 +16,6 @@ const toggleArray = <T>(arr: ReadonlyArray<T>, value: T): ReadonlyArray<T> =>
 
 export type UseCatalogueFilterSheetResult = Pick<
   CatalogueFilterSheetViewProps,
-  | 'sheetRef'
   | 'draft'
   | 'toggleFormat'
   | 'toggleSuperType'
@@ -29,7 +27,6 @@ export type UseCatalogueFilterSheetResult = Pick<
   | 'onToggleMissingOnly'
   | 'onApply'
   | 'onClearAll'
-  | 'onClose'
 >;
 
 /**
@@ -60,28 +57,19 @@ export type UseCatalogueFilterSheetResult = Pick<
  *     onClose: () => setOpen(false),
  *   });
  */
-const useCatalogueFilterSheet = (
-  options: UseCatalogueFilterSheetOptions,
-): UseCatalogueFilterSheetResult => {
-  const { open, committed, onApply, onClose } = options;
-
+const useCatalogueFilterSheet = (): UseCatalogueFilterSheetResult => {
   const sheetRef = useRef<BottomSheetModal | null>(null);
-  const [draft, setDraft] = useState<CatalogueFilterSet>(committed);
-
-  // Imperative open/dismiss driven by the `open` prop. The view stays free of
-  // useEffect by design (Layer rules table); the hook is the only place that
-  // touches the sheet's imperative API.
-  useEffect(() => {
-    if (open) sheetRef.current?.present();
-    else sheetRef.current?.dismiss();
-  }, [open]);
-
-  // Re-seed the draft when the committed prop changes (pill removal, external
-  // filter clear). React 19 may batch this; the explicit dependency keeps the
-  // sheet in lock-step.
-  useEffect(() => {
-    setDraft(committed);
-  }, [committed]);
+  const [draft, setDraft] = useState<CatalogueFilterSet>({
+    cmcMax: 0,
+    cmcMin: 0,
+    colors: [],
+    creatureTypes: [],
+    formats: [],
+    missingOnly: false,
+    name: "",
+    subTypes: [],
+    superTypes: []
+  });
 
   const toggleFormat = useCallback((value: string) => {
     setDraft((prev) => ({ ...prev, formats: toggleArray(prev.formats, value) }));
@@ -124,8 +112,8 @@ const useCatalogueFilterSheet = (
   }, []);
 
   const handleApply = useCallback(() => {
-    onApply(draft);
-  }, [draft, onApply]);
+    // onApply(draft);
+  }, [draft]);
 
   // FR-008 "Clear all" — local affordance only. The parent's onClear is
   // intentionally NOT invoked here; users may clear the draft, browse the
@@ -133,12 +121,6 @@ const useCatalogueFilterSheet = (
   const handleClearAll = useCallback(() => {
     setDraft(EMPTY_FILTER_SET);
   }, []);
-
-  const handleClose = useCallback(() => {
-    // Discard local edits — parent's filter state is untouched.
-    setDraft(committed);
-    onClose();
-  }, [committed, onClose]);
 
   return useMemo<UseCatalogueFilterSheetResult>(
     () => ({
@@ -154,7 +136,6 @@ const useCatalogueFilterSheet = (
       onToggleMissingOnly,
       onApply: handleApply,
       onClearAll: handleClearAll,
-      onClose: handleClose,
     }),
     [
       draft,
@@ -168,7 +149,6 @@ const useCatalogueFilterSheet = (
       onToggleMissingOnly,
       handleApply,
       handleClearAll,
-      handleClose,
     ],
   );
 };

@@ -3,7 +3,7 @@ import type { FC } from 'react';
 import { CatalogueFilterSheetContainer } from '@src/components/catalogue-filter-sheet/CatalogueFilterSheetContainer';
 
 import CatalogueView from './CatalogueView';
-import { useCatalogue } from './useCatalogue';
+import useCatalogue from './useCatalogue';
 
 const CatalogueContainer: FC = () => {
   const {
@@ -66,13 +66,6 @@ const CatalogueContainer: FC = () => {
         onFilterClear={onFilterClear}
         onFilterPillRemove={onFilterPillRemove}
         onRefreshPress={onRefreshPress}
-      />
-      <CatalogueFilterSheetContainer
-        open={filterSheetOpen}
-        committed={filters}
-        onApply={onFilterApply}
-        onClear={onFilterClear}
-        onClose={onFilterSheetClose}
       />
     </>
   );

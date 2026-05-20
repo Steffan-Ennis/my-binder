@@ -1,4 +1,3 @@
-import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, type FC } from 'react';
@@ -19,10 +18,8 @@ const RootLayout: FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <BottomSheetModalProvider>
-          <StatusBar style="light" />
-          <Stack screenOptions={{ headerShown: false }} />
-        </BottomSheetModalProvider>
+        <StatusBar style="light" />
+        <Stack screenOptions={{ headerShown: false }} />
       </GestureHandlerRootView>
     </QueryClientProvider>
   );

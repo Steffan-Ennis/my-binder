@@ -1,6 +1,191 @@
 <!--
 SYNC IMPACT REPORT
 ==================
+Version change: 1.26.0 → 1.27.0
+Bump type: MINOR — adds a new "Single root describe rule" sub-section
+  to Principle III (Test-First Development), placed between the
+  existing "Test co-location rule" and "Mobile mocking conventions"
+  sub-sections. The rule requires every Jest test file across the
+  monorepo (`apps/server`, `apps/mobile`, `packages/core`) to wrap
+  every `it(...)` and `test(...)` call inside exactly one top-level
+  `describe(...)` block. Nested `describe(...)` blocks are
+  permitted and encouraged for grouping (one per method, one per
+  route, one per scenario). The root describe name MUST identify
+  the module under test.
+
+  Permitted at file scope (outside the root describe): imports,
+  type aliases, named constants, helper functions, `jest.setTimeout`,
+  `jest.mock`, and file-scoped `beforeAll` / `afterAll` hooks that
+  own resources shared across every test (e.g.,
+  `connectTestDatabase()` / `disconnectTestDatabase()`, an offline-
+  mode MTGJSON SDK consumed by every test in the file).
+
+  Prohibited at file scope: bare `it(...)` / `test(...)` calls,
+  two or more top-level `describe(...)` blocks, and
+  `beforeEach(...)` / `afterEach(...)` hooks (those belong inside
+  the describe whose tests they reset).
+
+  The trigger was an audit of the monorepo's test files surfaced
+  during the spec 016 / 017 binder-home and card cleanup: ten
+  source-tree test files currently declare multiple top-level
+  describes (5 in `apps/server`, 6 in `apps/mobile`), and the
+  inconsistency makes file-level test runs produce flat,
+  unhierarchical CI reports. Codifying the convention turns the
+  inconsistency into a constitution breach catchable by review and
+  aligns every test file with the canonical pattern already used by
+  `apps/server/src/routes/auth.test.ts` (single `describe('Auth API',
+  () => { ... })`).
+
+  No principle is removed or redefined; no version-pin language is
+  altered. The rule applies project-wide from this amendment
+  forward; existing violators are surfaced as carry-over TODOs and
+  MUST be migrated before the next change touches the file in
+  question.
+
+Last amended: 2026-05-18
+
+Added principles:
+  (none — Principle III expanded, not added)
+
+Modified sections:
+  - Principle III. Test-First Development — added "Single root
+    describe rule" sub-section between "Test co-location rule" and
+    "Mobile mocking conventions", codifying the rules above with a
+    canonical compliant pattern (drawn from
+    `apps/server/src/routes/auth.test.ts`) and a prohibited-pattern
+    catalogue.
+
+Removed sections:
+  (none)
+
+Templates reviewed:
+  ✅ .specify/templates/plan-template.md  — No change required. The
+     Constitution Check section already directs plans to verify
+     compliance with every principle; the new Single root describe
+     rule is a Principle III refinement caught by the existing
+     gate. The Unit Testing Phase already requires every test file
+     to be listed by path, so a violator surfaces during plan
+     review.
+  ✅ .specify/templates/spec-template.md  — No change required
+     (specs are technology-agnostic; test file structure is a
+     code-author decision surfaced in plan.md).
+  ✅ .specify/templates/tasks-template.md — No change required (the
+     new rule surfaces as ordinary code-review work inside the
+     existing task categorisation).
+
+Deferred TODOs (new in 1.27.0 — code-side migrations):
+  ⚠ apps/server/src/services/cardService.test.ts — 3 top-level
+     `describe(...)` blocks. Wrap all three inside a single root
+     `describe('cardService', () => { ... })`.
+  ⚠ apps/server/src/providers/mtgjson/MtgjsonProvider.test.ts —
+     3 top-level `describe(...)` blocks (`MtgjsonProvider.search`,
+     `MtgjsonProvider.getByUuid`, `MtgjsonProvider.getCardImages`).
+     Wrap inside a single `describe('MtgjsonProvider', () => { ... })`
+     with the three existing blocks renamed to `.search`,
+     `.getByUuid`, `.getCardImages` and nested inside.
+  ⚠ apps/server/src/routes/cards.test.ts — multiple top-level
+     `describe(...)` blocks (collection CRUD, auth gate, MTGJSON
+     enrichment, provider routes, images route). Wrap inside a
+     single `describe('cards routes', () => { ... })` with the
+     existing blocks nested inside.
+  ⚠ apps/mobile/src/utils/pageMath.test.ts — 2 top-level
+     `describe(...)` blocks. Wrap inside a single
+     `describe('pageMath', () => { ... })`.
+  ⚠ apps/mobile/src/hooks/useCardImagesQuery.test.ts — 8 top-level
+     `describe(...)` blocks. Wrap inside a single
+     `describe('useCardImagesQuery', () => { ... })`.
+  ⚠ apps/mobile/src/components/binder-home/useBinderHome.test.ts —
+     3 top-level `describe(...)` blocks. Wrap inside a single
+     `describe('useBinderHome', () => { ... })`.
+  ⚠ apps/mobile/src/components/card/useCard.test.ts — 2 top-level
+     `describe(...)` blocks. Wrap inside a single
+     `describe('useCard', () => { ... })`.
+  ⚠ apps/mobile/src/services/auth/sessionStorage.test.ts — 3
+     top-level `describe(...)` blocks. Wrap inside a single
+     `describe('sessionStorage', () => { ... })`.
+  ⚠ apps/mobile/src/services/api/queryClient.test.ts — 2 top-level
+     `describe(...)` blocks. Wrap inside a single
+     `describe('queryClient', () => { ... })`.
+  ⚠ apps/mobile/src/services/api/apiClient.test.ts — 5 top-level
+     `describe(...)` blocks. Wrap inside a single
+     `describe('apiClient', () => { ... })`.
+
+Carry-over from 1.26.0 (unchanged):
+  ⚠ apps/mobile/src/components/card/useCard.ts — JSDoc at lines
+     18-20 still references `{ state, footprint }` as the returned
+     shape. Actual return is `{ pulseRef, imageUrl, error,
+     isLoading, isSuccess, onRetry }`. Rewrite the JSDoc to match
+     and to point at `CardViewProps` from `./types.ts`.
+
+Carry-over from 1.25.0 (unchanged):
+  ⚠ apps/mobile/src/components/binder-home/useBinderHome.ts —
+     rename `state` / `BinderHomeState` parameters per the
+     Identifier intent rule (lines 46, 125, 129).
+  ⚠ apps/mobile/src/services/auth/googleAuth.ts — JSDoc `(e) =>` →
+     `(error) =>` (line 55).
+  ⚠ apps/server/src/providers/mtgjson/MtgjsonProvider.ts —
+     `(c) =>` rename per domain meaning (lines 78, 101, 102).
+  ⚠ apps/server/src/routes/cards.ts — `(c) =>` rename (lines 177,
+     206).
+
+Carry-over from 1.24.0 (unchanged):
+  ⚠ Audit existing `apps/mobile/src/**/*View.test.tsx` files for
+    helper-style `renderView` / `renderComponent` functions and
+    migrate each to a sibling `<ComponentName>WithDefaults` FC.
+
+Carry-over from 1.23.0 (unchanged):
+  ⚠ apps/server/src/routes/cards.test.ts — extract inline
+     `dataSource.getRepository(UserEntity).upsert(...)` seed into
+     `apps/server/testing/userFactory.ts` exporting
+     `createTestUser(dataSource, overrides)`.
+  ⚠ apps/server/src/routes/auth.test.ts — extract inline allowlist
+     and user seeds into `apps/server/testing/allowedUserFactory.ts`
+     exporting `createTestAllowedUser(dataSource, overrides)`.
+
+Carry-over from 1.22.0 (unchanged):
+  ⚠ apps/server/src/routes/docs.test.ts — still uses
+     `jest.mock(...)` against `apps/server/src/services/` and
+     `apps/server/src/db/`. Rewrite as an E2E test against real
+     services, real repositories, the real TypeORM `DataSource`,
+     and the offline-mode MTGJSON SDK, with data setup through the
+     rule-5 factories.
+
+Carry-over from 1.21.0 (unchanged):
+  ⚠ CLAUDE.md — stale `binderStore` references at lines 50 and 200.
+     Update to note that `currentPage` plus search state now live
+     in `useBinderHome.ts`.
+
+Carry-over from 1.20.0 (unchanged):
+  ⚠ apps/mobile theme files — LoginView, AccessDeniedView, and
+     ComingSoonView MUST migrate inline `StyleSheet.create` blocks
+     into sibling `<Component>.theme.ts` files.
+
+Carry-over from 1.19.0 (unchanged):
+  ⚠ apps/mobile/src/services/auth/googleAuth.ts — uses
+     `expo-auth-session/providers/google` (deprecated by Expo).
+     Migration tracked in
+     `todo/migrate-google-auth-to-google-signin.md`.
+
+Carry-over from 1.17.0 (unchanged):
+  ⚠ apps/mobile/package-lock.json — npm lockfile; delete and
+     re-resolve via `pnpm install`.
+  ⚠ apps/mobile/tsconfig.json — currently declares
+     `paths: { "@/*": ["./*"] }`; Principle VII requires `@root/*`
+     and `@src/*` aliases.
+  ⚠ apps/mobile/hooks/{use-color-scheme.ts,use-color-scheme.web.ts,
+     use-theme-color.ts}, apps/mobile/scripts/reset-project.js,
+     apps/mobile/app/modal.tsx — leftover create-expo-app template
+     files outside the Principle X four-layer structure.
+
+Carry-over from 1.14.0 (unchanged):
+  ⚠ specs/001-server-architecture/plan.md — JSDoc → TypeScript
+     migration.
+  ⚠ specs/004-card-data-provider/plan.md — JSDoc → TypeScript
+     migration.
+-->
+
+<!-- PREVIOUS SYNC IMPACT REPORT (v1.25.0 → v1.26.0) follows for archival reference.
+==================
 Version change: 1.25.0 → 1.26.0
 Bump type: MINOR — adds a new "Data-fetching hook composition rule"
   sub-section to Principle X (Component Architecture, Mobile), placed
@@ -892,6 +1077,128 @@ the per-workspace tooling drift (separate matchers, separate mocks, separate cov
 formats) that accumulates when each package picks its own framework. Requiring an explicit
 Unit Testing Phase in every plan makes the test surface visible at design time rather than
 at implementation time, when scope creep has already happened.
+
+**Single root describe rule**: every Jest test file (`<filename>.test.ts` /
+`<filename>.test.tsx`) MUST wrap every `it(...)` and `test(...)` call inside exactly
+one top-level `describe(...)` block. Nested `describe(...)` blocks inside that root
+are permitted and encouraged for grouping — typically one per public method, one per
+HTTP route, or one per scenario. The root describe name MUST identify the module
+under test: the file name, the class name, the route group, or the hook name (e.g.,
+`describe('MtgjsonProvider', ...)`, `describe('cards routes', ...)`,
+`describe('useBinderHome', ...)`, `describe('Auth API', ...)`).
+
+The following are **permitted** at file scope (outside the root describe):
+
+- `import` statements.
+- Type aliases, named constants, and helper functions consumed by the tests.
+- `jest.setTimeout(...)` declarations.
+- `jest.mock(...)` calls (subject to the workspace-specific rules in **Mobile mocking
+  conventions** and **Server route test conventions** below).
+- File-scoped `beforeAll(...)` / `afterAll(...)` hooks that own resources shared
+  across every test in the file (e.g., `connectTestDatabase()` /
+  `disconnectTestDatabase()`, an offline-mode `MtgjsonSDK` consumed by every test).
+  These hooks run before / after every test in the file regardless of describe
+  nesting, which is intentional for shared infrastructure that has no natural
+  describe owner.
+
+The following are **prohibited** at file scope:
+
+- Bare `it(...)` / `test(...)` calls outside any `describe(...)`. They produce a
+  flat CI report with no breadcrumb tying the test back to the module under test.
+- Two or more top-level `describe(...)` blocks in the same file. The file's
+  identity is lost — running `pnpm jest path/to/file.test.ts` reports a list of
+  unrelated suites instead of a hierarchical breakdown of one named subject.
+- `beforeEach(...)` / `afterEach(...)` hooks at file scope. They fire for every
+  test in the file regardless of which describe the test belongs to, masking
+  the question "which group of tests owns this reset?" Place per-test hooks inside
+  the describe whose tests they affect.
+
+The compliant pattern (canonical reference:
+`apps/server/src/routes/auth.test.ts`, which is already in this shape):
+
+```ts
+import path from 'node:path';
+import { MtgjsonSDK } from 'mtgjson-sdk';
+import MtgjsonProvider from './MtgjsonProvider';
+
+jest.setTimeout(30_000);
+
+const CACHE_DIR = path.resolve(__dirname, '../../../data/mtgjson-cache');
+
+let sdk: MtgjsonSDK;
+let provider: MtgjsonProvider;
+
+beforeAll(async () => {
+  sdk = await MtgjsonSDK.create({ cacheDir: CACHE_DIR, offline: true });
+  provider = new MtgjsonProvider(sdk);
+});
+
+afterAll(async () => {
+  await sdk.close();
+});
+
+describe('MtgjsonProvider', () => {
+  describe('.search', () => {
+    test('returns enriched CardRecords with scryfall-derived imageRef', async () => {
+      /* ... */
+    });
+
+    test('returns empty array when search yields no cards', async () => {
+      /* ... */
+    });
+  });
+
+  describe('.getByUuid', () => {
+    test('returns CardDetails for a known UUID', async () => { /* ... */ });
+    test('returns null when the UUID is unknown', async () => { /* ... */ });
+  });
+
+  describe('.getCardImages', () => {
+    test('returns small/medium/large URLs for a known UUID', async () => { /* ... */ });
+    test('returns null when the UUID is unknown', async () => { /* ... */ });
+  });
+});
+```
+
+The prohibited patterns are:
+
+```ts
+// PROHIBITED — multiple top-level describes in the same file.
+//              `pnpm jest MtgjsonProvider.test.ts` reports three unrelated
+//              suites instead of one hierarchical breakdown of the provider.
+describe('MtgjsonProvider.search', () => { /* ... */ });
+describe('MtgjsonProvider.getByUuid', () => { /* ... */ });
+describe('MtgjsonProvider.getCardImages', () => { /* ... */ });
+
+// PROHIBITED — bare test() at file scope.
+//              Jest accepts it, but the test has no breadcrumb in CI output
+//              and cannot inherit describe-level setup or naming context.
+test('does the thing', () => { /* ... */ });
+
+// PROHIBITED — file-scope beforeEach.
+//              Fires before every test in the file, including tests in
+//              other describes whose state it does not touch. Obscures
+//              which describe owns the reset.
+beforeEach(() => { resetSomeMockState(); });
+describe('the suite', () => { /* ... */ });
+```
+
+Rationale: a single root describe makes the test file's identity match the file
+system path. When CI reports `MtgjsonProvider > .search > returns enriched
+CardRecords`, the breadcrumb mirrors the file (`MtgjsonProvider.test.ts`) and the
+nesting inside it. Running tests at the file level via
+`pnpm jest path/to/file.test.ts` produces a stable, hierarchical report instead of a
+flat list of unrelated suites — which matters for grep-driven debugging, for CI
+diff-checking, and for the **Phase completion validation gate** below (a phase
+failing on `MtgjsonProvider > .getByUuid > returns null` is faster to triage than
+the same failure surfaced as `MtgjsonProvider.getByUuid > returns null` alongside
+two other top-level peers). The rule also makes describe-level fixtures composable:
+shared infrastructure lives once at the root (or in a file-scope `beforeAll` for
+cross-cutting resources), method-specific setup nests inside, and a future reader
+finds both at predictable depths instead of grep'ing for the matching `beforeAll`.
+Forbidding multiple top-level describes and bare `it(...)` keeps every `*.test.ts`
+file behaving like a single, named unit — the way the **Test co-location rule**
+above already says it should.
 
 **Mobile mocking conventions** (`apps/mobile`). Tests in `apps/mobile` run under the
 `jest-expo` preset against React Native and Expo modules that have no implementation in a
@@ -2837,4 +3144,4 @@ Each feature plan MUST include a Constitution Check (as defined in
 before implementation begins. Violations MUST be justified in the plan's Complexity
 Tracking table.
 
-**Version**: 1.26.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-17
+**Version**: 1.27.0 | **Ratified**: 2026-03-21 | **Last Amended**: 2026-05-18

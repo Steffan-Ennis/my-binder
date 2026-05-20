@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import {useNavigation, useRouter} from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useCatalogueInfiniteQuery } from '@src/hooks/useCatalogueInfiniteQuery';
 import { SLOTS_PER_BINDER_PAGE } from '@src/utils/pageMath';
@@ -192,12 +192,12 @@ const useCatalogue = (): UseCatalogueResult => {
   }, [refetch]);
 
   const onFilterSheetOpen = useCallback(() => {
-    setFilterSheetOpen(true);
+    router.navigate('/catalogue/filter-modal')
   }, []);
 
   const onFilterSheetClose = useCallback(() => {
-    setFilterSheetOpen(false);
-  }, []);
+    router.back();
+  }, [router]);
 
   const onFilterApply = useCallback((next: CatalogueFilterSet) => {
     setFilters(next);
@@ -288,4 +288,3 @@ const useCatalogue = (): UseCatalogueResult => {
 };
 
 export default useCatalogue;
-export { useCatalogue };

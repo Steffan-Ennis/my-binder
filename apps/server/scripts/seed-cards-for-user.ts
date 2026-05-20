@@ -487,7 +487,8 @@ async function main(): Promise<void> {
       return;
     }
 
-    const rows = cards.map((c) => ({ id: c.uuid, name: c.name, userId: user.id }));
+    // @ts-ignore
+    const rows = cards.map<CardEntity>((c) => ({ id: c.uuid, name: c.name, userId: user.id, numberOwned: 1 }));
     await ds.getRepository(CardEntity).upsert(rows, {
       conflictPaths: ['id', 'userId'],
       skipUpdateIfNoValuesChanged: true,

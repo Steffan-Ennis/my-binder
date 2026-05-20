@@ -1,11 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import {
-  BottomSheetBackdrop,
-  BottomSheetModal,
-  BottomSheetScrollView,
-} from '@gorhom/bottom-sheet';
 import type { FC } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import {Pressable, ScrollView, Text, TextInput, View} from 'react-native';
 
 import { Colors } from '@src/constants/theme';
 
@@ -110,7 +105,6 @@ const Section: FC<{
 };
 
 const CatalogueFilterSheetView: FC<CatalogueFilterSheetViewProps> = ({
-  sheetRef,
   draft,
   toggleFormat,
   toggleSuperType,
@@ -122,37 +116,17 @@ const CatalogueFilterSheetView: FC<CatalogueFilterSheetViewProps> = ({
   onToggleMissingOnly,
   onApply,
   onClearAll,
-  onClose,
 }) => {
   const styles = useStyles();
 
+  // NestedScroll Enabled allows this to be rendered in a sheet
   return (
-    <BottomSheetModal
-      ref={sheetRef}
-      snapPoints={SNAP_POINTS}
-      backdropComponent={(props) => (
-        <BottomSheetBackdrop
-          {...props}
-          appearsOnIndex={0}
-          disappearsOnIndex={-1}
-          onPress={onClose}
-        />
-      )}
-      onDismiss={onClose}
-    >
-      <BottomSheetScrollView>
+      <ScrollView
+        nestedScrollEnabled={true}
+      >
         <View style={styles.container} testID="catalogue-filter-sheet">
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Refine catalogue</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Close filter sheet"
-              onPress={onClose}
-              style={styles.closeButton}
-              hitSlop={8}
-            >
-              <Ionicons name="close" size={22} color={Colors.dark.accentSoft} />
-            </Pressable>
+            <Text style={styles.headerTitle}>Refine Search</Text>
           </View>
 
           <View style={styles.toggleRow} testID="missing-only-row">
@@ -254,8 +228,7 @@ const CatalogueFilterSheetView: FC<CatalogueFilterSheetViewProps> = ({
             </Pressable>
           </View>
         </View>
-      </BottomSheetScrollView>
-    </BottomSheetModal>
+      </ScrollView>
   );
 };
 
