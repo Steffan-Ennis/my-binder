@@ -1,4 +1,5 @@
-import type {Card, CardRecord, SearchQuery, SearchResult } from '@my-binder/core';
+import isEmpty from 'lodash/isEmpty';
+import type {CardRecord, SearchQuery, SearchResult } from '@my-binder/core';
 import { useInfiniteQuery, type UseInfiniteQueryResult } from '@tanstack/react-query';
 
 import { apiClient } from '@src/services/api/apiClient';
@@ -55,7 +56,7 @@ export const useCatalogueInfiniteQuery = (
     initialPageParam: 1,
     getNextPageParam: (lastPage) =>
       lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined,
-    enabled: status === 'active' && !!filters.name,
+    enabled: status === 'active' && !isEmpty(filters),
     staleTime: STALE_TIME_MS,
     gcTime: GC_TIME_MS,
   });

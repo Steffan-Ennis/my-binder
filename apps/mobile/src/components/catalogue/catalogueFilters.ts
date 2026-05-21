@@ -5,7 +5,7 @@
 
 import type { CatalogueQueryShape } from '@src/hooks/useCatalogueInfiniteQuery';
 
-import type { CatalogueFilterPill, CatalogueFilterSet, ColorChip } from './types';
+import type { CatalogueFilterSet, ColorChip } from './types';
 
 const CMC_UNCONSTRAINED_MAX = 20;
 
@@ -29,31 +29,6 @@ export const filtersToQuery = (filters: CatalogueFilterSet): CatalogueQueryShape
   if (filters.cmcMax < CMC_UNCONSTRAINED_MAX) query.cmcMax = filters.cmcMax;
   if (filters.missingOnly) query.missingOnly = true;
   return query;
-};
-
-/**
- * Build the user-visible filter-pill row from the committed filter set. One
- * pill per value in array dimensions; one combined `cmc` pill when the range
- * is constrained; one `missingOnly` pill when the toggle is on.
- */
-export const buildPills = (
-  filters: CatalogueFilterSet,
-): ReadonlyArray<CatalogueFilterPill> => {
-  const pills: CatalogueFilterPill[] = [];
-  for (const v of filters.formats) pills.push({ id: `format:${v}`, label: `Format: ${v}` });
-  for (const v of filters.superTypes) pills.push({ id: `superType:${v}`, label: `Super: ${v}` });
-  for (const v of filters.subTypes) pills.push({ id: `subType:${v}`, label: `Sub: ${v}` });
-  for (const v of filters.creatureTypes) {
-    pills.push({ id: `creatureType:${v}`, label: `Creature: ${v}` });
-  }
-  for (const v of filters.colors) pills.push({ id: `color:${v}`, label: `Colour: ${v}` });
-  if (filters.cmcMin > 0 || filters.cmcMax < CMC_UNCONSTRAINED_MAX) {
-    pills.push({ id: 'cmc', label: `CMC: ${filters.cmcMin}–${filters.cmcMax}` });
-  }
-  if (filters.missingOnly) {
-    pills.push({ id: 'missingOnly', label: 'Missing only' });
-  }
-  return pills;
 };
 
 /**

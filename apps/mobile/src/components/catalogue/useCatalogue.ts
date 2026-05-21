@@ -5,9 +5,8 @@ import { useCatalogueInfiniteQuery } from '@src/hooks/useCatalogueInfiniteQuery'
 import { useCatalogueContext } from '@src/context/catalogue-context';
 import { SLOTS_PER_BINDER_PAGE } from '@src/utils/pageMath';
 
-import { buildPills, filtersToQuery } from './catalogueFilters';
+import { filtersToQuery } from './catalogueFilters';
 import {
-  type CatalogueFilterPill,
   type CatalogueFilterSet,
   type CataloguePage,
   type CatalogueViewProps,
@@ -169,11 +168,6 @@ const useCatalogue = (): UseCatalogueResult => {
     [isSearchActive, searchQuery],
   );
 
-  const filterPills = useMemo<ReadonlyArray<CatalogueFilterPill>>(
-    () => buildPills(filters),
-    [filters],
-  );
-
   const onSearchOpen = useCallback(() => {
     setIsSearchActive(true);
   }, []);
@@ -237,14 +231,12 @@ const useCatalogue = (): UseCatalogueResult => {
       totalPages,
       summaryCaption,
       error,
-      hasNextPage,
       isLoading,
       isFetchingNextPage,
       isError,
       isSearchActive,
       searchQuery,
       hasActiveQuery,
-      filterPills,
       isEmpty,
       resultsAreStale,
       onSearchOpen,
@@ -264,14 +256,12 @@ const useCatalogue = (): UseCatalogueResult => {
       totalPages,
       summaryCaption,
       error,
-      hasNextPage,
       isLoading,
       isFetchingNextPage,
       isError,
       isSearchActive,
       searchQuery,
       hasActiveQuery,
-      filterPills,
       isEmpty,
       resultsAreStale,
       onSearchOpen,

@@ -51,12 +51,6 @@ export type CataloguePage = {
   isPlaceholder: boolean;
 };
 
-// One filter-pill currently visible in the masthead slot.
-export type CatalogueFilterPill = {
-  id: string;     // dimension + value, stable across renders
-  label: string;  // user-visible label (e.g. "Format: Modern")
-};
-
 // Surface passed into the shared card-detail sheet so the stepper can render
 // the correct "+" / "−" affordances per the calling feature.
 export type CatalogueSurface = 'catalogue';
@@ -69,7 +63,7 @@ export type CatalogueSurface = 'catalogue';
 // fetching Rule 5 — never redeclare fields TanStack already types).
 export type CatalogueViewProps = Pick<
   UseCatalogueInfiniteQueryResult,
-  'error' | 'isLoading' | 'isFetchingNextPage' | 'isError' | 'hasNextPage'
+  'error' | 'isLoading' | 'isFetchingNextPage' | 'isError'
 > & {
   // Display state
   pages: ReadonlyArray<CataloguePage>;
@@ -83,10 +77,6 @@ export type CatalogueViewProps = Pick<
   isSearchActive: boolean;
   searchQuery: string;
   hasActiveQuery: boolean;
-
-  // US2 — filter surface (the view renders the pill row; the sheet is mounted
-  // by `<CatalogueContainer />` as a sibling).
-  filterPills: ReadonlyArray<CatalogueFilterPill>;
 
   // US4 — true when a binder mutation landed while at least one filter
   // dimension is active. The view renders the gold-bordered "results out of

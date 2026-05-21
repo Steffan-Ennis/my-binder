@@ -4,29 +4,11 @@ import { Pressable, Text, View } from 'react-native';
 import PagerView, { type PagerViewProps } from 'react-native-pager-view';
 import Masthead from '@src/components/masthead/Masthead';
 import useStyles, { type CatalogueViewStyles } from './CatalogueView.theme';
-import type { CatalogueFilterPill, CatalogueViewProps } from './types';
+import type { CatalogueViewProps } from './types';
 import BinderPage from "@src/components/binder-page/BinderPage";
 
 const RING_COUNT = 3;
 const SEARCH_PLACEHOLDER = 'Search the catalogue';
-
-const FilterPill: FC<{
-  pill: CatalogueFilterPill;
-  styles: CatalogueViewStyles;
-  onRemove: (id: string) => void;
-}> = ({ pill, styles, onRemove }) => (
-  <Pressable
-    accessibilityRole="button"
-    accessibilityLabel={`Remove ${pill.label}`}
-    onPress={() => onRemove(pill.id)}
-    hitSlop={6}
-    testID={`filter-pill-${pill.id}`}
-    style={styles.filterPill}
-  >
-    <Text style={styles.filterPillLabel}>{pill.label}</Text>
-    <Ionicons name="close" size={14} style={styles.filterPillIcon} />
-  </Pressable>
-);
 
 const FilterOpenerPill: FC<{
   styles: CatalogueViewStyles;
@@ -50,14 +32,12 @@ const CatalogueView: FC<CatalogueViewProps> = ({
   currentPage,
   totalPages,
   summaryCaption,
-  hasNextPage,
   isLoading,
   isError,
   isEmpty,
   isSearchActive,
   searchQuery,
   hasActiveQuery,
-  filterPills,
   resultsAreStale,
   onSearchOpen,
   onSearchChange,
@@ -67,37 +47,13 @@ const CatalogueView: FC<CatalogueViewProps> = ({
   onRetryPress,
   onFilterSheetOpen,
   onFilterClear,
-  onFilterPillRemove,
   onRefreshPress,
 }) => {
   const styles = useStyles();
 
-  const indicator =
-    totalPages === null || hasNextPage
-      ? `${currentPage} of many`
-      : `${currentPage} of ${totalPages}`;
-
   const handlePageSelected: Required<PagerViewProps>['onPageSelected'] = (event) => {
     onPagerSelected(event.nativeEvent.position + 1);
   };
-
-  const pillRowHasContent = filterPills.length > 0 || isSearchActive;
-  const pillsSlot = (
-    <View
-      style={pillRowHasContent ? styles.filterPillRow : styles.filterPillRowSingle}
-      testID="catalogue-filter-pill-row"
-    >
-      <FilterOpenerPill styles={styles} onPress={onFilterSheetOpen} />
-      {filterPills.map((pill) => (
-        <FilterPill
-          key={pill.id}
-          pill={pill}
-          styles={styles}
-          onRemove={onFilterPillRemove}
-        />
-      ))}
-    </View>
-  );
 
   return (
     <View style={styles.root} testID="catalogue-root">
@@ -111,7 +67,16 @@ const CatalogueView: FC<CatalogueViewProps> = ({
         onSearchChange={onSearchChange}
         onSearchClose={onSearchClose}
         onProfilePress={onProfilePress}
-        filterPills={pillsSlot}
+        filterPills={
+          (
+            <View
+              style={styles.filterPillRowSingle}
+              testID="catalogue-filter-pill-row"
+            >
+              <FilterOpenerPill styles={styles} onPress={onFilterSheetOpen} />
+            </View>
+          )
+        }
       />
 
       <View style={styles.canvas}>
@@ -182,7 +147,7 @@ const CatalogueView: FC<CatalogueViewProps> = ({
 
         <View style={styles.pageNavigator}>
           <Text style={styles.pageOf} testID="catalogue-page-indicator">
-            {indicator}
+            { currentPage } of { totalPages }
           </Text>
         </View>
       </View>
