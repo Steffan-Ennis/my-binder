@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { createElement } from 'react';
 
 import * as apiModule from '@src/services/api/apiClient';
+import { CatalogueProvider, useCatalogueContext } from '@src/context/catalogue-context';
 import { useSessionStore } from '@src/stores/sessionStore';
 import { SLOTS_PER_BINDER_PAGE } from '@src/utils/pageMath';
 
@@ -28,8 +29,14 @@ jest.mock('@src/hooks/useSession', () => {
 
 let client: QueryClient;
 
+// `useCatalogue` now reads the committed filter set from `CatalogueProvider`,
+// so every render must be wrapped in it (in addition to the query client).
 const wrapper = ({ children }: { children: ReactNode }) =>
-  createElement(QueryClientProvider, { client }, children);
+  createElement(
+    QueryClientProvider,
+    { client },
+    createElement(CatalogueProvider, null, children),
+  );
 
 const makeCard = (id: string, name: string, numberOwned?: number): CardRecord => ({
   id,
@@ -185,21 +192,29 @@ describe('useCatalogue', () => {
   });
 
   describe('filter sheet + pills (US2)', () => {
-    it('filterPills derives one pill per active dimension', async () => {
+    // The committed filter set lives in `CatalogueProvider`; render the hook
+    // alongside the context so a test can both seed filters (`ctx.applyFilter`)
+    // and read them back (`ctx.filters`).
+    const renderWithCtx = () =>
+      renderHook(() => ({ cat: useCatalogue(), ctx: useCatalogueContext() }), {
+        wrapper,
+      });
+
+    it('filterPills derives one pill per active dimension', () => {
       jest
         .spyOn(apiModule.apiClient, 'searchCards')
         .mockResolvedValue(makePage(1, [], 1, 0));
-      const { result } = renderHook(() => useCatalogue(), { wrapper });
-      expect(result.current.filterPills).toEqual([]);
+      const { result } = renderWithCtx();
+      expect(result.current.cat.filterPills).toEqual([]);
 
       act(() =>
-        result.current.onFilterApply({
-          ...result.current.filters,
+        result.current.ctx.applyFilter({
+          ...result.current.ctx.filters,
           formats: ['Modern'],
           colors: ['R'],
         }),
       );
-      expect(result.current.filterPills).toEqual([
+      expect(result.current.cat.filterPills).toEqual([
         { id: 'format:Modern', label: 'Format: Modern' },
         { id: 'color:R', label: 'Colour: R' },
       ]);
@@ -209,71 +224,100 @@ describe('useCatalogue', () => {
       jest
         .spyOn(apiModule.apiClient, 'searchCards')
         .mockResolvedValue(makePage(1, [], 1, 0));
-      const { result } = renderHook(() => useCatalogue(), { wrapper });
+      const { result } = renderWithCtx();
 
       act(() =>
-        result.current.onFilterApply({
-          ...result.current.filters,
+        result.current.ctx.applyFilter({
+          ...result.current.ctx.filters,
           formats: ['Modern', 'Legacy'],
           colors: ['R'],
         }),
       );
-      act(() => result.current.onFilterPillRemove('format:Modern'));
+      act(() => result.current.cat.onFilterPillRemove('format:Modern'));
 
-      expect(result.current.filters.formats).toEqual(['Legacy']);
-      expect(result.current.filters.colors).toEqual(['R']);
+      expect(result.current.ctx.filters.formats).toEqual(['Legacy']);
+      expect(result.current.ctx.filters.colors).toEqual(['R']);
     });
 
     it('onFilterPillRemove on "cmc" pill resets the CMC range', () => {
       jest
         .spyOn(apiModule.apiClient, 'searchCards')
         .mockResolvedValue(makePage(1, [], 1, 0));
-      const { result } = renderHook(() => useCatalogue(), { wrapper });
+      const { result } = renderWithCtx();
 
       act(() =>
-        result.current.onFilterApply({
-          ...result.current.filters,
+        result.current.ctx.applyFilter({
+          ...result.current.ctx.filters,
           cmcMin: 2,
           cmcMax: 5,
         }),
       );
-      expect(result.current.filterPills.some((p) => p.id === 'cmc')).toBe(true);
-      act(() => result.current.onFilterPillRemove('cmc'));
-      expect(result.current.filters.cmcMin).toBe(0);
-      expect(result.current.filters.cmcMax).toBe(20);
+      expect(result.current.cat.filterPills.some((p) => p.id === 'cmc')).toBe(true);
+      act(() => result.current.cat.onFilterPillRemove('cmc'));
+      expect(result.current.ctx.filters.cmcMin).toBe(0);
+      expect(result.current.ctx.filters.cmcMax).toBe(20);
     });
 
     it('onFilterClear resets every dimension to EMPTY_FILTER_SET', () => {
       jest
         .spyOn(apiModule.apiClient, 'searchCards')
         .mockResolvedValue(makePage(1, [], 1, 0));
-      const { result } = renderHook(() => useCatalogue(), { wrapper });
+      const { result } = renderWithCtx();
 
       act(() =>
-        result.current.onFilterApply({
-          ...result.current.filters,
+        result.current.ctx.applyFilter({
+          ...result.current.ctx.filters,
           formats: ['Modern'],
           missingOnly: true,
         }),
       );
-      act(() => result.current.onFilterClear());
+      act(() => result.current.cat.onFilterClear());
 
-      expect(result.current.filters.formats).toEqual([]);
-      expect(result.current.filters.missingOnly).toBe(false);
-      expect(result.current.filterPills).toEqual([]);
+      expect(result.current.ctx.filters.formats).toEqual([]);
+      expect(result.current.ctx.filters.missingOnly).toBe(false);
+      expect(result.current.cat.filterPills).toEqual([]);
     });
 
-    it('onFilterSheetOpen / onFilterSheetClose toggle the sheet flag', () => {
+    it('onFilterSheetOpen navigates to the filter-modal route', () => {
       jest
         .spyOn(apiModule.apiClient, 'searchCards')
         .mockResolvedValue(makePage(1, [], 1, 0));
       const { result } = renderHook(() => useCatalogue(), { wrapper });
 
-      expect(result.current.filterSheetOpen).toBe(false);
       act(() => result.current.onFilterSheetOpen());
-      expect(result.current.filterSheetOpen).toBe(true);
-      act(() => result.current.onFilterSheetClose());
-      expect(result.current.filterSheetOpen).toBe(false);
+      expect(mockNavigate).toHaveBeenCalledWith('/catalogue/filter-modal');
+    });
+
+    it('resets to page 1 when a non-name filter is applied (e.g. from the modal)', () => {
+      jest
+        .spyOn(apiModule.apiClient, 'searchCards')
+        .mockResolvedValue(makePage(1, [], 1, 0));
+      const { result } = renderWithCtx();
+
+      act(() => result.current.cat.onPagerSelected(3));
+      expect(result.current.cat.currentPage).toBe(3);
+
+      act(() =>
+        result.current.ctx.applyFilter({
+          ...result.current.ctx.filters,
+          formats: ['Modern'],
+        }),
+      );
+      expect(result.current.cat.currentPage).toBe(1);
+    });
+
+    it('preserves the current page when only the search name changes', async () => {
+      jest
+        .spyOn(apiModule.apiClient, 'searchCards')
+        .mockResolvedValue(makePage(1, [], 1, 0));
+      const { result } = renderWithCtx();
+
+      act(() => result.current.cat.onPagerSelected(2));
+      expect(result.current.cat.currentPage).toBe(2);
+
+      act(() => result.current.cat.onSearchChange('ab'));
+      await waitFor(() => expect(result.current.ctx.filters.name).toBe('ab'));
+      expect(result.current.cat.currentPage).toBe(2);
     });
   });
 

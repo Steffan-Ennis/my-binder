@@ -1,12 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query';
-import {useNavigation, useRouter} from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useCatalogueInfiniteQuery } from '@src/hooks/useCatalogueInfiniteQuery';
+import { useCatalogueContext } from '@src/context/catalogue-context';
 import { SLOTS_PER_BINDER_PAGE } from '@src/utils/pageMath';
 
-import { buildPills, filtersToQuery, removePillFromFilters } from './catalogueFilters';
+import { buildPills, filtersToQuery } from './catalogueFilters';
 import {
-  EMPTY_FILTER_SET,
   type CatalogueFilterPill,
   type CatalogueFilterSet,
   type CataloguePage,
@@ -39,15 +39,11 @@ const hasAnyFilterDimension = (filters: CatalogueFilterSet): boolean => {
   return false;
 };
 
-// The hook returns the view's prop bundle plus the filter-sheet-container
-// inputs (`filters`, `filterSheetOpen`, `onFilterApply`, `onFilterSheetClose`)
-// that `<CatalogueContainer />` threads to the sibling sheet container.
-export type UseCatalogueResult = CatalogueViewProps & {
-  filters: CatalogueFilterSet;
-  filterSheetOpen: boolean;
-  onFilterSheetClose: () => void;
-  onFilterApply: (next: CatalogueFilterSet) => void;
-};
+// The committed filter set + Apply now live in the shared catalogue context
+// (`CatalogueProvider`), consumed by both this hook and the sibling
+// filter-modal screen. The hook therefore returns exactly the view's prop
+// bundle.
+export type UseCatalogueResult = CatalogueViewProps;
 
 /**
  * Feature hook for the Catalogue screen (spec 018 / US1 + US2 + US4).
@@ -74,24 +70,47 @@ const useCatalogue = (): UseCatalogueResult => {
   // across re-renders (Principle X v1.16.0).
   const { mutate: mutateBinder } = { mutate: () => {} };
 
+  const { filters, applyFilter, clearFilters, removePill } = useCatalogueContext();
+
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [filters, setFilters] = useState<CatalogueFilterSet>(EMPTY_FILTER_SET);
-  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [resultsAreStale, setResultsAreStale] = useState(false);
+
+  // Keep the latest committed filters reachable from the debounce timeout
+  // without rescheduling it on every filter change (it depends only on the
+  // typed search text).
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
 
   // Debounced commit of `searchQuery` into `filters.name`. The visible input
   // updates immediately; the wire query lags so a fast typist doesn't fan out
   // a request per keystroke.
   useEffect(() => {
     const handle = setTimeout(() => {
-      setFilters((prev) =>
-        prev.name === searchQuery ? prev : { ...prev, name: searchQuery },
-      );
+      const current = filtersRef.current;
+      if (current.name !== searchQuery) {
+        applyFilter({ ...current, name: searchQuery });
+      }
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(handle);
-  }, [searchQuery]);
+  }, [searchQuery, applyFilter]);
+
+  // Reset to page 1 whenever a *non-name* filter dimension changes — this is
+  // how an Apply committed from the sibling filter-modal screen reaches the
+  // catalogue's pagination. The masthead search (name-only) deliberately
+  // preserves the current page.
+  const nonNameSignature = useMemo(
+    () => JSON.stringify({ ...filters, name: '' }),
+    [filters],
+  );
+  const prevNonNameSignature = useRef(nonNameSignature);
+  useEffect(() => {
+    if (prevNonNameSignature.current !== nonNameSignature) {
+      prevNonNameSignature.current = nonNameSignature;
+      setCurrentPage(1);
+    }
+  }, [nonNameSignature]);
 
   const queryShape = useMemo(() => filtersToQuery(filters), [filters]);
   const {
@@ -192,29 +211,19 @@ const useCatalogue = (): UseCatalogueResult => {
   }, [refetch]);
 
   const onFilterSheetOpen = useCallback(() => {
-    router.navigate('/catalogue/filter-modal')
-  }, []);
-
-  const onFilterSheetClose = useCallback(() => {
-    router.back();
+    router.navigate('/catalogue/filter-modal');
   }, [router]);
 
-  const onFilterApply = useCallback((next: CatalogueFilterSet) => {
-    setFilters(next);
-    setFilterSheetOpen(false);
-    setCurrentPage(1);
-  }, []);
-
   const onFilterClear = useCallback(() => {
-    setFilters(EMPTY_FILTER_SET);
+    clearFilters();
     setSearchQuery('');
     setCurrentPage(1);
-  }, []);
+  }, [clearFilters]);
 
   const onFilterPillRemove = useCallback((pillId: string) => {
-    setFilters((prev) => removePillFromFilters(prev, pillId));
+    removePill(pillId);
     setCurrentPage(1);
-  }, []);
+  }, [removePill]);
 
   const onRefreshPress = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: CATALOGUE_QUERY_PREFIX });
@@ -235,9 +244,7 @@ const useCatalogue = (): UseCatalogueResult => {
       isSearchActive,
       searchQuery,
       hasActiveQuery,
-      filters,
       filterPills,
-      filterSheetOpen,
       isEmpty,
       resultsAreStale,
       onSearchOpen,
@@ -247,8 +254,6 @@ const useCatalogue = (): UseCatalogueResult => {
       onPagerSelected,
       onRetryPress,
       onFilterSheetOpen,
-      onFilterSheetClose,
-      onFilterApply,
       onFilterClear,
       onFilterPillRemove,
       onRefreshPress,
@@ -266,9 +271,7 @@ const useCatalogue = (): UseCatalogueResult => {
       isSearchActive,
       searchQuery,
       hasActiveQuery,
-      filters,
       filterPills,
-      filterSheetOpen,
       isEmpty,
       resultsAreStale,
       onSearchOpen,
@@ -278,8 +281,6 @@ const useCatalogue = (): UseCatalogueResult => {
       onPagerSelected,
       onRetryPress,
       onFilterSheetOpen,
-      onFilterSheetClose,
-      onFilterApply,
       onFilterClear,
       onFilterPillRemove,
       onRefreshPress,

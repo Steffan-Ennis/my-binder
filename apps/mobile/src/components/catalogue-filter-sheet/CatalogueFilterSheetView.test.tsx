@@ -1,6 +1,5 @@
-import type { BottomSheetModal } from '@gorhom/bottom-sheet';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { createRef, type FC, type RefObject } from 'react';
+import { type FC } from 'react';
 
 import { EMPTY_FILTER_SET, type CatalogueFilterSet } from '@src/components/catalogue/types';
 
@@ -14,11 +13,7 @@ const SEEDED_DRAFT: CatalogueFilterSet = {
   missingOnly: true,
 };
 
-const stubRef = (): RefObject<BottomSheetModal | null> =>
-  createRef<BottomSheetModal | null>();
-
 const defaults: CatalogueFilterSheetViewProps = {
-  sheetRef: stubRef(),
   draft: EMPTY_FILTER_SET,
   toggleFormat: jest.fn(),
   toggleSuperType: jest.fn(),
@@ -30,18 +25,16 @@ const defaults: CatalogueFilterSheetViewProps = {
   onToggleMissingOnly: jest.fn(),
   onApply: jest.fn(),
   onClearAll: jest.fn(),
-  onClose: jest.fn(),
 };
 
 const ViewWithDefaults: FC<Partial<CatalogueFilterSheetViewProps>> = (overrides) => (
-  <CatalogueFilterSheetView {...defaults} sheetRef={stubRef()} {...overrides} />
+  <CatalogueFilterSheetView {...defaults} {...overrides} />
 );
 
 describe('CatalogueFilterSheetView — render contract (US2 / FR-005)', () => {
-  it('renders the sheet title and close button when open', () => {
+  it('renders the sheet title when open', () => {
     render(<ViewWithDefaults />);
-    expect(screen.getByText('Refine catalogue')).toBeOnTheScreen();
-    expect(screen.getByRole('button', { name: 'Close filter sheet' })).toBeOnTheScreen();
+    expect(screen.getByText('Refine Search')).toBeOnTheScreen();
   });
 
   it('renders the Missing only toggle row', () => {
@@ -146,12 +139,5 @@ describe('CatalogueFilterSheetView — callbacks', () => {
     render(<ViewWithDefaults onClearAll={onClearAll} />);
     fireEvent.press(screen.getByRole('button', { name: 'Clear all filters' }));
     expect(onClearAll).toHaveBeenCalledTimes(1);
-  });
-
-  it('tapping the close × fires onClose', () => {
-    const onClose = jest.fn();
-    render(<ViewWithDefaults onClose={onClose} />);
-    fireEvent.press(screen.getByRole('button', { name: 'Close filter sheet' }));
-    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

@@ -3,17 +3,6 @@
 // feature directory.
 import type { CatalogueFilterSet, ColorChip } from '@src/components/catalogue/types';
 
-// Hook options — the sheet edits a *working draft* of the filter set so chip
-// taps don't re-run the underlying catalogue query on every keystroke. The
-// draft commits to the parent's filter state only when `onApply` fires.
-export type UseCatalogueFilterSheetOptions = {
-  open: boolean;
-  committed: CatalogueFilterSet;          // current filter state from useCatalogue
-  onApply: (next: CatalogueFilterSet) => void;
-  onClear: () => void;                    // parent owns the post-clear semantics
-  onClose: () => void;                    // dismiss without applying
-};
-
 // Re-export `ColorChip` so consumers inside this feature don't have to import
 // from `@src/components/catalogue/types` (Principle IX — one type, one home).
 export type { ColorChip };

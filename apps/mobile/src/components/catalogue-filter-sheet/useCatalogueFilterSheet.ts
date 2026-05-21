@@ -1,11 +1,12 @@
-import type { BottomSheetModal } from '@gorhom/bottom-sheet';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   EMPTY_FILTER_SET,
   type CatalogueFilterSet,
   type ColorChip,
 } from '@src/components/catalogue/types';
+import { useCatalogueContext } from '@src/context/catalogue-context';
 
 import type {
   CatalogueFilterSheetViewProps,
@@ -34,42 +35,36 @@ export type UseCatalogueFilterSheetResult = Pick<
  * draft* of the filter set so users can twiddle chips without re-running the
  * catalogue query — the draft commits only on Apply.
  *
- * Also owns the `BottomSheetModal` ref and the open/dismiss effect (Data-
- * fetching Rule 4 — side effects and stateful primitives live in the hook,
- * not the view). The view receives `sheetRef` as a stable handle and attaches
- * it directly to `<BottomSheetModal ref={…}>`.
+ * The sheet is a sibling route (`/catalogue/filter-modal`), so it reads the
+ * committed filter set and the `applyFilter` callback from `CatalogueProvider`
+ * rather than from props. On Apply the draft is committed to the context and
+ * the modal route is dismissed via `router.back()`.
  *
- * The draft re-syncs from `committed` whenever the parent's committed filter
- * state changes (e.g. when a pill is removed externally) so the sheet always
- * mirrors reality when re-opened.
+ * The draft re-syncs from the committed set whenever it changes externally
+ * (e.g. a pill removed on the catalogue screen) so a re-open never shows stale
+ * chips.
  *
  * All non-primitive return values are memoised per Principle X v1.16.0.
  *
- * @param options - sheet visibility + committed filter set + lifecycle callbacks.
  * @returns the documented `UseCatalogueFilterSheetResult`.
  *
  * @example
- *   const sheet = useCatalogueFilterSheet({
- *     open,
- *     committed: filters,
- *     onApply: setFilters,
- *     onClear: () => setFilters(EMPTY_FILTER_SET),
- *     onClose: () => setOpen(false),
- *   });
+ *   const sheet = useCatalogueFilterSheet();
+ *   // …render chips from `sheet.draft`; footer button calls `sheet.onApply`.
  */
 const useCatalogueFilterSheet = (): UseCatalogueFilterSheetResult => {
-  const sheetRef = useRef<BottomSheetModal | null>(null);
-  const [draft, setDraft] = useState<CatalogueFilterSet>({
-    cmcMax: 0,
-    cmcMin: 0,
-    colors: [],
-    creatureTypes: [],
-    formats: [],
-    missingOnly: false,
-    name: "",
-    subTypes: [],
-    superTypes: []
-  });
+  const router = useRouter();
+  const { filters, applyFilter } = useCatalogueContext();
+
+  // Seed the working draft from the committed filter set so the sheet mirrors
+  // reality when opened…
+  const [draft, setDraft] = useState<CatalogueFilterSet>(filters);
+
+  // …and re-sync if the committed set changes underneath us (e.g. a pill was
+  // removed on the catalogue screen) so a re-open never shows stale chips.
+  useEffect(() => {
+    setDraft(filters);
+  }, [filters]);
 
   const toggleFormat = useCallback((value: string) => {
     setDraft((prev) => ({ ...prev, formats: toggleArray(prev.formats, value) }));
@@ -112,8 +107,9 @@ const useCatalogueFilterSheet = (): UseCatalogueFilterSheetResult => {
   }, []);
 
   const handleApply = useCallback(() => {
-    // onApply(draft);
-  }, [draft]);
+    applyFilter(draft);
+    router.back();
+  }, [applyFilter, draft, router]);
 
   // FR-008 "Clear all" — local affordance only. The parent's onClear is
   // intentionally NOT invoked here; users may clear the draft, browse the
@@ -124,7 +120,6 @@ const useCatalogueFilterSheet = (): UseCatalogueFilterSheetResult => {
 
   return useMemo<UseCatalogueFilterSheetResult>(
     () => ({
-      sheetRef,
       draft,
       toggleFormat,
       toggleSuperType,

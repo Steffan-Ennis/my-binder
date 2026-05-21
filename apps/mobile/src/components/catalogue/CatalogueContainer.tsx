@@ -1,7 +1,5 @@
 import type { FC } from 'react';
 
-import { CatalogueFilterSheetContainer } from '@src/components/catalogue-filter-sheet/CatalogueFilterSheetContainer';
-
 import CatalogueView from './CatalogueView';
 import useCatalogue from './useCatalogue';
 
@@ -20,9 +18,7 @@ const CatalogueContainer: FC = () => {
     isSearchActive,
     searchQuery,
     hasActiveQuery,
-    filters,
     filterPills,
-    filterSheetOpen,
     resultsAreStale,
     onSearchOpen,
     onSearchChange,
@@ -31,8 +27,6 @@ const CatalogueContainer: FC = () => {
     onPagerSelected,
     onRetryPress,
     onFilterSheetOpen,
-    onFilterSheetClose,
-    onFilterApply,
     onFilterClear,
     onFilterPillRemove,
     onRefreshPress,
