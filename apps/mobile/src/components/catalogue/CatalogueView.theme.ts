@@ -51,7 +51,7 @@ export type CatalogueViewStyles = {
   pageOf: Required<
     Pick<
       TextStyle,
-      'fontFamily' | 'fontSize' | 'lineHeight' | 'fontStyle' | 'color' | 'fontWeight'
+      'fontFamily' | 'fontSize' | 'lineHeight' | 'color' | 'fontWeight'
     >
   >;
   errorState: Required<Pick<ViewStyle, 'flex' | 'alignItems' | 'justifyContent' | 'gap'>>;
@@ -243,7 +243,6 @@ const styles = StyleSheet.create<CatalogueViewStyles>({
     fontFamily: Type.subtitleItalic.font,
     fontSize: Type.subtitleItalic.size,
     lineHeight: Type.subtitleItalic.lineHeight,
-    fontStyle: 'italic',
     color: Colors.dark.textMuted,
     fontWeight: Type.subtitleItalic.weight,
   },

@@ -140,11 +140,8 @@ const useCatalogue = (): UseCatalogueResult => {
   );
 
   const totalPages = useMemo<number | null>(() => {
-    if (!data) return null;
-    const last = data.pages[data.pages.length - 1];
-    if (last === undefined) return null;
-    return hasNextPage ? null : last.totalPages;
-  }, [data, hasNextPage]);
+    return data?.pages[0].totalPages ?? 0
+  }, [data]);
 
   const finalTotal = useMemo(() => {
     if (!data) return 0;
@@ -223,6 +220,8 @@ const useCatalogue = (): UseCatalogueResult => {
     void queryClient.invalidateQueries({ queryKey: CATALOGUE_QUERY_PREFIX });
     setResultsAreStale(false);
   }, [queryClient]);
+
+  console.log('THE total Pages', totalPages)
 
   return useMemo<UseCatalogueResult>(
     () => ({
