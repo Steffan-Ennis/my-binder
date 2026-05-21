@@ -104,7 +104,7 @@ describe('Cards API', () => {
 
   // ─── POST /cards ────────────────────────────────────────────────────────────
 
-  test('POST /cards creates a card and returns 201', async () => {
+  test('POST /cards first insert returns 201 with numberOwned=1 (spec 018 / FR-023)', async () => {
     const id = '22222222-2222-4222-8222-222222222222';
     const r = await fastify.inject({
       method: 'POST', url: '/cards',
@@ -112,9 +112,37 @@ describe('Cards API', () => {
       headers: authHeaders(),
     });
     expect(r.statusCode).toBe(201);
-    const card = r.json<{ id: string; name: string }>();
+    const card = r.json<{ id: string; name: string; numberOwned: number }>();
     expect(card.id).toBe(id);
     expect(card.name).toBe('Black Lotus');
+    expect(card.numberOwned).toBe(1);
+  });
+
+  test('POST /cards duplicate returns 200 with incremented numberOwned (spec 018 / FR-025)', async () => {
+    const id = '22222222-2222-4222-8222-222222222222';
+    const first = await fastify.inject({
+      method: 'POST', url: '/cards',
+      payload: { id, name: 'Black Lotus' },
+      headers: authHeaders(),
+    });
+    expect(first.statusCode).toBe(201);
+    expect(first.json<{ numberOwned: number }>().numberOwned).toBe(1);
+
+    const second = await fastify.inject({
+      method: 'POST', url: '/cards',
+      payload: { id, name: 'Black Lotus' },
+      headers: authHeaders(),
+    });
+    expect(second.statusCode).toBe(200);
+    expect(second.json<{ numberOwned: number }>().numberOwned).toBe(2);
+
+    const third = await fastify.inject({
+      method: 'POST', url: '/cards',
+      payload: { id, name: 'Black Lotus' },
+      headers: authHeaders(),
+    });
+    expect(third.statusCode).toBe(200);
+    expect(third.json<{ numberOwned: number }>().numberOwned).toBe(3);
   });
 
   test('POST /cards returns 400 when required fields are missing', async () => {
@@ -128,6 +156,102 @@ describe('Cards API', () => {
     const r = await fastify.inject({
       method: 'POST', url: '/cards',
       payload: { id: '33333333-3333-4333-8333-333333333333', name: 'Sol Ring' },
+    });
+    expect(r.statusCode).toBe(401);
+  });
+
+  // ─── PATCH /cards/:id (spec 018 / FR-026, FR-028) ──────────────────────────
+
+  test('PATCH /cards/:id { delta: +1 } returns 200 with incremented numberOwned', async () => {
+    const id = '44444444-4444-4444-8444-444444444444';
+    await aCard().forUser(testUser).withId(id).withName('Goblin Guide').persist(dataSource);
+
+    const r = await fastify.inject({
+      method: 'PATCH', url: `/cards/${id}`,
+      payload: { delta: 1 },
+      headers: authHeaders(),
+    });
+    expect(r.statusCode).toBe(200);
+    expect(r.json<{ numberOwned: number }>().numberOwned).toBe(2);
+  });
+
+  test('PATCH /cards/:id { delta: -1 } at numberOwned=2 returns 200 with count=1', async () => {
+    const id = '55555555-5555-4555-8555-555555555555';
+    await aCard().forUser(testUser).withId(id).withName('Lava Spike').persist(dataSource);
+    // Bump to 2 via PATCH first.
+    await fastify.inject({
+      method: 'PATCH', url: `/cards/${id}`,
+      payload: { delta: 1 },
+      headers: authHeaders(),
+    });
+
+    const r = await fastify.inject({
+      method: 'PATCH', url: `/cards/${id}`,
+      payload: { delta: -1 },
+      headers: authHeaders(),
+    });
+    expect(r.statusCode).toBe(200);
+    expect(r.json<{ numberOwned: number }>().numberOwned).toBe(1);
+  });
+
+  test('PATCH /cards/:id { delta: -1 } at numberOwned=1 returns 204 with empty body (row deleted)', async () => {
+    const id = '66666666-6666-4666-8666-666666666666';
+    await aCard().forUser(testUser).withId(id).withName('Searing Blaze').persist(dataSource);
+
+    const r = await fastify.inject({
+      method: 'PATCH', url: `/cards/${id}`,
+      payload: { delta: -1 },
+      headers: authHeaders(),
+    });
+    expect(r.statusCode).toBe(204);
+    expect(r.body).toBe('');
+
+    // Subsequent GET confirms the row is gone.
+    const after = await fastify.inject({
+      method: 'GET', url: `/cards/${id}`, headers: authHeaders(),
+    });
+    expect(after.statusCode).toBe(404);
+  });
+
+  test('PATCH /cards/:id against a non-existent row returns 404', async () => {
+    const r = await fastify.inject({
+      method: 'PATCH', url: `/cards/${UNKNOWN_UUID}`,
+      payload: { delta: -1 },
+      headers: authHeaders(),
+    });
+    expect(r.statusCode).toBe(404);
+  });
+
+  test('PATCH /cards/:id { delta: 0 } returns 400 VALIDATION_ERROR', async () => {
+    const id = '77777777-7777-4777-8777-777777777777';
+    await aCard().forUser(testUser).withId(id).withName('Bolt').persist(dataSource);
+
+    const r = await fastify.inject({
+      method: 'PATCH', url: `/cards/${id}`,
+      payload: { delta: 0 },
+      headers: authHeaders(),
+    });
+    expect(r.statusCode).toBe(400);
+    expect(r.json<{ error: string }>().error).toBe('VALIDATION_ERROR');
+  });
+
+  test('PATCH /cards/:id { delta: 2 } returns 400 VALIDATION_ERROR (only ±1 accepted)', async () => {
+    const id = '88888888-8888-4888-8888-888888888888';
+    await aCard().forUser(testUser).withId(id).withName('Bolt').persist(dataSource);
+
+    const r = await fastify.inject({
+      method: 'PATCH', url: `/cards/${id}`,
+      payload: { delta: 2 },
+      headers: authHeaders(),
+    });
+    expect(r.statusCode).toBe(400);
+    expect(r.json<{ error: string }>().error).toBe('VALIDATION_ERROR');
+  });
+
+  test('PATCH /cards/:id returns 401 without a Bearer token', async () => {
+    const r = await fastify.inject({
+      method: 'PATCH', url: `/cards/${UNKNOWN_UUID}`,
+      payload: { delta: 1 },
     });
     expect(r.statusCode).toBe(401);
   });

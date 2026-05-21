@@ -6,7 +6,7 @@ import type { CardProvider } from '@src/providers/interface';
 function makeProvider(overrides: Partial<CardProvider> = {}): CardProvider {
   return {
     checkLegality: async (name) => ({ cardName: name, legal: true, reason: null, colorIdentity: [] }),
-    search: async () => [],
+    searchRaw: async () => ({ cards: [], total: 0 }),
     getByUuid: async () => null,
     getByUuids: async () => [],
     getCardImages: async () => null,

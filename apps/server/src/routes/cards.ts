@@ -8,17 +8,21 @@ import {
   CARD_IMAGES_RESPONSE_SCHEMA,
   LEGALITY_QUERYSTRING_SCHEMA,
   LEGALITY_RESPONSE_SCHEMA,
+  PATCH_CARD_BODY_SCHEMA,
   SEARCH_QUERYSTRING_SCHEMA,
   SEARCH_RESULT_SCHEMA,
   ERROR_RESPONSE_SCHEMA,
   HTTP_STATUS,
   ERROR_CODES,
 } from '@my-binder/core';
-import type { CreateCardBody, UpdateCardBody, CardIdParams } from '@my-binder/core';
+import type {
+  CreateCardBody, UpdateCardBody, CardIdParams, PatchCardBody,
+} from '@my-binder/core';
 import {
   getCards,
   getCard,
-  createCard,
+  upsertCard,
+  adjustCardOwnedCount,
   updateCard,
   deleteCard,
   checkCommanderLegality,
@@ -130,14 +134,40 @@ export async function cardRoutes(fastify: FastifyInstance): Promise<void> {
     schema: {
       body: CREATE_CARD_BODY_SCHEMA,
       response: {
+        200: CARD_RESPONSE_SCHEMA,
         201: CARD_RESPONSE_SCHEMA,
         400: ERROR_RESPONSE_SCHEMA,
       },
     },
   }, async (request, reply) => {
     const { id: userId } = (request.identity as { kind: 'authenticated'; user: { id: string } }).user;
-    const card = await createCard(request.body, userId);
-    return reply.code(201).send(card);
+    const { card, wasCreated } = await upsertCard(request.body, userId);
+    return reply.code(wasCreated ? HTTP_STATUS.CREATED : HTTP_STATUS.OK).send(card);
+  });
+
+  fastify.patch<{ Params: CardIdParams; Body: PatchCardBody }>('/cards/:id', {
+    preHandler: [fastify.authenticate],
+    schema: {
+      params: CARD_ID_PARAMS_SCHEMA,
+      body: PATCH_CARD_BODY_SCHEMA,
+      response: {
+        200: CARD_RESPONSE_SCHEMA,
+        204: { type: 'null' },
+        400: ERROR_RESPONSE_SCHEMA,
+        404: ERROR_RESPONSE_SCHEMA,
+      },
+    },
+  }, async (request, reply) => {
+    const { id: userId } = (request.identity as { kind: 'authenticated'; user: { id: string } }).user;
+    const result = await adjustCardOwnedCount(request.params.id, userId, request.body.delta);
+    if (result.status === 'notfound') {
+      return reply.code(HTTP_STATUS.NOT_FOUND).send({
+        error: ERROR_CODES.NOT_FOUND,
+        message: `Card with id "${request.params.id}" not found`,
+      });
+    }
+    if (result.status === 'deleted') return reply.code(HTTP_STATUS.NO_CONTENT).send();
+    return reply.code(HTTP_STATUS.OK).send(result.card);
   });
 
   fastify.put<{ Params: CardIdParams; Body: UpdateCardBody }>('/cards/:id', {

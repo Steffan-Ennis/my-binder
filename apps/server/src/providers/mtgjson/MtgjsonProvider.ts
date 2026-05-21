@@ -1,4 +1,4 @@
-import type { MtgjsonSDK, CardSet} from 'mtgjson-sdk';
+import type { MtgjsonSDK } from 'mtgjson-sdk';
 import type {
   CardDetails,
   CardImages,
@@ -9,45 +9,29 @@ import type {
   SearchQuery,
 } from '@my-binder/core';
 import type { CardProvider } from '@src/providers/interface';
-import mapCardSetToCardRecord  from './mapper';
+import { CardSearchBuilder } from './cardSearchBuilder';
+import mapCardSetToCardRecord, { mapRowToCardRecord, type MappableCard } from './mapper';
 import buildScryfallImageUrls from './scryfallImages';
 
-// Spec 018 / FR-005 — post-fetch filter for the catalogue's new dimensions.
-// Implemented as post-filters because mtgjson-sdk@0.1.1's `cards.search`
-// surface does not accept supertype/subtype/legality array params. The SDK
-// returns paginated parquet rows; we pull the page and trim against the
-// filter set in-process before enrichment.
-const isCreature = (card: CardSet): boolean =>
-  (card.types ?? []).some((t) => t.toLowerCase() === 'creature');
+// Dummy UUID used only to trigger registration of the `card_legalities` view
+// (the SDK registers views lazily via its typed API, not via raw `sql()`).
+const VIEW_REGISTRATION_UUID = '00000000-0000-0000-0000-000000000000';
 
-const matchesFormats = (card: CardSet, formats: ReadonlyArray<string>): boolean => {
-  const legalities = (card.legalities ?? {}) as Record<string, string | undefined>;
-  return formats.some((format) => legalities[format.toLowerCase()] === 'Legal');
-};
-
-const matchesSupertypes = (card: CardSet, requested: ReadonlyArray<string>): boolean =>
-  requested.some((value) => (card.supertypes ?? []).includes(value));
-
-const matchesSubtypes = (card: CardSet, requested: ReadonlyArray<string>): boolean =>
-  requested.some((value) => (card.subtypes ?? []).includes(value));
-
-const matchesCreatureTypes = (card: CardSet, requested: ReadonlyArray<string>): boolean =>
-  isCreature(card) && requested.some((value) => (card.subtypes ?? []).includes(value));
-
-const applyCatalogueFilters = (cards: CardSet[], query: SearchQuery): CardSet[] => {
-  return cards.filter((card) => {
-    // FR-021 — paper printings only.
-    if (!card.availability.includes('paper')) return false;
-    if (query.formats?.length && !matchesFormats(card, query.formats)) return false;
-    if (query.superTypes?.length && !matchesSupertypes(card, query.superTypes)) return false;
-    if (query.subTypes?.length && !matchesSubtypes(card, query.subTypes)) return false;
-    if (query.creatureTypes?.length && !matchesCreatureTypes(card, query.creatureTypes)) return false;
-    return true;
-  });
-};
+// Project a raw DuckDB row (from `sdk.sql`) to the subset the record mapper
+// needs. DuckDB returns list columns as JS arrays and nullable text as null.
+const toMappableRow = (row: Record<string, unknown>): MappableCard => ({
+  uuid: String(row.uuid),
+  name: String(row.name),
+  setCode: String(row.setCode),
+  number: String(row.number),
+  manaCost: row.manaCost == null ? undefined : String(row.manaCost),
+  colorIdentity: Array.isArray(row.colorIdentity) ? row.colorIdentity.map(String) : [],
+});
 
 class MtgjsonProvider implements CardProvider {
   private readonly sdk: MtgjsonSDK;
+  // Memoised one-time registration of the DuckDB views `searchRaw` queries.
+  private viewsReady: Promise<void> | null = null;
 
   /**
    * Construct a card provider backed by an MTGJSON SDK instance.
@@ -66,6 +50,67 @@ class MtgjsonProvider implements CardProvider {
    */
   constructor(sdk: MtgjsonSDK) {
     this.sdk = sdk;
+  }
+
+  /**
+   * Register the `cards` and `card_legalities` views before issuing raw SQL.
+   * The SDK registers views lazily through its typed API, not through `sql()`,
+   * so a raw query referencing an unregistered view fails. `cards.count()`
+   * registers `cards`; a throwaway `legalities.isLegal` registers
+   * `card_legalities`. Memoised so it runs once per provider instance.
+   */
+  private ensureViews(): Promise<void> {
+    if (this.viewsReady === null) {
+      this.viewsReady = (async () => {
+        await this.sdk.cards.count();
+        await this.sdk.legalities.isLegal(VIEW_REGISTRATION_UUID, 'commander');
+      })();
+    }
+    return this.viewsReady;
+  }
+
+  /**
+   * Spec 018 — SQL-native catalogue search. Builds one parameterised query per
+   * the supplied filter set (via {@link CardSearchBuilder}), runs a COUNT and a
+   * paged SELECT against the `cards` view, and enriches only the returned page.
+   *
+   * Returns the page plus the total match count so the caller can paginate.
+   * `options.excludeUuids` drops printings the caller already owns (missingOnly)
+   * inside the SQL, keeping COUNT + paging exact.
+   *
+   * @param query - Catalogue filters plus `page`/`limit`.
+   * @param options.excludeUuids - Printing UUIDs to exclude from results.
+   * @returns `{ cards, total }` — one page of enriched records and the total count.
+   *
+   * @example
+   * ```ts
+   * const { cards, total } = await provider.searchRaw(
+   *   { name: 'bolt', colorIdentity: ['R'], page: 1, limit: 20 },
+   *   { excludeUuids: ownedUuids },
+   * );
+   * ```
+   */
+  async searchRaw(
+    query: SearchQuery,
+    options?: { excludeUuids?: ReadonlyArray<string> },
+  ): Promise<{ cards: CardRecord[]; total: number }> {
+    await this.ensureViews();
+
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(100, Math.max(1, query.limit ?? 20));
+    const offset = (page - 1) * limit;
+
+    const builder = CardSearchBuilder.fromQuery(query, options);
+
+    const [countSql, countParams] = builder.toCountQuery();
+    const countRows = await this.sdk.sql(countSql, countParams);
+    const total = Number(countRows[0]?.total ?? 0);
+
+    const [pageSql, pageParams] = builder.toPageQuery(limit, offset);
+    const rows = await this.sdk.sql(pageSql, pageParams);
+
+    const cards = await this.collectCards(rows.map(toMappableRow));
+    return { cards, total };
   }
 
   async getByUuids (uuids: string[]): Promise<CardRecord[]> {
@@ -164,61 +209,6 @@ class MtgjsonProvider implements CardProvider {
     return { cardName: name, legal: true, reason: null, colorIdentity: cardColorIdentity };
   }
 
-  /**
-   * Search the paper card pool with structured filters and return enriched records.
-   *
-   * Each result is enriched with the Scryfall identifier and Commander legality
-   * via sequential per-card SDK calls (see `enrichCards` for the rationale).
-   *
-   * @param query - Structured filters. Any combination may be supplied.
-   * @param query.name - Fuzzy name match.
-   * @param query.set - Restrict to a specific set code.
-   * @param query.cmcMin - Minimum mana value (inclusive).
-   * @param query.cmcMax - Maximum mana value (inclusive).
-   * @param query.colorIdentity - Restrict to cards within this colour identity (e.g. `['R', 'G']`).
-   * @returns An array of `CardRecord`s in SDK order. Empty if no card matches.
-   *
-   * @example
-   * ```ts
-   * const cheapReds = await provider.search({ colorIdentity: ['R'], cmcMax: 3 });
-   *
-   * const bolts = await provider.search({ name: 'bolt' });
-   *
-   * const m11Set = await provider.search({ set: 'M11' });
-   * ```
-   */
-  async search({
-  name,
-  cmcMax,
-  cmcMin,
-  limit = 15,
-  colorIdentity,
-  page = 1,
-  set,
-  ...rest
-}: SearchQuery): Promise<CardRecord[]> {
-    const cards = await this.sdk.cards.search({
-      ...(name !== undefined && { fuzzyName: name }),
-      ...(set !== undefined && { setCode: set }),
-      ...(cmcMin !== undefined && { manaValueGte: cmcMin }),
-      ...(cmcMax !== undefined && { manaValueLte: cmcMax }),
-      ...(colorIdentity !== undefined) && { colorIdentity: colorIdentity },
-      availability: 'paper',
-      limit,
-      offset: page * limit
-    });
-
-    return this.collectCards(applyCatalogueFilters(cards, {
-      name,
-      cmcMax,
-      cmcMin,
-      limit,
-      colorIdentity,
-      page,
-      set,
-      ...rest
-    }));
-  }
   /**
    * Resolve a single printing by its MTGJSON UUID and return display-ready
    * details (name, set, type line, scryfall id) used to decorate stored
@@ -341,7 +331,7 @@ class MtgjsonProvider implements CardProvider {
     );
   }
 
-  private async collectCards(cards: CardSet[]): Promise<CardRecord[]> {
+  private async collectCards(cards: MappableCard[]): Promise<CardRecord[]> {
     const results: CardRecord[] = [];
     for await (const record of this.enrichCards(cards)) {
       results.push(record);
@@ -354,7 +344,7 @@ class MtgjsonProvider implements CardProvider {
    * The SDK lazily downloads parquet files on first access — parallel fan-out causes
    * a race condition. Sequential iteration lets the first card warm the cache.
    */
-  private async *enrichCards(cards: CardSet[]): AsyncGenerator<CardRecord> {
+  private async *enrichCards(cards: MappableCard[]): AsyncGenerator<CardRecord> {
     for (const card of cards) {
       console.log(
         `[MtgjsonProvider] enriching card uuid=${card.uuid} name="${card.name}" set=${card.setCode} number=${card.number}`,
@@ -378,11 +368,11 @@ class MtgjsonProvider implements CardProvider {
    * concurrent access to the SDK's underlying DuckDB connection produces a
    * "Failed to execute prepared statement" race condition.
    */
-  private async enrichCard(card: CardSet): Promise<CardRecord> {
-    const ids = await this.sdk.identifiers.getIdentifiers(card.uuid);
+  private async enrichCard(card: MappableCard): Promise<CardRecord> {
+    // const ids = await this.sdk.identifiers.getIdentifiers(card.uuid);
     const commanderLegal = await this.sdk.legalities.isLegal(card.uuid, 'commander');
-    const scryfallId = typeof ids?.scryfallId === 'string' ? ids.scryfallId : null;
-    return mapCardSetToCardRecord(card, { commanderLegal, scryfallId });
+    // const scryfallId = typeof ids?.scryfallId === 'string' ? ids.scryfallId : null;
+    return mapRowToCardRecord(card, { commanderLegal });
   }
 }
 

@@ -43,7 +43,7 @@ const SOL_RING: CardRecord = {
 function makeProvider(overrides: Partial<CardProvider> = {}): CardProvider {
   return {
     checkLegality: async (name) => ({ cardName: name, legal: true, reason: null, colorIdentity: [] }),
-    search: async () => [LIGHTNING_BOLT, SOL_RING],
+    searchRaw: async () => ({ cards: [LIGHTNING_BOLT, SOL_RING], total: 2 }),
     getByUuid: async () => null,
     getByUuids: async () => [],
     getCardImages: async () => null,
@@ -221,12 +221,25 @@ describe('cardService — provider-backed functions', () => {
   });
 
   describe('searchCards', () => {
+    // searchRaw now owns filtering, COUNT and paging; the fake paginates the
+    // same way the real SQL would so the service-level assertions stay meaningful.
+    const makePagedProvider = (total: number): CardProvider =>
+      makeProvider({
+        searchRaw: async (q) => {
+          const all = Array.from({ length: total }, (_, i) => ({
+            ...LIGHTNING_BOLT,
+            name: `Card ${i + 1}`,
+            cardNumber: String(i + 1),
+          }));
+          const page = Math.max(1, q.page ?? 1);
+          const limit = Math.min(100, Math.max(1, q.limit ?? 20));
+          const start = (page - 1) * limit;
+          return { cards: all.slice(start, start + limit), total: all.length };
+        },
+      });
+
     beforeAll(async () => {
-      registry.register('search', makeProvider({
-        search: async () => Array.from({ length: 45 }, (_, i) => ({
-          ...LIGHTNING_BOLT, name: `Card ${i + 1}`, cardNumber: String(i + 1),
-        })),
-      }));
+      registry.register('search', makePagedProvider(45));
       await registry.setActive('search');
     });
 
@@ -262,7 +275,7 @@ describe('cardService — provider-backed functions', () => {
     });
 
     test('returns totalPages=0 for empty result set', async () => {
-      registry.register('empty', makeProvider({ search: async () => [] }));
+      registry.register('empty', makeProvider({ searchRaw: async () => ({ cards: [], total: 0 }) }));
       await registry.setActive('empty');
       const result = await searchCards({ name: 'nothing' });
       expect(result.total).toBe(0);
@@ -272,9 +285,8 @@ describe('cardService — provider-backed functions', () => {
     });
 
     test('Bubbles up original errors', async () => {
-      const error = new Error('disk error')
-
-      registry.register('search-broken', makeProvider({ search: async () => { throw error; } }));
+      const error = new Error('disk error');
+      registry.register('search-broken', makeProvider({ searchRaw: async () => { throw error; } }));
       await registry.setActive('search-broken');
       await expect(() => searchCards({ name: 'x' })).rejects.toThrow(error);
     });
@@ -282,9 +294,9 @@ describe('cardService — provider-backed functions', () => {
     test('forwards new filter dimensions through to the provider (FR-005)', async () => {
       const calls: SearchQuery[] = [];
       registry.register('search-forward', makeProvider({
-        search: async (q) => {
+        searchRaw: async (q) => {
           calls.push(q);
-          return [];
+          return { cards: [], total: 0 };
         },
       }));
       await registry.setActive('search-forward');
@@ -308,7 +320,9 @@ describe('cardService — provider-backed functions', () => {
         { ...LIGHTNING_BOLT, id: UUID_BOLT },
         { ...SOL_RING, id: UUID_SOL },
       ];
-      registry.register('search-with-user', makeProvider({ search: async () => providerCards }));
+      registry.register('search-with-user', makeProvider({
+        searchRaw: async () => ({ cards: providerCards, total: providerCards.length }),
+      }));
       await registry.setActive('search-with-user');
 
       // userA owns only Lightning Bolt (numberOwned defaults to 1 via the entity)
@@ -324,7 +338,7 @@ describe('cardService — provider-backed functions', () => {
 
     test('omits numberOwned when no userId is supplied', async () => {
       registry.register('search-no-user', makeProvider({
-        search: async () => [{ ...LIGHTNING_BOLT, id: UUID_BOLT }],
+        searchRaw: async () => ({ cards: [{ ...LIGHTNING_BOLT, id: UUID_BOLT }], total: 1 }),
       }));
       await registry.setActive('search-no-user');
 
@@ -332,18 +346,27 @@ describe('cardService — provider-backed functions', () => {
       expect(result.cards[0]?.numberOwned).toBeUndefined();
     });
 
-    test('missingOnly: drops printings whose numberOwned > 0 (FR-005)', async () => {
+    test('missingOnly: passes owned UUIDs as excludeUuids so they never appear (FR-005)', async () => {
+      let receivedExclude: ReadonlyArray<string> | undefined;
       const providerCards: CardRecord[] = [
         { ...LIGHTNING_BOLT, id: UUID_BOLT },
         { ...SOL_RING, id: UUID_SOL },
       ];
-      registry.register('search-missing-only', makeProvider({ search: async () => providerCards }));
+      registry.register('search-missing-only', makeProvider({
+        searchRaw: async (_q, opts) => {
+          receivedExclude = opts?.excludeUuids;
+          const excluded = new Set(opts?.excludeUuids ?? []);
+          const cards = providerCards.filter((c) => !excluded.has(c.id));
+          return { cards, total: cards.length };
+        },
+      }));
       await registry.setActive('search-missing-only');
 
       await aCard().forUser(userA).withId(UUID_BOLT).withName('Lightning Bolt').persist(dataSource);
 
       const result = await searchCards({ name: 'any', userId: userA.id, missingOnly: true });
 
+      expect(receivedExclude).toEqual([UUID_BOLT]);
       expect(result.cards.map((c) => c.id)).toEqual([UUID_SOL]);
       expect(result.cards[0]?.numberOwned).toBe(0);
     });

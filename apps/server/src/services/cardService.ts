@@ -1,9 +1,10 @@
 import type {
-  Card, CardList, CardRecord, CreateCardBody,
+  Card, CardList, CreateCardBody,
   UpdateCardBody, LegalityResult,
   SearchQuery, SearchResult, CardImages,
 } from '@my-binder/core';
 import { getRepositories } from '@src/db/repositories';
+import type { AdjustNumberOwnedResult } from '@src/repositories/cardRepository';
 import { registry } from '@src/providers/registry';
 import { CardProvider } from "@src/providers/interface";
 
@@ -112,6 +113,55 @@ export async function getCard(id: string, userId: string): Promise<Card> {
  */
 export async function createCard(body: CreateCardBody, userId: string): Promise<Card> {
   return getRepositories().card.create(body, userId);
+}
+
+/**
+ * Upsert-and-increment a card into a user's binder (spec 018 / FR-025).
+ * A fresh `(id, userId)` pair creates the row at `numberOwned = 1`; a duplicate
+ * increments. The route layer maps `wasCreated → 201`, `!wasCreated → 200`.
+ *
+ * @param body - Validated request body (`{ id, name }`).
+ * @param userId - Owner of the row.
+ * @returns `{ card, wasCreated }`.
+ *
+ * @example
+ * ```ts
+ * const { card, wasCreated } = await upsertCard({ id, name }, userId);
+ * reply.code(wasCreated ? 201 : 200).send(card);
+ * ```
+ */
+export async function upsertCard(
+  body: CreateCardBody,
+  userId: string,
+): Promise<{ card: Card; wasCreated: boolean }> {
+  return getRepositories().card.upsertIncrement(body.id, body.name, userId);
+}
+
+/**
+ * Adjust the `numberOwned` of a card already in a user's binder (spec 018 /
+ * FR-026, FR-028). `+1` increments; `-1` decrements; a decrement to zero
+ * deletes the row in the same atomic step. The route layer maps the three
+ * outcomes to 200 / 204 / 404 respectively.
+ *
+ * @param id - MTGJSON printing UUID.
+ * @param userId - Owner constraint.
+ * @param delta - `+1` to increment, `-1` to decrement.
+ * @returns `{ status: 'updated', card }` | `{ status: 'deleted' }` | `{ status: 'notfound' }`.
+ *
+ * @example
+ * ```ts
+ * const r = await adjustCardOwnedCount(id, userId, -1);
+ * if (r.status === 'notfound') reply.code(404).send();
+ * if (r.status === 'deleted')  reply.code(204).send();
+ * if (r.status === 'updated')  reply.code(200).send(r.card);
+ * ```
+ */
+export async function adjustCardOwnedCount(
+  id: string,
+  userId: string,
+  delta: 1 | -1,
+): Promise<AdjustNumberOwnedResult> {
+  return getRepositories().card.adjustNumberOwned(id, userId, delta);
 }
 
 /**
@@ -240,20 +290,22 @@ export async function checkCommanderLegality(
 }
 
 /**
- * Search the active provider's card pool with structured filters and paginate
- * the results in-process.
+ * Search the active provider's card pool with structured filters, delegating
+ * filtering, the total count, and pagination to `provider.searchRaw` (SQL-native).
  *
- * Pagination clamps `page` to `[1, ∞)` and `limit` to `[1, 100]`. The provider
- * is expected to return the full unpaginated set, which is then sliced — that
- * matches the current MTGJSON parquet flow where the SDK has no native paging.
+ * Pagination clamps `page` to `[1, ∞)` and `limit` to `[1, 100]`. For an
+ * authenticated request the user's owned printings (Postgres) are projected
+ * onto the page as `numberOwned`; when `missingOnly` is set those UUIDs are
+ * passed to `searchRaw` as an exclusion list so the SQL `COUNT` and page stay
+ * exact.
  *
- * If `registry.getActive()` itself throws (no active provider), this surfaces
- * as `ProviderUnavailableError`. Errors raised by `provider.search` propagate
+ * If `registry.getActive()` throws (no active provider), this surfaces as
+ * `ProviderUnavailableError`. Errors raised by `provider.searchRaw` propagate
  * unchanged so they can be observed in tests; the HTTP layer catches them and
  * maps to 500.
  *
- * @param query - Structured filters plus `page`/`limit`.
- * @returns A `SearchResult` slice with `total`, `page`, `limit`, `totalPages`.
+ * @param query - Structured filters plus `page`/`limit` (and optional `userId`).
+ * @returns A `SearchResult` page with `total`, `page`, `limit`, `totalPages`.
  * @throws ProviderUnavailableError when no provider is active.
  *
  * @example
@@ -308,42 +360,39 @@ export async function getCardImagesById(id: string): Promise<CardImages> {
 export async function searchCards(query: SearchQuery): Promise<SearchResult> {
   const page = Math.max(1, query.page ?? 1);
   const limit = Math.min(100, Math.max(1, query.limit ?? 20));
-  let activeProvider: CardProvider
+
+  let activeProvider: CardProvider;
   try {
-    activeProvider = registry.getActive()
+    activeProvider = registry.getActive();
   } catch (error) {
-    console.error(error)
+    console.error(error);
     throw new ProviderUnavailableError();
   }
 
-  const allCards = await activeProvider.search(query)
-
-  // Spec 018 / FR-024 — LEFT JOIN against the user's binder:
-  //   numberOwned = COALESCE(cards.number_owned, 0) per printing.
-  // When userId is absent (anonymous catalogue browse) the field is omitted.
-  let joined: CardRecord[] = allCards;
+  // Spec 018 / FR-024 — the user's binder lives in Postgres, the card pool in
+  // DuckDB. Resolve owned printings once: used to project numberOwned onto the
+  // returned page and, for missingOnly, to exclude owned UUIDs inside the SQL
+  // query so COUNT + paging stay exact. Absent userId → anonymous browse, no
+  // numberOwned projection.
+  let ownedById: Map<string, number> | null = null;
+  let excludeUuids: string[] | undefined;
   if (query.userId !== undefined) {
-    const userId = query.userId;
-    const ownedRows = await getRepositories().card.findAll(userId);
-    const ownedById = new Map<string, number>();
-    for (const row of ownedRows) {
-      ownedById.set(row.id, row.numberOwned ?? 0);
-    }
-    joined = allCards.map((card) => ({
-      ...card,
-      numberOwned: ownedById.get(card.id) ?? 0,
-    }));
-
-    // FR-005 clarification — `missingOnly` filters AFTER the join so we can
-    // drop owned printings (numberOwned > 0).
+    const ownedRows = await getRepositories().card.findAll(query.userId);
+    ownedById = new Map(ownedRows.map((row) => [row.id, row.numberOwned ?? 0]));
     if (query.missingOnly === true) {
-      joined = joined.filter((card) => (card.numberOwned ?? 0) === 0);
+      excludeUuids = [...ownedById.keys()];
     }
   }
 
-  const total = joined.length;
-  const offset = (page - 1) * limit;
-  const cards = joined.slice(offset, offset + limit);
+  const { cards: pageCards, total } = await activeProvider.searchRaw(
+    { ...query, page, limit },
+    excludeUuids !== undefined ? { excludeUuids } : undefined,
+  );
+
+  const cards =
+    ownedById !== null
+      ? pageCards.map((card) => ({ ...card, numberOwned: ownedById!.get(card.id) ?? 0 }))
+      : pageCards;
 
   return {
     cards,

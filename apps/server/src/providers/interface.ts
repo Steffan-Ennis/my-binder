@@ -18,7 +18,15 @@ export type LookupOptions = {
 
 export type CardProvider = {
   checkLegality(name: string, commanderColors?: string[]): Promise<LegalityResult>;
-  search(query: SearchQuery): Promise<CardRecord[]>;
+  // Spec 018 — SQL-native catalogue search. Applies all filter dimensions in a
+  // single parameterised query, returning one page plus the total match count
+  // for pagination. `excludeUuids` drops printings the caller already owns
+  // (missingOnly), keeping COUNT + paging exact even though ownership lives in
+  // a separate datastore.
+  searchRaw(
+    query: SearchQuery,
+    options?: { excludeUuids?: ReadonlyArray<string> },
+  ): Promise<{ cards: CardRecord[]; total: number }>;
   // Resolve a single printing by its MTGJSON UUID. Returns null when the UUID
   // does not resolve to a card. Used by the user-collection layer to enrich
   // stored Card rows with display metadata (set name, type line, image).
