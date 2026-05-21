@@ -221,8 +221,6 @@ const useCatalogue = (): UseCatalogueResult => {
     setResultsAreStale(false);
   }, [queryClient]);
 
-  console.log('THE total Pages', totalPages)
-
   return useMemo<UseCatalogueResult>(
     () => ({
       pages,

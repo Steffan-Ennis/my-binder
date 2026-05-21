@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import type { Card } from '@my-binder/core';
 import type { FC } from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -6,10 +5,9 @@ import PagerView, { PagerViewProps } from 'react-native-pager-view';
 
 import Masthead from '@src/components/masthead/Masthead';
 import type { MastheadProps } from '@src/components/masthead/types';
-import { Card as CardSlot } from '@src/components/card';
 import { SLOTS_PER_BINDER_PAGE } from '@src/utils/pageMath';
 
-import useStyles, { type BinderHomeViewStyles } from './BinderHomeView.theme';
+import useStyles from './BinderHomeView.theme';
 import BinderPage from '@src/components/binder-page/BinderPage';
 
 const RING_COUNT = 3;

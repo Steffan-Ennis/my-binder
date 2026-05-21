@@ -62,54 +62,8 @@ export type BinderHomeViewStyles = {
   pageOf: Required<
     Pick<
       TextStyle,
-      'fontFamily' | 'fontSize' | 'lineHeight' | 'letterSpacing' | 'color' | 'fontWeight'
+      'fontFamily' | 'fontSize' | 'lineHeight' | 'color' | 'fontWeight'
     >
-  >;
-  // US4 — populated-pocket grid + glyph overlays.
-  grid: Required<
-    Pick<ViewStyle, 'flex' | 'flexDirection' | 'flexWrap' | 'justifyContent' | 'alignContent'>
-  >;
-  pocket: Required<
-    Pick<
-      ViewStyle,
-      'width' | 'height' | 'aspectRatio' | 'borderRadius' | 'overflow' | 'marginBottom'
-    >
-  >;
-  pocketEmpty: Required<
-    Pick<ViewStyle, 'borderWidth' | 'borderStyle' | 'borderColor' | 'backgroundColor'>
-  >;
-  pocketWrapper: Required<
-    Pick<ViewStyle, 'width' | 'aspectRatio' | 'marginBottom' | 'position'>
-  >;
-  pocketActionRemove: Required<
-    Pick<
-      ViewStyle,
-      | 'position'
-      | 'bottom'
-      | 'right'
-      | 'width'
-      | 'height'
-      | 'borderRadius'
-      | 'backgroundColor'
-      | 'alignItems'
-      | 'justifyContent'
-    >
-  >;
-  pocketActionRemoveIcon: Required<Pick<TextStyle, 'color'>>;
-  pocketOwnedGlyph: Required<
-    Pick<
-      ViewStyle,
-      | 'position'
-      | 'top'
-      | 'right'
-      | 'paddingHorizontal'
-      | 'paddingVertical'
-      | 'borderRadius'
-      | 'backgroundColor'
-    >
-  >;
-  pocketOwnedGlyphLabel: Required<
-    Pick<TextStyle, 'fontFamily' | 'fontSize' | 'color' | 'fontWeight'>
   >;
 };
 
@@ -193,68 +147,11 @@ const styles = StyleSheet.create<BinderHomeViewStyles>({
     flex: 1,
   },
   pageOf: {
-    fontFamily: Type.overline.font,
-    fontSize: Type.overline.size,
-    lineHeight: Type.overline.lineHeight,
-    letterSpacing: Type.overline.letterSpacing,
+    fontFamily: Type.subtitleItalic.font,
+    fontSize: Type.subtitleItalic.size,
+    lineHeight: Type.subtitleItalic.lineHeight,
     color: Colors.dark.textMuted,
-    fontWeight: Type.overline.weight,
-  },
-  grid: {
-    flex: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    alignContent: 'space-between',
-  },
-  pocket: {
-    width: '32%',
-    height: '100%',
-    aspectRatio: 5 / 7,
-    borderRadius: Radius.md,
-    overflow: 'hidden',
-    marginBottom: Spacing.xs,
-  },
-  pocketEmpty: {
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: Colors.dark.pocketEmpty,
-    backgroundColor: 'transparent',
-  },
-  pocketWrapper: {
-    width: '32%',
-    aspectRatio: 5 / 7,
-    marginBottom: Spacing.xs,
-    position: 'relative',
-  },
-  pocketActionRemove: {
-    position: 'absolute',
-    bottom: Spacing.xs,
-    right: Spacing.xs,
-    width: 28,
-    height: 28,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.dark.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pocketActionRemoveIcon: {
-    color: Colors.dark.textOnAccent,
-  },
-  pocketOwnedGlyph: {
-    position: 'absolute',
-    top: Spacing.xs,
-    right: Spacing.xs,
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
-    borderRadius: Radius.pill,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-  },
-  pocketOwnedGlyphLabel: {
-    fontFamily: Type.bodyStrong.font,
-    fontSize: 11,
-    color: Colors.dark.text,
-    fontWeight: Type.bodyStrong.weight,
+    fontWeight: Type.subtitleItalic.weight,
   },
 });
 
