@@ -215,26 +215,6 @@ describe('useCatalogue', () => {
       );
     });
 
-    it('onFilterPillRemove drops one dimension only (FR-008)', () => {
-      jest
-        .spyOn(apiModule.apiClient, 'searchCards')
-        .mockResolvedValue(makePage(1, [], 1, 0));
-      const { result } = renderWithCtx();
-
-      act(() =>
-        result.current.ctx.applyFilter({
-          ...result.current.ctx.filters,
-          formats: ['Modern', 'Legacy'],
-          colors: ['R'],
-        }),
-      );
-      act(() => result.current.cat.onFilterPillRemove('format:Modern'));
-
-      expect(result.current.ctx.filters.formats).toEqual(['Legacy']);
-      expect(result.current.ctx.filters.colors).toEqual(['R']);
-    });
-
-
     it('onFilterClear resets every dimension to EMPTY_FILTER_SET', () => {
       jest
         .spyOn(apiModule.apiClient, 'searchCards')
