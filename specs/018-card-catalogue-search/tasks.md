@@ -222,117 +222,80 @@ runtime context error is resolved. Phase 5 (US4) may now begin.
 
 ---
 
-## Phase 5: User Story 4 - Add Cards From Catalogue, Remove From Binder (Priority: P1)
+## Phase 5: User Story 4 — DEFERRED → spec `019-binder-add-remove`
 
-**Goal**: Inline `+` glyph-button on every Catalogue pocket and inline `−`
-glyph-button on every Binder pocket. Both surfaces render the `×N`
-owned-count glyph driven by `numberOwned`. Mutations are optimistic
-(SC-011 / SC-012). Adopting the shared `<Masthead />` on the Binder
-(FR-022) lands as part of this story. The `Missing only` defer-and-refresh
-affordance (FR-031) is wired in.
-
-**Independent Test**: Sign in with an empty binder, open Catalogue, tap `+`
-on any pocket and confirm the `×1` glyph appears and the Binder now contains
-that card. Tap `+` again on the same pocket → `×2`. Switch to the Binder,
-tap `−` on the pocket twice → on the second tap the pocket disappears, the
-binder grid reflows, the summary caption and page count recompute. Turn on
-`Missing only` in the Catalogue, tap `+` on a pocket and confirm the pocket
-**stays put** while the gold-bordered "results out-of-date" banner appears;
-tap the banner → the pocket disappears.
-
-### Tests for User Story 4 (Jest unit tests REQUIRED) ⚠️
-
-- [ ] T043 [P] [US4] Tests — Extend `apps/server/src/repositories/cardRepository.test.ts`: `upsertIncrement` creates a fresh row at `numberOwned=1`; `upsertIncrement` on a duplicate `(id, user_id)` increments by 1; `adjustNumberOwned(delta:+1)` increments; `adjustNumberOwned(delta:-1)` at count > 1 decrements; `adjustNumberOwned(delta:-1)` at count = 1 deletes the row inside the same transaction and returns null; `adjustNumberOwned` against a non-row returns 404 / null sentinel.
-- [ ] T045 [P] [US4] Tests — Extend `apps/server/src/routes/cards.test.ts`: `POST /cards` first insert returns 201 with `numberOwned=1`; `POST /cards` duplicate returns 200 with incremented `numberOwned` (NOT 409); `PATCH /cards/:id { delta: +1 }` returns 200; `PATCH /cards/:id { delta: -1 }` at `numberOwned=2` returns 200 with count=1; `PATCH /cards/:id { delta: -1 }` at `numberOwned=1` returns 204 with no body; `PATCH /cards/:id { delta: -1 }` against a non-row returns 404; `PATCH /cards/:id { delta: 0 }` returns 400 `VALIDATION_ERROR`.
-- [ ] T047 [P] [US4] Tests — `apps/mobile/src/hooks/useUpdateBinderEntryMutation.test.tsx`: `onMutate({delta:+1})` optimistically increments `numberOwned` in `['cards','list']` AND in every `['catalogue','search', …]` cache; `onMutate({delta:-1})` at `numberOwned=1` removes the row from `['cards','list']` and zeroes the catalogue cache row; `onError` rolls back both caches to the snapshot; `onSettled` invalidates `['cards','list']` but does NOT invalidate the catalogue caches (FR-031); `onSettled` publishes the `binderMutationLanded` signal that `useCatalogue` subscribes to.
-- [ ] T052 [P] [US4] Tests — Update `apps/mobile/src/components/binder-home/BinderHomeView.test.tsx`: `<Masthead />` is rendered as a child component (the inline header bar is removed); each populated pocket renders a `−` glyph-button; tapping the `−` glyph fires `onPocketRemove(id)`; the owned-count `×N` glyph is visible iff `numberOwned >= 2` (FR-024); existing SC-006 assertions (`pocket-occupied`, `pocket-empty`, `binder-page-ring`) remain green.
-- [ ] T053 [P] [US4] Tests — Update `apps/mobile/src/components/binder-home/useBinderHome.test.ts`: exposes `mastheadProps` derived from existing state; `onPocketRemove(id)` invokes `useUpdateBinderEntryMutation` with `{delta:-1}`; the binder grid recomputes `totalPages` and summary caption when a row is removed (FR-026).
-
-### Implementation for User Story 4
-
-- [ ] T044 [US4] Implement `upsertIncrement(id, name, userId)` and `adjustNumberOwned(id, userId, delta)` in `apps/server/src/repositories/cardRepository.ts` using `INSERT … ON CONFLICT (id, user_id) DO UPDATE SET number_owned = cards.number_owned + 1, updated_at = NOW() RETURNING *` and `UPDATE … SET number_owned = number_owned + :delta, updated_at = NOW() WHERE id = :id AND user_id = :userId RETURNING *` (inside a TypeORM transaction; the helper issues `DELETE` when the returned `number_owned = 0`). Makes T043 pass.
-- [ ] T046 [US4] Modify `apps/server/src/routes/cards.ts`: rewire `POST /cards` to call `upsertIncrement` (201 on fresh, 200 on duplicate); add the new `PATCH /cards/:id` handler validating body against `PATCH_CARD_BODY_SCHEMA` and params against `CARD_ID_PARAMS_SCHEMA`; on `delta:-1` against a non-row, return 404; on row deletion, return 204; otherwise return 200 with the updated card. Makes T045 pass.
-- [ ] T048 [US4] Implement `apps/mobile/src/hooks/useUpdateBinderEntryMutation.ts`: `useMutation` over `apiClient.upsertCard` (when adding) and `apiClient.patchCard` (when incrementing or decrementing); `onMutate` snapshots and optimistically updates both cache spaces; `onError` restores; `onSettled` invalidates `['cards','list']` and publishes the internal `binderMutationLanded` event (in-memory `EventTarget`/pub-sub). Exports `useBinderMutationLandedSignal()` for consumers. Makes T047 pass.
-- [ ] T049 [US4] Extend `apps/mobile/src/components/catalogue/useCatalogue.ts` (continuing the file shaped in T028/T040): consume `useUpdateBinderEntryMutation`; add `onPocketAddPress(id)` that calls the mutation with `{delta:+1}`; add `resultsAreStale` flag set to `true` when the `binderMutationLanded` signal fires AND any filter dimension is active (FR-031); add `onRefreshPress` that invalidates `['catalogue','search',…]` and clears the stale flag. All callbacks memoised per Principle X v1.16.0.
-- [ ] T050 [US4] Extend `apps/mobile/src/components/catalogue/CatalogueView.tsx`: overlay a `catalogue-pocket-action-add` `+` glyph-button on every populated pocket (bottom-right, `hitSlop:8`, `pointerEvents:'box-only'` per FR-027 / SC-013); overlay a `catalogue-owned-glyph` `×N` glyph in the top-right when `card.numberOwned >= 1`; render the `catalogue-refresh-hint` gold-bordered banner inside the canvas when `resultsAreStale === true` (FR-031).
-- [ ] T051 [US4] Extend `apps/mobile/src/components/catalogue/useCatalogue.test.ts` + `CatalogueView.test.tsx`: tapping `+` on a pocket invokes the mutation with `{delta:+1}` and does NOT navigate; the owned-count glyph appears in the optimistic frame; the refresh banner appears after a mutation while a filter is active and disappears after `onRefreshPress`; mutating without an active filter does not set the stale flag.
-- [ ] T054 [US4] Refactor `apps/mobile/src/components/binder-home/BinderHomeView.tsx`: delete the inline header (lines 82–151 in the current file) and render `<Masthead {...mastheadProps} />`; add the `−` glyph-button overlay (`catalogue-pocket-action-add`-style, mirrored to `binder-pocket-action-remove`) and the `×N` owned-count glyph visible when `numberOwned >= 2` (FR-024). Makes T052 pass.
-- [ ] T055 [US4] Refactor `apps/mobile/src/components/binder-home/useBinderHome.ts`: derive a `mastheadProps` object from the existing search/profile state and expose it on the return; consume `useUpdateBinderEntryMutation` and expose `onPocketRemove(id)` that calls it with `{delta:-1}`; ensure derived `totalPages` and `summaryCaption` recompute when the binder cache changes. Makes T053 pass.
-
-**Checkpoint**: User Stories 1, 2, AND 4 all work independently and together.
-
-> **Phase completion validation gate (Constitution Principle III).** Run
-> `turbo test` and `turbo typecheck` across `@my-binder/core`,
-> `@my-binder/server`, `@my-binder/mobile`. Both MUST exit 0 with a 100% Jest
-> pass rate. Specifically re-verify spec 016 binder behaviours (in-binder
-> search, Profile shortcut) have not regressed (FR-022 / SC-008).
+> **Moved out of spec 018 by the 2026-05-22 split.** US4 (add from
+> Catalogue / remove from Binder + owned-count glyphs + `Missing only`
+> defer-and-refresh) is now owned by spec `019-binder-add-remove`.
+>
+> **Already implemented + tested on this branch** (so spec 019 inherits a
+> done backend): the original T043/T044 (`CardRepository.upsertIncrement` /
+> `adjustNumberOwned`) and T045/T046 (`POST /cards` upsert returning
+> 200/201, `PATCH /cards/:id` adjust returning 200/204/404) are complete in
+> `apps/server/src/repositories/cardRepository.ts` and
+> `apps/server/src/routes/cards.ts`, with passing tests. FR-022 (Binder
+> adopts the shared `<Masthead />`) is also already done in spec 018.
+>
+> **Remaining (mobile-only, tracked in spec 019):** the original
+> T047/T048 (`useUpdateBinderEntryMutation`), T049–T051 (Catalogue `+`
+> glyph + owned-count glyph + defer-and-refresh banner), and T052–T055
+> (Binder `−` glyph + owned-count glyph). The Catalogue `useCatalogue` /
+> `CatalogueViewProps` already carry forward-reference fields
+> (`resultsAreStale`, `onRefreshPress`) that spec 019 will activate.
 
 ---
 
-## Phase 6: User Story 3 - Inspect a Card's Prices and 30-Day Trend (Priority: P2)
+## Phase 6: User Story 3 — DEFERRED → spec `020-card-detail-prices`
 
-**Goal**: Tapping a populated pocket on either surface (Catalogue or Binder)
-opens the shared bottom sheet showing the card's identity, the `−ㅤNㅤ+`
-stepper, two labelled price rows (Card Kingdom + TCG Player), and a 30-day
-two-line price-trend chart. Missing observations render as `—` and gaps. The
-sheet dismisses via swipe-down past threshold or the close control and
-restores the underlying page/scroll position. Price data is served live by
-the MTGJSON SDK via two new methods on the `CardProvider` abstraction — no
-new entity, no migration. MTG Goldfish is deferred to a follow-up specification.
-
-**Independent Test**: Open the Catalogue, tap any populated pocket. Confirm
-the sheet renders the card hero, the stepper showing the user's current count
-(0 for unowned), the two price rows (each either a `$x.xx` value or `—`), and
-the 30-day chart with up to two lines and a legend. Tap `+` on the stepper —
-the count increments and the pocket glyph updates. Swipe the sheet down past
-threshold — it dismisses and the catalogue page is unchanged.
-
-### Tests for User Story 3 (Jest unit tests REQUIRED) ⚠️
-
-- [ ] T056 [P] [US3] Tests — Extend `apps/server/src/providers/mtgjson/MtgjsonProvider.test.ts`: `getPrices(uuid)` fans out two `sdk.prices.today` calls (provider keys `cardkingdom` and `tcgplayer`, `finish='normal'`, `priceType='retail'`) and returns `{printingId, cardKingdom, tcgPlayer}`; returns `null` per slot when the SDK reports no observation; `getPriceHistory(uuid, 30)` fans out two `sdk.prices.history` calls with `dateFrom = today - 30 days`; returns an empty array per slot when no observations are in the window; the provider-key map contains exactly `CARD_KINGDOM → cardkingdom` and `TCG_PLAYER → tcgplayer` (MTG Goldfish deferred per spec's 2026-05-18 Clarifications entry).
-- [ ] T058 [P] [US3] Tests — `apps/server/src/services/priceService.test.ts`: `getCardPrices` delegates to `provider.getPrices` and re-throws as `ProviderUnavailableError`; `getCardPriceHistory` delegates to `provider.getPriceHistory` with `days=30` as the default; both return the provider response unchanged on success.
-- [ ] T060 [P] [US3] Tests — `apps/server/src/routes/prices.test.ts`: `GET /cards/:id/prices` against an unknown UUID returns 404 `CARD_NOT_FOUND`; against a valid printing with no observations returns 200 with both slots `null` (FR-019); against a printing MTGJSON has prices for returns the latest observation per source; `GET /cards/:id/prices/history?days=30` returns the per-source arrays; default `days=30` when omitted; both endpoints require authentication.
-- [ ] T062 [P] [US3] Tests — `apps/mobile/src/hooks/useCardPricesQuery.test.ts`: returns `null` per slot for printings with no observations; returns populated quotes for seeded printings; `enabled` gates on non-null `id`.
-- [ ] T064 [P] [US3] Tests — `apps/mobile/src/hooks/useCardPriceHistoryQuery.test.ts`: returns per-source arrays; default window `days=30`; `enabled` gates on non-null `id`.
-- [ ] T066 [P] [US3] Tests — `apps/mobile/src/hooks/useCardDetailsQuery.test.ts`: returns the validated `Card` for a known id; throws `ApiError('NOT_FOUND')` on 404; `enabled` gates on non-null `id`.
-- [ ] T069 [P] [US3] Tests — `apps/mobile/src/components/card-detail-sheet/useCardDetailSheet.test.ts`: returns `name`, `setCode`, `setName`, `typeLine`, `oracleText`, `artUrl` derived from the composed queries; returns `numberOwned` from the cache; `canDecrement` is false when `numberOwned === 0`; `onIncrement`/`onDecrement` call `useUpdateBinderEntryMutation` with `{delta:+1}` and `{delta:-1}`; `cardKingdomPrice.displayValue` is the formatted dollar amount when present and `"—"` when the slot is `null` (FR-019); `priceHistory` passed through unchanged.
-- [ ] T071 [P] [US3] Tests — `apps/mobile/src/components/card-detail-sheet/PriceTrendChart.test.tsx`: renders one SVG `<Path>` per non-empty series (max 2); renders the legend with one entry per visible source; renders only the axes + "no recent price data" annotation when every series is empty (FR-019); y-axis range is computed as `min*0.95` to `max*1.05`.
-- [ ] T073 [P] [US3] Tests — `apps/mobile/src/components/card-detail-sheet/CardDetailSheetView.test.tsx`: renders the hero (name, set, type, oracle); renders the stepper with the current `numberOwned` and `−`/`+` controls; `−` is visibly disabled when `canDecrement=false` (FR-028); renders both price rows (formatted value OR `—`); renders the chart (two lines OR the empty annotation); tapping the close `×` fires `onClose` (FR-020).
-
-### Implementation for User Story 3
-
-- [ ] T057 [US3] Implement `getPrices` and `getPriceHistory` on `apps/server/src/providers/mtgjson/MtgjsonProvider.ts` per data-model §2.2: define `PROVIDER_KEYS: Record<PriceSource, string>` (`CARD_KINGDOM:'cardkingdom'`, `TCG_PLAYER:'tcgplayer'`); fan out two `sdk.prices.today` (or `.history`) calls with `Promise.all`; map SDK row shapes via `mapTodayToQuote`/`mapHistoryToPoints`; return `null` per slot when no observation. Makes T056 pass.
-- [ ] T059 [US3] Implement `apps/server/src/services/priceService.ts`: thin wrapper over `provider.getPrices(uuid)` and `provider.getPriceHistory(uuid, days)` with `ProviderUnavailableError` rewriting per research.md §7. JSDoc + `@example` per Principle IX. Makes T058 pass.
-- [ ] T061 [US3] Implement `apps/server/src/routes/prices.ts`: `GET /cards/:id/prices` and `GET /cards/:id/prices/history` route handlers; validate params/query against the Ajv schemas; delegate to `priceService`; map `CARD_NOT_FOUND` to 404 and `ProviderUnavailableError` to 503. Register the file in `apps/server/src/app.ts`. Makes T060 pass.
-- [ ] T063 [US3] Implement `apps/mobile/src/hooks/useCardPricesQuery.ts` (TanStack `useQuery` over `apiClient.getCardPrices`; `staleTime: 60_000`; `enabled: id != null`). Makes T062 pass.
-- [ ] T065 [US3] Implement `apps/mobile/src/hooks/useCardPriceHistoryQuery.ts` (TanStack `useQuery` over `apiClient.getCardPriceHistory`; default `days=30`; `staleTime: 5 * 60_000`). Makes T064 pass.
-- [ ] T067 [US3] Implement `apps/mobile/src/hooks/useCardDetailsQuery.ts` (TanStack `useQuery` over `apiClient.getCard`; `staleTime: 60_000`; `enabled: id != null`). Makes T066 pass.
-- [ ] T068 [P] [US3] Create `apps/mobile/src/components/card-detail-sheet/types.ts` exporting `UseCardDetailSheetOptions`, `CardDetailViewProps`, `PriceQuoteDisplay` per data-model §4 / contracts/ui.md §5.1.
-- [ ] T070 [US3] Implement `apps/mobile/src/components/card-detail-sheet/useCardDetailSheet.ts`: compose `useCardImagesQuery` (existing) + `useCardPricesQuery` + `useCardPriceHistoryQuery` + `useCardDetailsQuery` + `useUpdateBinderEntryMutation`; derive `PriceQuoteDisplay` values formatted as `$x.xx` or `—`; expose `numberOwned`, `canDecrement`, `onIncrement`, `onDecrement`, `onClose`. All Principle X v1.26.0 rules honoured. Makes T069 pass.
-- [ ] T072 [US3] Implement `apps/mobile/src/components/card-detail-sheet/PriceTrendChart.tsx` and `PriceTrendChart.theme.ts` using `react-native-svg` direct path drawing per research.md §6: axes via `<Line />`, one `<Path />` per non-empty series, legend via `<Text />` + swatches, "no recent price data" annotation when both series are empty. Makes T071 pass.
-- [ ] T074 [US3] Implement `apps/mobile/src/components/card-detail-sheet/CardDetailSheetView.tsx` and `CardDetailSheetView.theme.ts` per contracts/ui.md §5.2 (hero + stepper + prices section + chart, wrapped in `BottomSheetModal` with snap points `['80%']`, swipe-down past 30% dismisses). Makes T073 pass.
-- [ ] T075 [US3] Implement `apps/mobile/src/components/card-detail-sheet/CardDetailSheetContainer.tsx` (named-props bridge from hook to view).
-- [ ] T076 [US3] Wire the sheet into the catalogue: extend `apps/mobile/src/components/catalogue/useCatalogue.ts` with `detailPrintingId` state (set by `onPocketPress`, cleared by `onDetailSheetClose`); render `<CardDetailSheetContainer printingId={detailPrintingId} surface="catalogue" onClose={onDetailSheetClose} />` inside `CatalogueView.tsx`. Update `useCatalogue.test.ts` and `CatalogueView.test.tsx` to cover the open/close lifecycle and the requirement that closing the sheet preserves `currentPage` (FR-020).
-- [ ] T077 [US3] Wire the sheet into the binder: extend `apps/mobile/src/components/binder-home/useBinderHome.ts` and `BinderHomeView.tsx` to open the same `<CardDetailSheetContainer surface="binder" />` on pocket press; update the matching `useBinderHome.test.ts` and `BinderHomeView.test.tsx` for the same lifecycle assertions on the binder surface.
-
-**Checkpoint**: All user stories independently functional.
-
-> **Phase completion validation gate (Constitution Principle III).** Run
-> `turbo test` and `turbo typecheck` across **every** workspace touched by
-> US1+US2+US3+US4. Both MUST exit 0 with a 100% Jest pass rate. Investigate
-> every failure at root cause.
+> **Moved out of spec 018 by the 2026-05-22 split.** US3 (card detail
+> sheet with Card Kingdom + TCG Player prices and a 30-day two-line trend
+> chart) is now owned by spec `020-card-detail-prices`. Depends on spec 019
+> (the detail-sheet stepper shares the binder-mutation hook).
+>
+> **Already present on this branch for spec 020 to inherit:** the core
+> price types/schemas (`PriceQuote`, `CardPricesResponse`, `PricePoint`,
+> `CardPriceHistoryResponse`, `PRICE_*` schemas) from the foundational
+> phase, and the `CardProvider.getPrices` / `getPriceHistory` interface
+> declarations. The provider methods are **throwing stubs** in
+> `apps/server/src/providers/mtgjson/MtgjsonProvider.ts` (they reference
+> "pending spec 018 US3 / T057"; that work moves to spec 020).
+>
+> **Remaining (tracked in spec 020):** the original T056–T077 — implement
+> the provider methods, `priceService`, the `prices` routes, the price /
+> history / details query hooks, the `card-detail-sheet` feature directory,
+> the `PriceTrendChart`, and the sheet wiring into both Catalogue and Binder.
 
 ---
 
-## Phase 7: Polish & Cross-Cutting Concerns
+## Phase 7: Polish & Cross-Cutting Concerns (US1 + US2 scope)
+
+> ### 🔴 Closeout prerequisite (2026-05-22 split) — make the build green first
+>
+> The post-Phase-4.5 refactors (filter-state moved to React Context in
+> `src/context/catalogue-context/`; the filter sheet moved to an Expo Router
+> modal route; the masthead value pills removed, keeping only the
+> filter-opener) left `turbo test typecheck` **RED**. Resolve before the
+> tasks below:
+>
+> - `apps/mobile/src/components/catalogue/types.ts` `CatalogueViewProps` no
+>   longer declares `filterPills` / `hasNextPage`, but stale tests +
+>   `CatalogueContainer.tsx` still reference them — update
+>   `CatalogueView.test.tsx`, `useCatalogue.test.ts`,
+>   `CatalogueContainer.test.tsx`, and `CatalogueContainer.tsx`.
+> - `catalogueFilters.test.ts` imports the removed `buildPills` export — drop it.
+> - Delete the orphaned `apps/mobile/src/app/(authenticated)/(tabs)/search.test.tsx`
+>   (imports `./search`, renamed to `catalogue/catalogue.tsx`).
+> - Confirm `@my-binder/server:test` is green in isolation (turbo aborted on
+>   the mobile typecheck failure; server typecheck itself passes).
 
 **Purpose**: Manual acceptance walk-through, full repository validation, and a
-final sweep over the new code for constitution compliance.
+final sweep over the new code for constitution compliance — **scoped to US1
+(browse) + US2 (filter) only** after the 2026-05-22 split.
 
-- [ ] T078 [P] Run the manual acceptance walkthrough in `specs/018-card-catalogue-search/quickstart.md` §3.1–§3.5 on a simulator (Catalogue browse, filter, detail sheet, add/remove, defer-and-refresh) and tick every box in §5.
-- [ ] T079 [P] Run `turbo test` and `turbo typecheck` across all three touched workspaces (`@my-binder/core`, `@my-binder/server`, `@my-binder/mobile`); both MUST exit 0 with a 100% Jest pass rate, with coverage thresholds from T003 honoured.
-- [ ] T080 Constitution sweep on every file touched by this feature: FC declaration rule (`const X: FC<…> = …`), style co-location (`<Component>.theme.ts` sibling), hook return-value memoisation (v1.16.0), data-fetching hook composition (v1.26.0), state locality (no new Zustand store), Principle IX (every new public function on `cardRepository`, `priceService`, `MtgjsonProvider` has JSDoc with `@example`).
-- [ ] T081 Verify `apps/mobile/package.json` lists `@gorhom/bottom-sheet` at the registry-current `^5` (Principle XI Dependency Currency Check).
+- [ ] T078 [P] Run the manual acceptance walkthrough on a simulator for **Catalogue browse + filter only** (the detail-sheet / add-remove / defer-and-refresh steps move to specs 020 / 019). Confirm SC-001/002/003 (paging budgets), SC-004 (filter conjunction), SC-007 (no digital-only printings), SC-008 (shared masthead, no Binder regression), SC-010 (filter/page preserved across tab switch).
+- [ ] T079 [P] Run `turbo test` and `turbo typecheck` across all three touched workspaces (`@my-binder/core`, `@my-binder/server`, `@my-binder/mobile`); both MUST exit 0 with a 100% Jest pass rate, with coverage thresholds from T003 honoured. (Blocked on the 🔴 closeout prerequisite above.)
+- [ ] T080 Constitution sweep on every file touched by US1+US2: FC declaration rule (`const X: FC<…> = …`), style co-location (`<Component>.theme.ts` sibling), hook return-value memoisation (v1.16.0), data-fetching hook composition (v1.26.0), state locality (the new `catalogue-context` provider replaces prop-drilling for the shared filter set — confirm no new Zustand store), Principle IX (JSDoc + `@example` on every new public function on `cardRepository`, `cardService`, `MtgjsonProvider`, `CardSearchBuilder`).
+- [ ] T081 Dependency Currency Check (Principle XI): `@gorhom/bottom-sheet` was the filter sheet's original backing library, but the filter is now an Expo Router modal route and the bottom-sheet detail view moved to spec 020. **Verify whether `@gorhom/bottom-sheet` is still imported anywhere in 018; if not, decide whether to drop it now or keep it pinned at `^5` for spec 020.**
 - [ ] T082 Confirm no `.skip` / `xit` / `describe.skip` / `it.todo` exist in any test file added or modified by this feature (Principle III gate).
 
 ---
@@ -345,21 +308,20 @@ final sweep over the new code for constitution compliance.
 - **Foundational (Phase 2)**: Depends on Setup completion — BLOCKS all user stories
 - **User Story 1 (Phase 3, P1)**: Depends on Foundational completion
 - **User Story 2 (Phase 4, P1)**: Depends on Foundational; lightly extends US1's `useCatalogue` + `CatalogueView` files but adds the filter sheet as a fresh feature directory. Can begin in parallel with US4 once US1 has landed.
-- **Principle X Compliance Sweep (Phase 4.5, BLOCKING)**: Depends on US1 + US2 commits being on the branch. Fixes the runtime `BottomSheetModalProvider` context error and the Principle X violations introduced by US1/US2 (view-layer effects, cross-feature container imports in views, inline styles, view-props that redeclare query-result fields). **MUST complete before Phase 5 (US4) starts** — the violations compound if US4 layers more wiring on top of the broken pattern.
-- **User Story 4 (Phase 5, P1)**: Depends on Foundational AND Phase 4.5 compliance sweep; extends US1's `useCatalogue` + `CatalogueView`; ships the cross-feature mutation hook and the Binder refactor. Server-side it adds endpoints that US3 does NOT depend on.
-- **User Story 3 (Phase 6, P2)**: Depends on Foundational, Phase 4.5, and on US4 (the stepper inside the detail sheet shares `useUpdateBinderEntryMutation` with the inline `+`/`−` glyphs from US4). US3 also extends US1's `useCatalogue` to open the sheet — so US1 must be complete.
-- **Polish (Phase 7)**: Depends on all user stories being complete.
+- **Principle X Compliance Sweep (Phase 4.5, BLOCKING)**: Depends on US1 + US2 commits being on the branch. Fixes the runtime `BottomSheetModalProvider` context error and the Principle X violations introduced by US1/US2 (view-layer effects, cross-feature container imports in views, inline styles, view-props that redeclare query-result fields).
+- **Phase 5 (US4) and Phase 6 (US3)**: ⛔ **Removed from spec 018 by the 2026-05-22 split** → specs `019-binder-add-remove` and `020-card-detail-prices` respectively. See the deferral blocks above.
+- **Polish (Phase 7)**: Scoped to US1 + US2. Depends on the 🔴 closeout prerequisite (green build) plus Phases 1–4.5.
 
-### User Story Dependencies
+### User Story Dependencies (post-split — spec 018)
 
 ```text
 Foundational (Phase 2)
         │
         ▼
-   User Story 1 (P1) — MVP
+   User Story 1 (P1) — MVP   (browse)
         │
         ▼
-   User Story 2 (P1)
+   User Story 2 (P1)         (filter)
         │
         ▼
  ┌──────────────────────────────────────┐
@@ -368,12 +330,15 @@ Foundational (Phase 2)
  └──────────────────────────────────────┘
         │
         ▼
-   User Story 4 (P1)  ─► User Story 3 (P2) ─► Polish
+   Phase 7 Polish  (after 🔴 build-green closeout)
+
+   [moved out]  US4 → spec 019-binder-add-remove
+                US3 → spec 020-card-detail-prices (depends on 019)
 ```
 
-- **US1** is the strict MVP — every later story extends files US1 creates.
-- **US2** and **US4** were originally planned to run in parallel after US1, but the 2026-05-18 audit found Principle X violations in the US1/US2 code that compound when US4 layers on top. **Phase 4.5 MUST land before US4 begins.**
-- **US3** is sequenced after US4 because the detail-sheet stepper consumes the same `useUpdateBinderEntryMutation` hook US4 owns, and the sheet's open/close lifecycle is layered on top of US1's `useCatalogue` state.
+- **US1** is the strict MVP — US2 extends the files US1 creates.
+- **US4 (spec 019)** depends on Foundational + Phase 4.5; its server side is already done on this branch.
+- **US3 (spec 020)** depends on US4 (spec 019) — the detail-sheet stepper shares the binder-mutation hook — and on US1's `useCatalogue` for the sheet open/close lifecycle.
 
 ### Within Each User Story
 
@@ -390,7 +355,6 @@ Foundational (Phase 2)
 - Phase 2 server tasks T008 + T010 can run in parallel (distinct files); T009 depends on T008.
 - Phase 2 mobile tasks T011 + T012 + T014 can run in parallel; T013 depends on T012; T015 depends on T014.
 - All `[P]` test-writing tasks within a single user story can run in parallel.
-- Once Foundational is done, US2 and US4 can run in parallel by two developers.
 
 ---
 
@@ -420,27 +384,15 @@ Task: "T031 CatalogueContainer.test.tsx"
 4. **STOP and VALIDATE**: Open the Catalogue, swipe through pages, confirm SC-001/SC-002/SC-003.
 5. Deploy/demo if ready.
 
-### Incremental Delivery
+### Incremental Delivery (post-split — spec 018)
 
 1. Setup + Foundational → Foundation ready
 2. US1 → demo browse-only Catalogue (MVP)
 3. US2 → demo filtered Catalogue
-4. **Phase 4.5** → Principle X compliance sweep (BLOCKING gate before US4)
-5. US4 → demo `+`/`−` glyphs + Binder masthead + defer-and-refresh
-6. US3 → demo detail sheet with prices and chart
-7. Polish → final acceptance + constitution sweep
-
-### Parallel Team Strategy
-
-With multiple developers, after Foundational completes:
-
-- Developer A: US1 (sole owner; everyone else waits)
-- Then, in parallel:
-  - Developer B: US2 (filter sheet + masthead filter-pill row)
-  - Developer C: US4 (mutation hook + Binder refactor + Catalogue glyphs)
-- Then sequentially:
-  - Developer A or any: US3 (detail sheet + price endpoints + chart)
-- Final phase: shared Polish pass.
+4. **Phase 4.5** → Principle X compliance sweep
+5. 🔴 Closeout → fix the RED build introduced by the Context/pill-removal refactors
+6. Phase 7 → final acceptance + constitution sweep (US1 + US2 scope)
+7. **Follow-ups** → spec `019-binder-add-remove` (US4), then spec `020-card-detail-prices` (US3)
 
 ---
 
@@ -450,5 +402,6 @@ With multiple developers, after Foundational completes:
 - `[Story]` label maps each task to a specific user story for traceability.
 - Tests MUST be written and MUST fail before the corresponding implementation lands (Principle III).
 - Every Checkpoint above is gated on `turbo test` + `turbo typecheck` exiting 0 with a **100% Jest pass rate** across the affected workspaces. Investigate every failure at root cause (bleeding state, leaky async, fixture ordering, regression, real defect); `.skip` / `.todo` / quarantine / retry-until-green are prohibited.
-- The MTG Goldfish price source was named in the original input. It is deferred to a follow-up specification per spec.md §Clarifications 2026-05-18. The wire shapes ship with two slots (Card Kingdom, TCG Player); the follow-up spec adds a third slot additively without breaking existing consumers.
+- **2026-05-22 split**: US4 (Phase 5) → spec `019-binder-add-remove`; US3 (Phase 6) → spec `020-card-detail-prices`. The MTG Goldfish source remains deferred beyond US3 (spec.md §Clarifications 2026-05-18); spec 020 ships two slots and a later spec adds the third additively.
+- **As-built divergence from this tasks file**: the implementation moved filter state into `src/context/catalogue-context/`, replaced the `@gorhom/bottom-sheet` filter with an Expo Router modal route, made the server catalogue search SQL-native (`CardSearchBuilder`), and removed the masthead value pills (only the filter-opener remains). `plan.md` / `research.md` / `data-model.md` / `contracts/` still describe the superseded design and need a refresh.
 - Commit after each task or logical group; stop at any checkpoint to validate the story independently.

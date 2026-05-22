@@ -2,12 +2,31 @@
 
 **Feature Branch**: `018-card-catalogue-search`
 **Created**: 2026-05-17
-**Status**: Draft
+**Status**: Scope reduced to US1 + US2 (2026-05-22) — see the 2026-05-22 Clarifications entry
 **Input**: User description: "Card Catalogue Search using the same design artifacts as the binder view a user should be able to do the following: Browse the Card Catalogue for a Card, the user should be able to filter by set, creature type, format legality, card super type, card sub type, card name, cmc and colour identity. Cards should be displayed according current 9 pocket visual design of the binder. The search icon should be in the header the same as the binder view (with a reusable header component across both views that takes prop slots for the sub-headers — Binder, Catalogue, etc). Search bar extends as per Image #2. An infinite query pattern should be used with pages that follow the current `cards/search/` route. The Card component should be lazy loaded and swiping left and right should lazy load the next page. When pressing a card a slider from the bottom should come up with the card's details such as price heuristics from Card Kingdom, MTG Goldfish and TCG Player. In addition a graph of the last 30 days should show the price trend plotted from all 3 sources. We only track physical cards."
 
-**Scope addition (clarify session)**: The user added during `/speckit.clarify` that catalogue pockets must indicate when a card is already in the user's binder and how many copies are owned, that an **add to binder** action must exist on the Catalogue screen, and that a **remove from binder** action must exist on the Binder screen. The spec below treats those as in-scope and the original "Adding catalogue cards to the user's binder" entry has been removed from Out of Scope.
+> ## ⚠️ Scope reduction (2026-05-22)
+>
+> This spec was **split** during implementation. It now covers **only**:
+> - **US1 — Browse the Card Catalogue in 9-Pocket Pages** (P1)
+> - **US2 — Filter the Catalogue by Card Attributes** (P1)
+> - The **shared `<Masthead />`** extraction (FR-002) and its adoption by the Binder (FR-022).
+>
+> The two remaining user stories are **deferred to follow-up specifications**:
+> - **US4 — Add Cards From Catalogue, Remove From Binder + owned-count glyphs** → **spec `019-binder-add-remove`**.
+>   The **server side of US4 is already implemented on this branch** (`number_owned` column + migration; `CardRepository.upsertIncrement` / `adjustNumberOwned`; `POST /cards` upsert + `PATCH /cards/:id` adjust, all with tests). Spec 019 is therefore mobile-only.
+> - **US3 — Inspect a Card's Prices and 30-Day Trend** → **spec `020-card-detail-prices`**.
+>   The core price types/schemas and the `CardProvider.getPrices` / `getPriceHistory` interface declarations are already present (the provider methods are **throwing stubs** pending 020). US3 depends on US4 (the detail-sheet stepper shares the binder-mutation hook), so 020 follows 019.
+>
+> The US3/US4 user stories, requirements, key entities, and success criteria below are replaced by **"DEFERRED" pointer blocks** for traceability; the canonical home for that work — full acceptance scenarios, FR text, and design — is specs 019/020. The `plan.md`, `research.md`, `data-model.md`, and `contracts/` artifacts in this folder still describe the **superseded** pre-split architecture (prop-drilled filter state + `@gorhom/bottom-sheet`; SDK-typed `cards.search`) and the full four-story scope — they need a follow-up refresh to match the as-built code (React-Context filter state in `src/context/catalogue-context/`, Expo Router modal route for the filter, SQL-native `CardSearchBuilder`, masthead with the filter-opener only and no value pills).
+
+**Scope addition (clarify session)**: During `/speckit.clarify` the user added owned-count glyphs and add/remove-from-binder actions. **As of the 2026-05-22 split those belong to spec `019-binder-add-remove` (US4), not this spec.**
 
 ## Clarifications
+
+### Session 2026-05-22
+
+- Q: The catalogue work grew to four user stories and the post-Phase-4.5 implementation diverged from the design artifacts. How should the spec be closed out? → A: **Split the spec.** Spec 018 retains US1 (browse) + US2 (filter) + the shared masthead (FR-002 / FR-022). US4 (add/remove + owned counts) moves to spec `019-binder-add-remove`; its server side is already built and tested on this branch, so 019 is mobile-only. US3 (prices + 30-day trend) moves to spec `020-card-detail-prices`; the core price types and provider interface decls already exist (provider methods stubbed). The detail-sheet and add/remove FRs, key entities, and success criteria are replaced by DEFERRED pointer blocks below, each naming its new home. Closeout for 018 itself is the RED-test fix introduced by the intentional removal of the masthead value pills (only the filter-opener pill remains) and the filter-state Context refactor.
 
 ### Session 2026-05-17
 
@@ -28,10 +47,11 @@ This spec covers the **Catalogue** tab — the bottom-tab Search destination int
 
 The catalogue reuses the binder's 9-pocket page metaphor: the visual identity, masthead, paper-cream canvas, and pocket grid are the same materials the user already knows from the Binder tab — only the data underneath changes (catalogue printings instead of personal collection) and the paging behaviour changes (infinite/lazy-loaded pages of search results instead of a finite owned collection).
 
-Two cross-cutting concerns sit alongside the catalogue feature itself:
+One cross-cutting concern sits alongside the catalogue feature itself (in this reduced scope):
 
 1. A **shared masthead component** is extracted from the binder-home header (spec 016, FR-001–FR-007) so the Binder and Catalogue tabs render the same crimson header bar, the same right-aligned circular action buttons (search + profile), and the same inline-search expand behaviour. Each consumer passes its own sub-title text (e.g. "My Binder" vs "Catalogue") and its own scoped search behaviour into the same component via slot props.
-2. A **card detail sheet** opens from the bottom of the screen when a catalogue pocket is tapped, surfacing the card's price heuristics from Card Kingdom and TCG Player (sourced from the MTGJSON SDK's `cardkingdom` and `tcgplayer` paper-retail observations) together with a 30-day price-trend chart plotting both sources on the same axes. The sheet is scoped to **physical printings only** — digital-only formats (MTGO, Arena) are not tracked. (The original input named MTG Goldfish as a third source; that source is deferred to a follow-up specification per the 2026-05-18 Clarifications entry — MTGJSON does not publish MTG Goldfish data and adding it requires bespoke ingestion.)
+
+> **DEFERRED — moved to spec `020-card-detail-prices`:** A **card detail sheet** opening from the bottom of the screen on pocket tap, surfacing Card Kingdom + TCG Player price heuristics and a 30-day price-trend chart (physical printings only; MTG Goldfish further deferred per the 2026-05-18 entry).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -75,43 +95,15 @@ A user opens the Catalogue and refines the result set by combining one or more o
 
 ---
 
-### User Story 3 - Inspect a Card's Prices and 30-Day Trend (Priority: P2)
-
-A user taps any card pocket in the catalogue (or in their own binder — see the cross-cutting note in the Background) and a sheet slides up from the bottom of the screen showing that card's details: oracle/type line, current best-available physical-print prices from Card Kingdom and TCG Player as two labelled rows, and a 30-day price-trend line chart that plots both sources on the same axes. The user can dismiss the sheet by swiping it down or tapping a close control, returning to the catalogue page they were viewing. (MTG Goldfish was named in the original input as a third source; it is deferred to a follow-up specification per the 2026-05-18 Clarifications entry.)
-
-**Why this priority**: Prices are the primary external signal that turns "I see this card" into "should I buy it / trade for it." Surfacing the two commonly-watched price sources MTGJSON publishes — with a 30-day trend — is what makes the catalogue genuinely useful for collection decisions. It is co-prioritised behind US1 and US2 because users cannot inspect a card they cannot reach.
-
-**Independent Test**: Can be fully tested by opening the Catalogue, tapping any card pocket, and confirming that a bottom sheet slides up showing (a) the card's basic identity (name, set, type), (b) two labelled price rows for Card Kingdom and TCG Player with non-empty values for at least one source, and (c) a 30-day line chart that plots one line per source against the last 30 days. Dismissing the sheet must return the user to the same catalogue page and scroll position they were on before opening it.
-
-**Acceptance Scenarios**:
-
-1. **Given** the user is on the Catalogue (or Binder) view, **When** they tap a card pocket, **Then** a bottom sheet slides up over the canvas containing the card's name, set, and type/oracle text along with the price section and the 30-day trend chart.
-2. **Given** the detail sheet is open, **When** the prices section renders, **Then** two labelled rows are visible — one each for **Card Kingdom** and **TCG Player** — each displaying the most-recent observed price for the **physical printing** the user is inspecting.
-3. **Given** the detail sheet is open, **When** the price trend chart renders, **Then** a single chart shows the last 30 days on the x-axis and price on the y-axis, with two lines (one per source) drawn on the same axes and a legend identifying each line.
-4. **Given** a price source has no observation for a given card (or for some days within the 30-day window), **When** that row or line renders, **Then** the missing value is shown as a clearly non-numeric placeholder (e.g. "—" for the row, a gap in the line) rather than as `0` or a misleading default.
-5. **Given** the detail sheet is open, **When** the user swipes the sheet downward past a threshold or taps the close control, **Then** the sheet dismisses and the user is returned to the same catalogue page and scroll position they were on before opening it.
-6. **Given** the user opens the detail sheet for a card that has multiple printings, **When** the sheet renders, **Then** the prices and trend chart are scoped to the specific printing (set + collector number) the user tapped, not the cheapest or most-recent printing.
-7. **Given** the catalogue search returns a digital-only printing (e.g. an MTGO or Arena-exclusive set), **When** the detail sheet would render, **Then** that printing is filtered out of the catalogue results entirely (or, if shown, the price section makes clear that no physical prices are tracked for it) — only physical printings are eligible for price tracking and 30-day trends.
+> ### ⛔ User Story 3 - Inspect a Card's Prices and 30-Day Trend (Priority: P2) — DEFERRED → spec `020-card-detail-prices`
+>
+> Tapping a populated pocket opens a bottom sheet showing the card's identity, two labelled price rows (Card Kingdom + TCG Player), and a 30-day two-line price-trend chart; missing observations render as `—`/gaps; the sheet dismisses by swipe-down or close and restores the underlying page. **Moved out of spec 018 by the 2026-05-22 split.** Already present on-branch for 020 to inherit: the core price types/schemas and the `CardProvider.getPrices`/`getPriceHistory` interface declarations (provider methods are throwing stubs). Depends on US4 (spec 019) for the shared binder-mutation hook behind the stepper. Full acceptance scenarios live in spec 020.
 
 ---
 
-### User Story 4 - Add Cards From Catalogue, Remove From Binder (Priority: P1)
-
-A user finds a card they want in the Catalogue (via browse or filter) and taps the inline `+` glyph-button on the pocket — the card is added to their binder and an owned-count glyph appears in the pocket's top-right showing `1`. Tapping `+` again increments the count to `2`. Switching to the Binder tab, the card is now present; the user taps the inline `−` glyph-button on the pocket to remove one copy, and the count decrements. When the count reaches `0`, the card disappears from the Binder entirely, the remaining cards re-flow forward into the freed pocket, and the page count and summary caption recompute. The detail sheet also exposes a `−  [numberOwned]  +` stepper that behaves identically from either surface.
-
-**Why this priority**: Owning cards is the entire reason the binder exists. Without an add path the Catalogue is read-only browsing; without a remove path the Binder accretes mistakes. These two actions, together with the owned-count glyph, turn the Catalogue from a reference tool into the primary on-ramp for growing the user's collection. Co-prioritised with US1 / US2 because the Catalogue's value is gated on being able to act on what you find.
-
-**Independent Test**: Can be fully tested by signing in with an empty binder, opening the Catalogue, tapping the `+` glyph on any card pocket, and confirming (a) the pocket's owned-count glyph appears showing `1`, (b) the Binder tab now contains that card, (c) tapping `+` a second time on the same Catalogue pocket bumps the glyph to `2` and the Binder reflects `numberOwned = 2`, (d) tapping the `−` glyph on the Binder pocket decrements to `1`, and (e) tapping `−` again removes the card from the Binder, re-flows the grid, and removes the Catalogue glyph.
-
-**Acceptance Scenarios**:
-
-1. **Given** the user is on the Catalogue, **When** they tap the `+` glyph-button on a pocket whose `numberOwned` is 0, **Then** `numberOwned` becomes 1 for that printing, the owned-count glyph appears in the pocket's top-right showing `1`, and the card is now present in the user's Binder.
-2. **Given** the user is on the Catalogue and a pocket already shows an owned-count glyph (e.g. `2`), **When** they tap the `+` glyph-button on that pocket, **Then** `numberOwned` becomes 3, the Catalogue glyph updates to `3`, and the Binder reflects the new count.
-3. **Given** the user is on the Binder with a card whose `numberOwned` is 3, **When** they tap the `−` glyph-button on the pocket, **Then** `numberOwned` becomes 2 and the on-pocket glyph updates accordingly.
-4. **Given** the user is on the Binder with a card whose `numberOwned` is 1, **When** they tap the `−` glyph-button on the pocket, **Then** `numberOwned` becomes 0, the pocket is removed from the Binder, the subsequent pockets re-flow forward into the freed position, and the summary caption + page count recompute against the new total.
-5. **Given** the user opens the card detail sheet from either surface, **When** the sheet renders, **Then** a `−  [numberOwned]  +` stepper appears alongside the price section showing the current `numberOwned` for the signed-in user. Tapping `+` increments by 1, tapping `−` decrements by 1, and `−` is a no-op (visibly disabled) when `numberOwned` is 0.
-6. **Given** the inline `+` / `−` glyph-buttons are present on pockets, **When** the user performs a horizontal swipe to page through the binder, **Then** the swipe gesture is unaffected by the glyph-buttons — the page advances and the buttons do not absorb the gesture.
-7. **Given** the user has added a card from the Catalogue, **When** they swipe back to the same Catalogue page later in the session, **Then** that card's pocket still shows the owned-count glyph with the current count without requiring a re-fetch.
+> ### ⛔ User Story 4 - Add Cards From Catalogue, Remove From Binder (Priority: P1) — DEFERRED → spec `019-binder-add-remove`
+>
+> Inline `+` glyph on each Catalogue pocket and `−` glyph on each Binder pocket, an owned-count glyph driven by `numberOwned`, a `− [numberOwned] +` stepper in the detail sheet, optimistic mutations, and the `Missing only` defer-and-refresh affordance. **Moved out of spec 018 by the 2026-05-22 split.** The **server side is already implemented and tested on this branch** — `number_owned` column + migration, `CardRepository.upsertIncrement`/`adjustNumberOwned`, `POST /cards` upsert (200/201), `PATCH /cards/:id` adjust (200/204/404) — so spec 019 is mobile-only. The Binder's masthead adoption (FR-022) is **already done in spec 018**. Full acceptance scenarios live in spec 019.
 
 ---
 
@@ -120,14 +112,10 @@ A user finds a card they want in the Catalogue (via browse or filter) and taps t
 - **Empty catalogue load**: When the catalogue's initial page fetch fails after a transient retry, the canvas shows an inline retry affordance inside the binder page surface — the header, masthead, and page indicator remain visible.
 - **Filter combination yields zero**: When the active filter combination matches no cards, render a single page of empty pockets with "no cards match these filters" inline and a clear-all affordance. The page indicator shows "Page 1 / OF 1".
 - **Very large filter result**: When the filtered result set is in the thousands, the user must still be able to swipe forward and backward without the previously loaded pages being evicted from cache mid-session (so swiping back is instant). Memory pressure may evict images outside the visible window but must not evict the page structure.
-- **Tap during page load**: When the user taps a pocket that is still rendering a skeleton (image not yet decoded), the detail sheet either waits for the underlying card record before opening or opens immediately and resolves the image inside the sheet — it must not open an empty sheet with no card identity.
-- **No price data at all**: When a card has zero observations across both in-scope sources for the entire 30-day window, the price section renders both rows as "—" and the chart renders the axes with a "no recent price data" annotation instead of an empty plot.
-- **Background while sheet is open**: When the user backgrounds the app with the detail sheet open and returns within the active session window, the sheet remains open on the same card.
 - **Switching tabs while filtered**: When the user navigates away from the Catalogue tab to another bottom tab and returns within the same session, the active filters and current page position are preserved.
 - **Network change while paging**: When the network drops mid-page-load, the in-flight page renders the inline retry affordance inside the next-page pockets without disturbing the previously loaded pages.
-- **Add/remove tap during pending mutation**: When the user taps `+` or `−` repeatedly faster than the server can confirm each mutation, the on-pocket glyph and detail-sheet stepper MUST reflect the user's intent immediately (optimistic update) and reconcile against the server's authoritative count when each round-trip resolves. A failed mutation MUST roll back the glyph to the last server-confirmed value with an inline error toast — the user MUST never see a count that diverges from the server beyond the in-flight window.
-- **Decrement below zero**: A `−` tap on a pocket whose `numberOwned` is already 0 (only reachable in the detail-sheet stepper, since the Binder never shows a 0-count pocket) MUST be a visibly-disabled no-op.
-- **Remove the card the binder-search is filtered against**: When a binder-search query (spec 016 FR-005a) is active and the user removes the last copy of a card whose entry was the only match, the binder's filtered view recomputes to show the "no matches in your binder" empty state (spec 016 FR-005d). Clearing the search restores the full (now smaller) binder.
+
+> **DEFERRED edge cases** (Tap during page load, No price data at all, Background while sheet is open) moved to spec `020-card-detail-prices`. (Add/remove tap during pending mutation, Decrement below zero, Remove the card the binder-search is filtered against) moved to spec `019-binder-add-remove`.
 
 ## Requirements *(mandatory)*
 
@@ -157,43 +145,26 @@ A user finds a card they want in the Catalogue (via browse or filter) and taps t
 - **FR-014**: When the user reaches the genuine end of the result set (no more pages exist), the swipe-forward gesture MUST be a no-op (no wrap-around). No button-disabled state is required because no pager buttons exist (FR-010).
 - **FR-015**: When the result set is empty (zero matches for the active filters), the canvas MUST render a single page of empty pockets with an inline "no cards match these filters" message and a "clear filters" affordance.
 
-**Card detail sheet and prices**
+**Card detail sheet and prices** — ⛔ DEFERRED → spec `020-card-detail-prices`
 
-- **FR-016**: Tapping a populated pocket on the Catalogue (and on the Binder, per the cross-cutting note in the Background) MUST open a bottom sheet that slides up over the canvas. The sheet MUST display the card's name, set name and code, and type line at minimum.
-- **FR-017**: The detail sheet MUST display two labelled price rows — **Card Kingdom**, **TCG Player** — each showing the most-recent observed price for the specific physical printing the user tapped (set + collector number). MTG Goldfish was named as a third source in the original input; it is deferred to a follow-up specification (see 2026-05-18 Clarifications entry) and MUST NOT appear in this spec's UI or contracts.
-- **FR-018**: The detail sheet MUST render a 30-day price-trend chart that plots, on a single axes, one line per source (Card Kingdom, TCG Player) with a legend identifying each line, the last 30 days on the x-axis, and price on the y-axis.
-- **FR-019**: Missing price observations MUST render as a clearly non-numeric placeholder (e.g. "—" for a row, a gap in the line) rather than as `0` or a misleading default. When **both** sources have zero observations across the entire 30-day window, the chart MUST render its axes with a "no recent price data" annotation in place of an empty plot.
-- **FR-020**: The detail sheet MUST be dismissable by both a downward swipe past a threshold and an explicit close control. Dismissal MUST return the user to the exact catalogue page and scroll position they were on before opening the sheet.
-- **FR-021**: The price section and 30-day trend MUST be scoped to **physical printings only**. Digital-only printings (MTGO-exclusive, Arena-exclusive) MUST either be excluded from the catalogue result set entirely or, if shown, MUST make clear that no physical prices are tracked for them. The catalogue MUST NOT mix physical and digital price observations into the same chart series.
+> FR-016–FR-021 (bottom-sheet open on pocket tap; two labelled Card Kingdom + TCG Player price rows; 30-day two-line trend chart; `—`/gap placeholders for missing observations; swipe-down/close dismissal restoring page position; physical-printings-only scoping) **moved to spec 020**. Note: FR-021's "exclude digital-only printings from catalogue results" guarantee for the **browse path** is retained in this spec as **SC-007**. The core price types/schemas and provider interface decls already exist on-branch for 020 to inherit.
 
 **Cross-surface consistency**
 
-- **FR-022**: The shared masthead component (FR-002) MUST be adopted by the existing binder-home view from spec 016 as part of shipping this feature, replacing the current per-screen header implementation with the shared component. The Binder tab's behaviour MUST not regress: the binder-search inline expand, the in-binder filter behaviour from spec 016 FR-005 / FR-005a–f, and the Profile shortcut from spec 016 FR-006 MUST all continue to work exactly as specified there.
+- **FR-022**: The shared masthead component (FR-002) MUST be adopted by the existing binder-home view from spec 016 as part of shipping this feature, replacing the current per-screen header implementation with the shared component. The Binder tab's behaviour MUST not regress: the binder-search inline expand, the in-binder filter behaviour from spec 016 FR-005 / FR-005a–f, and the Profile shortcut from spec 016 FR-006 MUST all continue to work exactly as specified there. *(Done in spec 018 — `BinderHomeView` renders the shared `<Masthead />`.)*
 
-**Owned-count indicator and add / remove from binder**
+**Owned-count indicator and add / remove from binder** — ⛔ DEFERRED → spec `019-binder-add-remove`
 
-- **FR-023**: Every card record reachable from either the Catalogue or the Binder MUST carry a `numberOwned` integer (≥ 0) representing the number of physical copies of that specific printing the signed-in user owns. The user's binder is modelled as one row per `(printing, user)` carrying `numberOwned`; adding a duplicate increments `numberOwned`, removing a copy decrements it, and a row with `numberOwned = 0` MUST NOT appear in the binder.
-- **FR-024**: A small **owned-count glyph** MUST render in the top-right of each card pocket displaying the current `numberOwned` value **for the specific printing** that pocket represents (per-printing scope, not aggregated across card names). On the **Catalogue** the glyph MUST render whenever `numberOwned ≥ 1`. On the **Binder** the glyph MUST render whenever `numberOwned ≥ 2` (single-copy entries need no badge). The glyph MUST be visually subordinate to the card art (e.g. small, corner-anchored, with a translucent backdrop so the card image remains the primary content). Different printings of the same card name (e.g. M21 Lightning Bolt vs M20 Lightning Bolt) MUST render independent glyphs based on the user's per-printing `numberOwned`.
-- **FR-025**: Every **Catalogue** pocket MUST expose an inline `+` glyph-button. Tapping it MUST increment that printing's `numberOwned` by 1 for the signed-in user. The owned-count glyph (FR-024) MUST update immediately on tap to reflect the new count.
-- **FR-026**: Every **Binder** pocket MUST expose an inline `−` glyph-button. Tapping it MUST decrement that printing's `numberOwned` by 1 for the signed-in user. When `numberOwned` reaches 0, the pocket MUST be removed from the binder, subsequent pockets MUST re-flow forward into the freed position, and the binder's summary caption and page count (spec 016 FR-009 / FR-021) MUST recompute against the new total.
-- **FR-027**: The inline `+` / `−` glyph-buttons on pockets MUST be positioned and sized so they do not conflict with the horizontal swipe-page gesture defined by spec 016 FR-017 / FR-018 and this spec's FR-010 — e.g. small, edge-anchored, and triggered only by a discrete tap (not a drag or swipe).
-- **FR-028**: The card detail sheet (FR-016) MUST render a `−  [numberOwned]  +` stepper alongside the price section. The stepper's centre value MUST always reflect the current `numberOwned` for the signed-in user, the `+` control MUST increment by 1, and the `−` control MUST decrement by 1 but never below 0. The stepper MUST behave identically whether the sheet was opened from the Catalogue or the Binder.
-- **FR-029**: The Catalogue's owned-count glyph (FR-024) MUST keep in lock-step with the binder's contents — adding a copy from the Catalogue (FR-025 or FR-028) MUST cause that printing to become a binder row (if it was not already) and the catalogue glyph MUST appear; removing the last copy (FR-026 or FR-028) MUST remove the binder row and the catalogue glyph MUST disappear.
-- **FR-030**: Adding from the Catalogue MUST NOT require navigating away from the Catalogue tab. Removing from the Binder MUST NOT require navigating away from the Binder tab. Both actions MUST resolve in-place with the masthead, canvas, and current page position preserved.
-- **FR-031**: When an add or remove action changes a card's ownership such that the card would no longer satisfy an active filter (e.g. `Missing only` is ON and the user taps `+`, or any other filter dimension becomes inconsistent with the card's new state), the Catalogue MUST **defer the re-filter** — the pocket remains in its current position, the owned-count glyph updates immediately, and a single non-blocking "results out-of-date — refresh" affordance MUST appear inside the canvas. The result set MUST re-apply the active filters only when the user taps that affordance OR when the user navigates away from the Catalogue tab and returns within the same session. Filter mutations made by the user (changing a filter value, clearing filters, typing in the search input) MUST re-apply filters immediately as normal — the defer rule applies ONLY to ownership mutations from `+` / `−` / stepper actions.
+> FR-023–FR-031 (per-`(printing, user)` `numberOwned` model; owned-count glyph with Catalogue ≥1 / Binder ≥2 thresholds; inline `+`/`−` glyph-buttons; detail-sheet stepper; swipe-safe glyph placement; catalogue/binder lock-step; in-place resolution; `Missing only` defer-and-refresh) **moved to spec 019**. The **server side is already implemented and tested on this branch** (FR-023's `number_owned` model + the upsert/adjust repository methods and the `POST`/`PATCH` routes); spec 019 covers the mobile UI for FR-024–FR-031.
 
 ### Key Entities *(include if feature involves data)*
 
 - **Catalogue Browse**: An infinite, paged view over the global card catalogue. Identified by the currently active filter set and the currently loaded set of pages. Has a "head" position (current visible page) and a "tail" position (highest page loaded so far).
 - **Catalogue Filter Set**: The collection of currently applied filters — name, set, format legality, super type, sub type, creature type, CMC, colour identity — combined as AND across dimensions and OR within a dimension. The empty filter set corresponds to the unfiltered browse.
 - **Catalogue Page**: A 9-card slice of the result set for the current filter set, identified by 1-based page number, occupying one binder-page surface. May be in one of three load states: not-yet-loaded, loading (skeleton), or loaded.
-- **Card Detail Sheet**: The bottom sheet rendered when a pocket is tapped. Carries the identity of the specific printing the user tapped (so prices and trend are scoped to that printing), the current price rows, and the 30-day trend series.
-- **Price Observation**: A `(card-printing, source, day, price)` tuple where source is one of Card Kingdom, TCG Player and the card printing is a physical (non-digital) printing.
-- **Price Source**: One of Card Kingdom, TCG Player. Each source contributes at most one observation per card-printing per day. (MTG Goldfish is deferred to a follow-up specification per the 2026-05-18 Clarifications entry.)
 - **Masthead Component**: The shared crimson header rendered by both the Binder and Catalogue tabs. Accepts sub-title text, an on-search callback, and an on-profile callback from its consumer.
-- **Binder Card Entry**: A single row per `(printing, user)` carrying a `numberOwned` integer (≥ 1 while the entry exists; the entry is deleted when `numberOwned` reaches 0). Surfaces the owned-count to both the Binder pocket renderer (when `≥ 2`) and the Catalogue pocket renderer (when `≥ 1`).
-- **Owned-Count Glyph**: A small corner-anchored indicator on a card pocket displaying the current `numberOwned`. Identical visual on Catalogue and Binder; visibility thresholds differ per FR-024.
-- **Owned-Count Stepper**: The `−  [numberOwned]  +` control rendered inside the card detail sheet. Single source of mutation truth shared by both surfaces.
+
+> **DEFERRED entities** — *Card Detail Sheet*, *Price Observation*, *Price Source* → spec `020-card-detail-prices`. *Binder Card Entry*, *Owned-Count Glyph*, *Owned-Count Stepper* → spec `019-binder-add-remove` (the *Binder Card Entry* `numberOwned` model is already implemented server-side on this branch).
 
 ## Success Criteria *(mandatory)*
 
@@ -203,15 +174,12 @@ A user finds a card they want in the Catalogue (via browse or filter) and taps t
 - **SC-002**: Page navigation between consecutive catalogue pages already loaded in the current session completes within one display frame on a standard mobile device, with no perceptible stutter.
 - **SC-003**: Swiping forward into an unloaded page reveals the skeleton page within one display frame; the page resolves to populated pockets within 1.5 seconds in the median case on a standard network.
 - **SC-004**: For at least 95% of catalogue result sets, the active filters produce a refined result set where every returned card satisfies every active filter (verified by sampling result sets across each filter dimension and combinations).
-- **SC-005**: 100% of taps on a populated pocket open the card detail sheet for the specific printing tapped (verified across at least the Catalogue surface and, after FR-022 lands, the Binder surface).
-- **SC-006**: The 30-day price-trend chart renders within 1 second of the detail sheet appearing for cards with non-empty price history (rendering at most two lines — Card Kingdom and TCG Player); cards with empty price history render the "no recent price data" annotation within the same window.
-- **SC-007**: Zero digital-only printings appear in any catalogue result, in any detail sheet, or in any price observation in the 30-day trend (verified across the entire catalogue index).
+- **SC-007**: Zero digital-only printings appear in any catalogue result (verified across the entire catalogue index). *(The detail-sheet / price-observation half of the original SC-007 moves to spec 020.)*
 - **SC-008**: The shared masthead component is adopted by both the Binder and Catalogue tabs; the Binder tab's existing spec-016 behaviours (in-binder search, Profile shortcut) regress in zero test cases.
 - **SC-009**: 95% of users in usability testing correctly identify, without prompting, that the Catalogue search filters the global card catalogue while the Binder search (spec 016) filters only their own collection.
 - **SC-010**: The Catalogue tab preserves the user's active filter set and current page position across in-session tab switches in 100% of test runs.
-- **SC-011**: Tapping the inline `+` glyph on a Catalogue pocket or the inline `−` glyph on a Binder pocket updates the on-screen owned-count glyph within one display frame (optimistic update) and reconciles against the server-confirmed value within 1 second in the median case on a standard network.
-- **SC-012**: In 100% of test runs, a Catalogue pocket's owned-count glyph reflects the user's binder state to within one in-flight mutation — i.e. the Catalogue glyph never diverges from the Binder's actual contents beyond the window between an optimistic add/remove and its server confirmation.
-- **SC-013**: Across at least 50 add-then-remove cycles in a single session, swiping the Catalogue and Binder pages remains responsive within one frame and no swipe gesture is absorbed by the inline `+` / `−` glyph-buttons (verified by gesture-conflict instrumentation).
+
+> **DEFERRED success criteria** — SC-005 (pocket tap opens detail sheet), SC-006 (30-day chart render budget) → spec `020-card-detail-prices`. SC-011 (optimistic glyph update), SC-012 (catalogue/binder glyph lock-step), SC-013 (50-cycle gesture-conflict) → spec `019-binder-add-remove`.
 
 ## Assumptions
 
@@ -222,19 +190,18 @@ A user finds a card they want in the Catalogue (via browse or filter) and taps t
 - The shared masthead component (FR-002, FR-022) is **extracted from** the existing binder-home header (spec 016) as part of shipping this feature. Spec 016's functional behaviour is treated as the canonical reference for the masthead's visual contract.
 - The card-name filter on the Catalogue search performs a case-insensitive substring match by default. Quoted phrases, boolean operators, and other advanced query syntax are out of scope for this spec.
 - Format legality covers at least the major constructed formats present in the existing card data (Standard, Modern, Legacy, Vintage, Commander, Pauper). Limited formats (Sealed, Draft) and casual formats (Brawl variants) are not in initial scope.
-- The 30-day price trend renders the most recent 30 calendar days ending today. Earlier history (older than 30 days) is not surfaced in this view.
-- "Physical printings only" means non-digital printings — printings that have a paper edition. MTGO-exclusive and Arena-exclusive printings are excluded. Paper printings that also have a digital release ARE in scope (a paper printing whose price is also observable on digital marketplaces is still a physical printing).
-- The card detail sheet is shared between the Catalogue and Binder views; FR-016 / FR-020 are written so the sheet behaves identically on either surface, and adopting it on the Binder is part of this feature.
+- "Physical printings only" means non-digital printings — printings that have a paper edition. MTGO-exclusive and Arena-exclusive printings are excluded from catalogue results (SC-007). Paper printings that also have a digital release ARE in scope.
 - Card images, identity metadata (name, set, type, oracle text), and format legality information are available from the existing card data layer (provider abstraction from specs 001 / 004 / 010). This spec does not redefine how that data is fetched.
-- Daily price observations from Card Kingdom and TCG Player are sourced from the MTGJSON SDK's paper-retail dataset (`sdk.prices.today` + `sdk.prices.history`, provider keys `cardkingdom` and `tcgplayer`, finish `normal`, priceType `retail`). One observation per card-printing per source per day. The MTG Goldfish source named in the original input is not available from MTGJSON and is deferred to a follow-up specification per the 2026-05-18 Clarifications entry — no in-scope ingestion mechanism is pinned for it here.
 - Pagination follows the existing `/cards/search/` endpoint contract; expanding that endpoint's filter dimensions to cover everything in FR-005 is an expected planning-phase outcome of this spec.
+
+> **DEFERRED assumptions** (30-day trend window; price-observation sourcing from `sdk.prices.today`/`history`; the detail sheet being shared across Catalogue + Binder) moved to spec `020-card-detail-prices`.
 
 ## Out of Scope
 
+- **Add to binder / remove from binder + owned-count glyphs (US4).** Deferred to spec `019-binder-add-remove`. The server side is already implemented and tested on this branch; spec 019 covers the mobile UI.
+- **Card detail sheet, prices, and the 30-day trend chart (US3).** Deferred to spec `020-card-detail-prices`. Core price types/schemas and provider interface decls already exist (provider methods stubbed); spec 020 implements the rest. Depends on spec 019.
 - **Wishlist / saved searches.** The Catalogue does not persist queries or favourites across sessions in this spec.
-- **Buying or linking out to retailer pages.** The detail sheet surfaces prices for awareness; click-out / affiliate flows are out of scope.
-- **Historic price windows other than 30 days** (e.g. 90-day, 1-year). Only the 30-day trend is in scope.
 - **Sort controls** (cheapest first, alphabetical, release date). Result ordering is whatever the underlying search returns; explicit user-facing sort is out of scope here.
 - **Advanced query syntax** (boolean operators, quoted phrases, field-scoped queries like `t:creature`). Name search is plain substring match in scope.
-- **Digital-only printings and digital marketplaces.** Excluded by FR-021.
-- **MTG Goldfish as a price source.** Named in the original input as the third row of the detail-sheet price section, but MTGJSON (the catalogue + price data source) does not publish MTG Goldfish observations — only Card Kingdom, Cardmarket, TCG Player, CardHoarder, and Cardsphere. Adding MTG Goldfish requires bespoke ingestion work (third-party data acquisition, scheduling, licensing review) that warrants its own specification. The spec ships with two sources (Card Kingdom + TCG Player) and a follow-up spec will add the third row + line later without further changes to the catalogue itself. See the 2026-05-18 Clarifications entry.
+- **Digital-only printings and digital marketplaces.** Excluded from catalogue results (SC-007).
+- **Price-related out-of-scope items** — buying / retailer click-out, historic windows other than 30 days, and **MTG Goldfish as a price source** — move with the detail sheet to spec `020-card-detail-prices` (MTGJSON does not publish MTG Goldfish; spec 020 ships two sources and a later spec adds the third additively). See the 2026-05-18 Clarifications entry.

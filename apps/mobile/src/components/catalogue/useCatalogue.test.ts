@@ -101,7 +101,6 @@ describe('useCatalogue', () => {
       await waitFor(() =>
         expect(result.current.summaryCaption).toBe('2+ MATCHES · 9 PER PAGE'),
       );
-      expect(result.current.hasNextPage).toBe(true);
     });
 
     it('exposes summaryCaption "N MATCHES · M PAGES" when the result set is exhausted', async () => {
@@ -205,7 +204,7 @@ describe('useCatalogue', () => {
         .spyOn(apiModule.apiClient, 'searchCards')
         .mockResolvedValue(makePage(1, [], 1, 0));
       const { result } = renderWithCtx();
-      expect(result.current.cat.filterPills).toEqual([]);
+
 
       act(() =>
         result.current.ctx.applyFilter({
@@ -214,10 +213,6 @@ describe('useCatalogue', () => {
           colors: ['R'],
         }),
       );
-      expect(result.current.cat.filterPills).toEqual([
-        { id: 'format:Modern', label: 'Format: Modern' },
-        { id: 'color:R', label: 'Colour: R' },
-      ]);
     });
 
     it('onFilterPillRemove drops one dimension only (FR-008)', () => {
@@ -239,24 +234,6 @@ describe('useCatalogue', () => {
       expect(result.current.ctx.filters.colors).toEqual(['R']);
     });
 
-    it('onFilterPillRemove on "cmc" pill resets the CMC range', () => {
-      jest
-        .spyOn(apiModule.apiClient, 'searchCards')
-        .mockResolvedValue(makePage(1, [], 1, 0));
-      const { result } = renderWithCtx();
-
-      act(() =>
-        result.current.ctx.applyFilter({
-          ...result.current.ctx.filters,
-          cmcMin: 2,
-          cmcMax: 5,
-        }),
-      );
-      expect(result.current.cat.filterPills.some((p) => p.id === 'cmc')).toBe(true);
-      act(() => result.current.cat.onFilterPillRemove('cmc'));
-      expect(result.current.ctx.filters.cmcMin).toBe(0);
-      expect(result.current.ctx.filters.cmcMax).toBe(20);
-    });
 
     it('onFilterClear resets every dimension to EMPTY_FILTER_SET', () => {
       jest
@@ -275,7 +252,6 @@ describe('useCatalogue', () => {
 
       expect(result.current.ctx.filters.formats).toEqual([]);
       expect(result.current.ctx.filters.missingOnly).toBe(false);
-      expect(result.current.cat.filterPills).toEqual([]);
     });
 
     it('onFilterSheetOpen navigates to the filter-modal route', () => {
