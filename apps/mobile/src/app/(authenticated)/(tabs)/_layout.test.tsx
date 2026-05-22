@@ -25,7 +25,7 @@ describe('(tabs) layout', () => {
 
     try {
       render(<TabsLayout />);
-      expect(calls).toEqual(['binder', 'search', 'scan', 'profile']);
+      expect(calls).toEqual(['binder', 'catalogue', 'scan', 'profile']);
     } finally {
       (Tabs as unknown as { Screen: typeof original }).Screen = original;
     }
@@ -45,7 +45,7 @@ describe('(tabs) layout', () => {
       render(<TabsLayout />);
       expect((captured.binder as { headerShown?: boolean }).headerShown).toBe(false);
       // Spec 018 T033 — Catalogue renders its own crimson masthead edge-to-edge.
-      expect((captured.search as { headerShown?: boolean }).headerShown).toBe(false);
+      expect((captured.catalogue as { headerShown?: boolean }).headerShown).toBe(false);
       expect((captured.scan as { headerShown?: boolean }).headerShown).toBeUndefined();
       expect((captured.profile as { headerShown?: boolean }).headerShown).toBeUndefined();
     } finally {
