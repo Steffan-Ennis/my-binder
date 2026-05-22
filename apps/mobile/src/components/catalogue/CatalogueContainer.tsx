@@ -10,7 +10,6 @@ const CatalogueContainer: FC = () => {
     totalPages,
     summaryCaption,
     error,
-    hasNextPage,
     isLoading,
     isFetchingNextPage,
     isError,
@@ -18,7 +17,6 @@ const CatalogueContainer: FC = () => {
     isSearchActive,
     searchQuery,
     hasActiveQuery,
-    filterPills,
     resultsAreStale,
     onSearchOpen,
     onSearchChange,
@@ -28,7 +26,6 @@ const CatalogueContainer: FC = () => {
     onRetryPress,
     onFilterSheetOpen,
     onFilterClear,
-    onFilterPillRemove,
     onRefreshPress,
   } = useCatalogue();
 
@@ -40,7 +37,6 @@ const CatalogueContainer: FC = () => {
         totalPages={totalPages}
         summaryCaption={summaryCaption}
         error={error}
-        hasNextPage={hasNextPage}
         isLoading={isLoading}
         isFetchingNextPage={isFetchingNextPage}
         isError={isError}
@@ -48,7 +44,6 @@ const CatalogueContainer: FC = () => {
         isSearchActive={isSearchActive}
         searchQuery={searchQuery}
         hasActiveQuery={hasActiveQuery}
-        filterPills={filterPills}
         resultsAreStale={resultsAreStale}
         onSearchOpen={onSearchOpen}
         onSearchChange={onSearchChange}
@@ -58,7 +53,6 @@ const CatalogueContainer: FC = () => {
         onRetryPress={onRetryPress}
         onFilterSheetOpen={onFilterSheetOpen}
         onFilterClear={onFilterClear}
-        onFilterPillRemove={onFilterPillRemove}
         onRefreshPress={onRefreshPress}
       />
     </>

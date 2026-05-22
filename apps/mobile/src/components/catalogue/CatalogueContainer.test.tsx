@@ -39,7 +39,6 @@ describe('CatalogueContainer — named-props bridge', () => {
     onRetryPress: jest.fn(),
     onFilterSheetOpen: jest.fn(),
     onFilterClear: jest.fn(),
-    onFilterPillRemove: jest.fn(),
     onRefreshPress: jest.fn(),
   });
 
@@ -52,7 +51,6 @@ describe('CatalogueContainer — named-props bridge', () => {
       totalPages: null,
       summaryCaption: 'CAP',
       error: null,
-      hasNextPage: false,
       isLoading: false,
       isFetchingNextPage: false,
       isError: false,
@@ -60,7 +58,6 @@ describe('CatalogueContainer — named-props bridge', () => {
       isSearchActive: false,
       searchQuery: '',
       hasActiveQuery: false,
-      filterPills: [],
       resultsAreStale: false,
       ...cb,
     });
@@ -74,7 +71,6 @@ describe('CatalogueContainer — named-props bridge', () => {
       totalPages: null,
       summaryCaption: 'CAP',
       error: null,
-      hasNextPage: false,
       isLoading: false,
       isFetchingNextPage: false,
       isError: false,
@@ -82,7 +78,6 @@ describe('CatalogueContainer — named-props bridge', () => {
       isSearchActive: false,
       searchQuery: '',
       hasActiveQuery: false,
-      filterPills: [],
       resultsAreStale: false,
       onSearchOpen: cb.onSearchOpen,
       onSearchChange: cb.onSearchChange,
@@ -92,7 +87,6 @@ describe('CatalogueContainer — named-props bridge', () => {
       onRetryPress: cb.onRetryPress,
       onFilterSheetOpen: cb.onFilterSheetOpen,
       onFilterClear: cb.onFilterClear,
-      onFilterPillRemove: cb.onFilterPillRemove,
       onRefreshPress: cb.onRefreshPress,
     });
   });

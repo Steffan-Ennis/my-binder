@@ -53,7 +53,6 @@ const defaults: CatalogueViewProps = {
   onRetryPress: jest.fn(),
   onFilterSheetOpen: jest.fn(),
   onFilterClear: jest.fn(),
-  onFilterPillRemove: jest.fn(),
   onRefreshPress: jest.fn(),
 };
 

@@ -69,7 +69,7 @@ const useCatalogue = (): UseCatalogueResult => {
   // across re-renders (Principle X v1.16.0).
   const { mutate: mutateBinder } = { mutate: () => {} };
 
-  const { filters, applyFilter, clearFilters, removePill } = useCatalogueContext();
+  const { filters, applyFilter, clearFilters } = useCatalogueContext();
 
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -211,11 +211,6 @@ const useCatalogue = (): UseCatalogueResult => {
     setCurrentPage(1);
   }, [clearFilters]);
 
-  const onFilterPillRemove = useCallback((pillId: string) => {
-    removePill(pillId);
-    setCurrentPage(1);
-  }, [removePill]);
-
   const onRefreshPress = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: CATALOGUE_QUERY_PREFIX });
     setResultsAreStale(false);
@@ -244,7 +239,6 @@ const useCatalogue = (): UseCatalogueResult => {
       onRetryPress,
       onFilterSheetOpen,
       onFilterClear,
-      onFilterPillRemove,
       onRefreshPress,
     }),
     [
@@ -269,7 +263,6 @@ const useCatalogue = (): UseCatalogueResult => {
       onRetryPress,
       onFilterSheetOpen,
       onFilterClear,
-      onFilterPillRemove,
       onRefreshPress,
     ],
   );

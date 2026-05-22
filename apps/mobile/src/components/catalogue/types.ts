@@ -90,12 +90,11 @@ export type CatalogueViewProps = Pick<
   onProfilePress: () => void;
   onPagerSelected: (pageNumber: number) => void;
   onRetryPress: () => void;
-  // US2 — filter pill row + zero-match empty state. The sheet container owns
+  // US2 — filter opener + zero-match empty state. The sheet container owns
   // open/close + apply; the view only knows about clear (empty-state) +
-  // single-pill removal + sheet open.
+  // sheet open.
   onFilterSheetOpen: () => void;
   onFilterClear: () => void;
-  onFilterPillRemove: (pillId: string) => void;
   // US4 — clears the stale flag AND invalidates the catalogue caches.
   onRefreshPress: () => void;
 };

@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState, type FC, type PropsWithChildren } from 'react';
 
-import { removePillFromFilters } from '@src/components/catalogue/catalogueFilters';
 import { EMPTY_FILTER_SET, type CatalogueFilterSet } from '@src/components/catalogue/types';
 
 import { CatalogueContext } from './CatalogueContext';
@@ -31,13 +30,9 @@ const CatalogueProvider: FC<PropsWithChildren> = ({ children }) => {
     setFilters(EMPTY_FILTER_SET);
   }, []);
 
-  const removePill = useCallback((pillId: string) => {
-    setFilters((prev) => removePillFromFilters(prev, pillId));
-  }, []);
-
   const value = useMemo<CatalogueContextValue>(
-    () => ({ filters, applyFilter, clearFilters, removePill }),
-    [filters, applyFilter, clearFilters, removePill],
+    () => ({ filters, applyFilter, clearFilters }),
+    [filters, applyFilter, clearFilters],
   );
 
   return <CatalogueContext.Provider value={value}>{children}</CatalogueContext.Provider>;

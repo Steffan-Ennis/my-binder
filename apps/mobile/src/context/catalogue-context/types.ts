@@ -19,7 +19,4 @@ export type CatalogueContextValue = {
 
   // Reset to the empty filter set.
   clearFilters: () => void;
-
-  // Remove a single filter pill by its `dimension:value` id.
-  removePill: (pillId: string) => void;
 };
