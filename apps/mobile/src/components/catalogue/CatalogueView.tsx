@@ -45,6 +45,7 @@ const CatalogueView: FC<CatalogueViewProps> = ({
   onProfilePress,
   onPagerSelected,
   onRetryPress,
+  onCardPress,
   onFilterSheetOpen,
   onFilterClear,
   onRefreshPress,
@@ -139,7 +140,12 @@ const CatalogueView: FC<CatalogueViewProps> = ({
               onPageSelected={handlePageSelected}
             >
               {pages.map((page, pageIndex) => (
-                <BinderPage pageIndex={pageIndex} cards={page.cards} isLoading={isLoading} />
+                <BinderPage
+                  pageIndex={pageIndex}
+                  cards={page.cards}
+                  isLoading={isLoading}
+                  onCardPress={onCardPress}
+                />
               ))}
             </PagerView>
           )}

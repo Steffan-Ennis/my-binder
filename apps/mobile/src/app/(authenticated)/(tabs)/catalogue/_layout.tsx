@@ -23,6 +23,18 @@ const CatalogueLayout: FC = () => {
             sheetCornerRadius: 24,
           }}
         />
+        {/*<Stack.Screen*/}
+        {/*  name={'card-detail'}*/}
+        {/*  options={{*/}
+        {/*    // Spec 020 — swipe-down dismiss stays ENABLED here (FR-005), unlike*/}
+        {/*    // the filter sheet; that is the only deviation from its options.*/}
+        {/*    animation: 'slide_from_bottom',*/}
+        {/*    presentation: 'formSheet',*/}
+        {/*    sheetAllowedDetents: [0.9],*/}
+        {/*    sheetInitialDetentIndex: 'last',*/}
+        {/*    sheetCornerRadius: 24,*/}
+        {/*  }}*/}
+        {/*/>*/}
       </Stack>
     </CatalogueProvider>
   )

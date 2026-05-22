@@ -24,6 +24,7 @@ const CatalogueContainer: FC = () => {
     onProfilePress,
     onPagerSelected,
     onRetryPress,
+    onCardPress,
     onFilterSheetOpen,
     onFilterClear,
     onRefreshPress,
@@ -51,6 +52,7 @@ const CatalogueContainer: FC = () => {
         onProfilePress={onProfilePress}
         onPagerSelected={onPagerSelected}
         onRetryPress={onRetryPress}
+        onCardPress={onCardPress}
         onFilterSheetOpen={onFilterSheetOpen}
         onFilterClear={onFilterClear}
         onRefreshPress={onRefreshPress}

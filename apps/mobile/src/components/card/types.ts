@@ -15,4 +15,5 @@ export type CardViewProps = Pick<UseCardImagesQueryResult, 'error' | 'isLoading'
   onRetry: () => Promise<void>
   imageUrl?: string
   pulseRef: RefObject<Animated.Value>
+  onPress?: (id: string) => void
 }

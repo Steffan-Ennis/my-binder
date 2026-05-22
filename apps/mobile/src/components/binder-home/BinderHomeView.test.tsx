@@ -58,6 +58,7 @@ const defaults: BinderHomeViewProps = {
   hasActiveQuery: false,
   handlePagerSelected: jest.fn(),
   onRetryPress: jest.fn(),
+  onCardPress: jest.fn(),
   mastheadProps: defaultMasthead,
 };
 

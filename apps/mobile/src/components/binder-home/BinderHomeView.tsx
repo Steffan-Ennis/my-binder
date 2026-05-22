@@ -25,6 +25,9 @@ export type BinderHomeViewProps = {
   searchQuery: string;
   hasActiveQuery: boolean;
   onRetryPress: () => void;
+  // Spec 020 / FR-001 — opens the card-detail sheet for the tapped populated
+  // pocket; empty/skeleton pockets never call it.
+  onCardPress: (printingId: string) => void;
   mastheadProps: MastheadProps;
   handlePagerSelected: Required<PagerViewProps>['onPageSelected'];
 };
@@ -38,6 +41,7 @@ const BinderHomeView: FC<BinderHomeViewProps> = ({
   isLoading,
   isError,
   onRetryPress,
+  onCardPress,
   mastheadProps,
   handlePagerSelected,
 }) => {
@@ -90,7 +94,7 @@ const BinderHomeView: FC<BinderHomeViewProps> = ({
                   start + SLOTS_PER_BINDER_PAGE,
                 );
                 return (pageIdx + 1 === currentPage)
-                  ? <BinderPage pageIndex={pageIdx} cards={pageCards} isLoading={isLoading} />
+                  ? <BinderPage pageIndex={pageIdx} cards={pageCards} isLoading={isLoading} onCardPress={onCardPress} />
                   : <></>
               })}
             </PagerView>

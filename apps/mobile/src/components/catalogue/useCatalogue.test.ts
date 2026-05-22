@@ -168,6 +168,31 @@ describe('useCatalogue', () => {
       expect(mockNavigate).toHaveBeenCalledWith('/profile');
     });
 
+    it('onCardPress navigates to the card-detail route with the tapped printing id (FR-001)', async () => {
+      jest
+        .spyOn(apiModule.apiClient, 'searchCards')
+        .mockResolvedValue(makePage(1, [], 1, 0));
+      const { result } = renderHook(() => useCatalogue(), { wrapper });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      act(() => result.current.onCardPress('6ca7af0b-4b6a-59ba-90be-6da4f62bcff1'));
+      expect(mockNavigate).toHaveBeenCalledWith({
+        pathname: '/catalogue/card-detail',
+        params: { id: '6ca7af0b-4b6a-59ba-90be-6da4f62bcff1' },
+      });
+    });
+
+    it('onCardPress is a no-op for a pocket with no printing id (no-open-on-skeleton)', async () => {
+      jest
+        .spyOn(apiModule.apiClient, 'searchCards')
+        .mockResolvedValue(makePage(1, [], 1, 0));
+      const { result } = renderHook(() => useCatalogue(), { wrapper });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      act(() => result.current.onCardPress(''));
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
+
     it('search toggle: onSearchOpen → onSearchClose round-trip clears the query', async () => {
       jest
         .spyOn(apiModule.apiClient, 'searchCards')

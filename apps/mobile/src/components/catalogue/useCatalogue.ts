@@ -205,6 +205,17 @@ const useCatalogue = (): UseCatalogueResult => {
     router.navigate('/catalogue/filter-modal');
   }, [router]);
 
+  // Spec 020 / FR-001 — open the card-detail sheet for the tapped printing.
+  // Guarded on a truthy id so an empty/skeleton pocket (which has none) is a
+  // no-op (Edge Case "Tap during page load").
+  const onCardPress = useCallback(
+    (printingId: string) => {
+      if (!printingId) return;
+      router.navigate({ pathname: '/catalogue/card-detail', params: { id: printingId } });
+    },
+    [router],
+  );
+
   const onFilterClear = useCallback(() => {
     clearFilters();
     setSearchQuery('');
@@ -237,6 +248,7 @@ const useCatalogue = (): UseCatalogueResult => {
       onProfilePress,
       onPagerSelected,
       onRetryPress,
+      onCardPress,
       onFilterSheetOpen,
       onFilterClear,
       onRefreshPress,
@@ -261,6 +273,7 @@ const useCatalogue = (): UseCatalogueResult => {
       onProfilePress,
       onPagerSelected,
       onRetryPress,
+      onCardPress,
       onFilterSheetOpen,
       onFilterClear,
       onRefreshPress,

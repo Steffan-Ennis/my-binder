@@ -90,6 +90,10 @@ export type CatalogueViewProps = Pick<
   onProfilePress: () => void;
   onPagerSelected: (pageNumber: number) => void;
   onRetryPress: () => void;
+  // Spec 020 — opens the card-detail sheet for the tapped populated pocket
+  // (FR-001). Wired to each occupied pocket by the view; empty/skeleton pockets
+  // never call it.
+  onCardPress: (printingId: string) => void;
   // US2 — filter opener + zero-match empty state. The sheet container owns
   // open/close + apply; the view only knows about clear (empty-state) +
   // sheet open.

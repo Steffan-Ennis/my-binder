@@ -7,6 +7,7 @@ import type { CardFootprint } from './types';
 export type CardProps = {
   id: string;
   footprint: CardFootprint;
+  onPress?: (printingId: string) => void,
 };
 
 const CardContainer: FC<CardProps> = ({ id, footprint }) => {

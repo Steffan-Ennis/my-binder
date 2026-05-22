@@ -161,6 +161,23 @@ describe('useBinderHome', () => {
       act(() => result.current.onRetryPress());
       expect(refetch).toHaveBeenCalled();
     });
+
+    it('onCardPress navigates to the binder card-detail route with the tapped id (FR-001)', () => {
+      setQueryMock({ cards: [makeCard('1', 'A')] });
+      const { result } = renderHook(() => useBinderHome(), { wrapper });
+      act(() => result.current.onCardPress('6ca7af0b-4b6a-59ba-90be-6da4f62bcff1'));
+      expect(mockNavigate).toHaveBeenCalledWith({
+        pathname: '/binder/card-detail',
+        params: { id: '6ca7af0b-4b6a-59ba-90be-6da4f62bcff1' },
+      });
+    });
+
+    it('onCardPress is a no-op when no printing id is supplied (no-open-on-skeleton)', () => {
+      setQueryMock({ cards: [makeCard('1', 'A')] });
+      const { result } = renderHook(() => useBinderHome(), { wrapper });
+      act(() => result.current.onCardPress(''));
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
   });
 
   describe('US2 paging surface', () => {

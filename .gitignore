@@ -37,3 +37,4 @@ packages/infrastructure/cdk.out/**
 # duckdb
 apps/server/binder.duckdb
 apps/server/binder.duckdb.wal
+/todo/

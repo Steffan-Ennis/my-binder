@@ -17,6 +17,7 @@ const BinderHomeContainer: FC = () => {
     searchQuery,
     hasActiveQuery,
     onRetryPress,
+    onCardPress,
     mastheadProps,
     handlePagerSelected,
   } = useBinderHome();
@@ -35,6 +36,7 @@ const BinderHomeContainer: FC = () => {
       searchQuery={searchQuery}
       hasActiveQuery={hasActiveQuery}
       onRetryPress={onRetryPress}
+      onCardPress={onCardPress}
       mastheadProps={mastheadProps}
       handlePagerSelected={handlePagerSelected}
     />

@@ -44,19 +44,21 @@ const CardView: FC<CardViewProps> = ({ onRetry, isLoading, imageUrl, isSuccess, 
 
   return (
     <View style={styles.root} testID="card-error">
-      <View style={styles.frame}>
-        <Ionicons name="warning-outline" size={24} color={Colors.dark.textOnAccent} />
-        <Text style={styles.fallbackCaption}>Couldn’t load</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Retry loading card"
-          onPress={onRetry}
-          style={styles.retryButton}
-          testID="card-retry"
-        >
-          <Text style={styles.retryLabel}>Retry</Text>
-        </Pressable>
-      </View>
+      <Pressable>
+        <View style={styles.frame}>
+          <Ionicons name="warning-outline" size={24} color={Colors.dark.textOnAccent} />
+          <Text style={styles.fallbackCaption}>Couldn’t load</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading card"
+            onPress={onRetry}
+            style={styles.retryButton}
+            testID="card-retry"
+          >
+            <Text style={styles.retryLabel}>Retry</Text>
+          </Pressable>
+        </View>
+      </Pressable>
     </View>
   );
 };

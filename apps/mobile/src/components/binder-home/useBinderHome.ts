@@ -93,6 +93,7 @@ export type UseBinderHomeResult = Pick<
   'isSearchActive' |
   'searchQuery' |
   'onRetryPress' |
+  'onCardPress' |
   'mastheadProps'
 >;
 
@@ -149,6 +150,17 @@ const useBinderHome = (): UseBinderHomeResult => {
     void cardsQuery.refetch();
   }, [cardsQuery]);
 
+  // Spec 020 / FR-001 — open the card-detail sheet for the tapped printing,
+  // identical behaviour to the Catalogue. Guarded on a truthy id so an empty
+  // pocket is a no-op.
+  const onCardPress = useCallback(
+    (printingId: string) => {
+      if (!printingId) return;
+      router.navigate({ pathname: '/binder/card-detail', params: { id: printingId } });
+    },
+    [router],
+  );
+
   const onSearchOpen = useCallback(() => {
     dispatch({ type: 'SEARCH_OPENED' });
   }, []);
@@ -199,6 +211,7 @@ const useBinderHome = (): UseBinderHomeResult => {
       searchQuery,
       hasActiveQuery,
       onRetryPress,
+      onCardPress,
       handlePagerSelected,
       mastheadProps,
     }),
@@ -215,6 +228,7 @@ const useBinderHome = (): UseBinderHomeResult => {
       searchQuery,
       hasActiveQuery,
       onRetryPress,
+      onCardPress,
       handlePagerSelected,
       hasActiveQuery,
       mastheadProps,
