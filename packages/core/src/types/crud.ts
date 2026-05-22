@@ -3,8 +3,11 @@ import {CardRecord} from "@root/src";
 export interface Card {
   id: string;
   name: string;
-  createdAt: string;
-  updatedAt: string;
+  // OPTIONAL: present for binder rows (owned cards). Absent for a catalogue
+  // printing the user does not own — spec 020's detail sheet opens on unowned
+  // cards too, where there is no binder row and thus no timestamps.
+  createdAt?: string;
+  updatedAt?: string;
   // Mobile binder-home additions (spec 016) — all OPTIONAL. Server may begin
   // returning these in a follow-up enrichment; mobile consumers MUST tolerate
   // their absence and degrade gracefully (name-only filter).

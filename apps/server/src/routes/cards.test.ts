@@ -13,6 +13,7 @@ import authPlugin from '@src/auth/authPlugin';
 import { issueToken } from '@src/auth/sessionJwt';
 import { cardRoutes } from '@src/routes/cards';
 import { registry } from '@src/providers/registry';
+import type { CardProvider } from '@src/providers/interface';
 import MtgjsonProvider from '@src/providers/mtgjson/MtgjsonProvider';
 
 const TEST_SECRET = 'a-test-secret-that-is-at-least-32-characters-long!!';
@@ -452,5 +453,116 @@ describe('Cards API', () => {
     for (const card of body.cards) {
       expect(card.numberOwned).toBeUndefined();
     }
+  });
+
+  // ─── Spec 020 — GET /cards/:id/prices + /prices/history ─────────────────────
+  // The offline cache holds no price parquets, so a stub provider stands in for
+  // the price layer (per the spec's mock-the-SDK decision). The real provider is
+  // restored afterwards; this exercises the route → service → schema pipeline,
+  // the 404 existence gate and the auth gate.
+  describe('price routes', () => {
+    const priceStub = (over: Partial<CardProvider> = {}): CardProvider => ({
+      checkLegality: async (name) => ({ cardName: name, legal: true, reason: null, colorIdentity: [] }),
+      searchRaw: async () => ({ cards: [], total: 0 }),
+      getByUuid: async (uuid) =>
+        uuid === M11_BOLT_UUID
+          ? {
+              uuid, name: 'Lightning Bolt', setCode: 'M11', setName: 'Magic 2011',
+              cardNumber: '149', typeLine: 'Instant', oracle: null, scryfallId: null,
+            }
+          : null,
+      getByUuids: async () => [],
+      getCardImages: async () => null,
+      getPrices: async (uuid) => ({
+        printingId: uuid,
+        cardKingdom: { source: 'CARD_KINGDOM', amountCents: 1723, currency: 'USD', observedOn: '2026-05-22' },
+        tcgPlayer: { source: 'TCG_PLAYER', amountCents: 1638, currency: 'USD', observedOn: '2026-05-22' },
+      }),
+      getPriceHistory: async (uuid, days) => ({
+        printingId: uuid,
+        days,
+        cardKingdom: [{ observedOn: '2026-05-20', amountCents: 1699 }],
+        tcgPlayer: [],
+      }),
+      isReachable: async () => true,
+      ...over,
+    });
+
+    beforeEach(async () => {
+      registry.register('prices-stub', priceStub());
+      await registry.setActive('prices-stub');
+    });
+
+    afterAll(async () => {
+      await registry.setActive('mtgjson');
+    });
+
+    test('GET /cards/:id/prices returns 200 with the validated CardPricesResponse', async () => {
+      const r = await fastify.inject({
+        method: 'GET', url: `/cards/${M11_BOLT_UUID}/prices`, headers: authHeaders(),
+      });
+      expect(r.statusCode).toBe(200);
+      const body = r.json<{
+        printingId: string;
+        cardKingdom: { source: string; amountCents: number } | null;
+        tcgPlayer: { source: string; amountCents: number } | null;
+      }>();
+      expect(body.printingId).toBe(M11_BOLT_UUID);
+      expect(body.cardKingdom?.source).toBe('CARD_KINGDOM');
+      expect(body.cardKingdom?.amountCents).toBe(1723);
+      expect(body.tcgPlayer?.source).toBe('TCG_PLAYER');
+    });
+
+    test('GET /cards/:id/prices/history?days=30 returns 200 with the validated history', async () => {
+      const r = await fastify.inject({
+        method: 'GET', url: `/cards/${M11_BOLT_UUID}/prices/history?days=30`, headers: authHeaders(),
+      });
+      expect(r.statusCode).toBe(200);
+      const body = r.json<{ printingId: string; days: number; cardKingdom: unknown[]; tcgPlayer: unknown[] }>();
+      expect(body.printingId).toBe(M11_BOLT_UUID);
+      expect(body.days).toBe(30);
+      expect(body.cardKingdom).toEqual([{ observedOn: '2026-05-20', amountCents: 1699 }]);
+      expect(body.tcgPlayer).toEqual([]);
+    });
+
+    test('GET /cards/:id/prices/history defaults days to 30 when omitted', async () => {
+      const r = await fastify.inject({
+        method: 'GET', url: `/cards/${M11_BOLT_UUID}/prices/history`, headers: authHeaders(),
+      });
+      expect(r.statusCode).toBe(200);
+      expect(r.json<{ days: number }>().days).toBe(30);
+    });
+
+    test('GET /cards/:id/prices returns 200 with null slots when there are no observations', async () => {
+      registry.register('prices-empty', priceStub({
+        getPrices: async (uuid) => ({ printingId: uuid, cardKingdom: null, tcgPlayer: null }),
+      }));
+      await registry.setActive('prices-empty');
+
+      const r = await fastify.inject({
+        method: 'GET', url: `/cards/${M11_BOLT_UUID}/prices`, headers: authHeaders(),
+      });
+      expect(r.statusCode).toBe(200);
+      const body = r.json<{ cardKingdom: unknown; tcgPlayer: unknown }>();
+      expect(body.cardKingdom).toBeNull();
+      expect(body.tcgPlayer).toBeNull();
+    });
+
+    test('GET /cards/:id/prices returns 404 for an unknown printing', async () => {
+      const r = await fastify.inject({
+        method: 'GET', url: `/cards/${UNKNOWN_UUID}/prices`, headers: authHeaders(),
+      });
+      expect(r.statusCode).toBe(404);
+    });
+
+    test('GET /cards/:id/prices returns 401 without a Bearer token', async () => {
+      const r = await fastify.inject({ method: 'GET', url: `/cards/${M11_BOLT_UUID}/prices` });
+      expect(r.statusCode).toBe(401);
+    });
+
+    test('GET /cards/:id/prices/history returns 401 without a Bearer token', async () => {
+      const r = await fastify.inject({ method: 'GET', url: `/cards/${M11_BOLT_UUID}/prices/history` });
+      expect(r.statusCode).toBe(401);
+    });
   });
 });

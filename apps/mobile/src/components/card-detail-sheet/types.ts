@@ -54,13 +54,6 @@ export type ChartLegendEntry = { label: string; color: string; disabled: boolean
 // Hook options (Principle X rule 6).
 export type UseCardDetailSheetOptions = { printingId: string };
 
-// Props for the presentational chart wrapper (props-only, no fetching).
-export type PriceTrendChartProps = {
-  chartSeries: ChartSeries[];
-  chartLegend: ChartLegendEntry[];
-  historyStatus: SectionStatus;
-};
-
 // Props supplied by `useCardDetailSheet` to `CardDetailSheetView`.
 export type CardDetailSheetViewProps = Pick<
   CardDetailQueryResult,

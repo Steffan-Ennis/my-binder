@@ -6,6 +6,9 @@ import type {
   CardPricesResponse,
   CardRecord,
   LegalityResult,
+  PricePoint,
+  PriceQuote,
+  PriceSource,
   SearchQuery,
 } from '@my-binder/core';
 import type { CardProvider } from '@src/providers/interface';
@@ -16,6 +19,20 @@ import buildScryfallImageUrls from './scryfallImages';
 // Dummy UUID used only to trigger registration of the `card_legalities` view
 // (the SDK registers views lazily via its typed API, not via raw `sql()`).
 const VIEW_REGISTRATION_UUID = '00000000-0000-0000-0000-000000000000';
+
+// Spec 020 — map each in-scope wire price source to the MTGJSON SDK provider
+// key. MTG Goldfish is intentionally absent (MTGJSON does not publish it).
+const SOURCE_PROVIDER_KEY: Record<PriceSource, string> = {
+  CARD_KINGDOM: 'cardkingdom',
+  TCG_PLAYER: 'tcgplayer',
+};
+
+// Paper-retail only: the `source` (format) column is 'paper' for physical
+// printings and 'mtgo'/'arena' for digital. Filtering to 'paper' enforces the
+// physical-only contract (FR-006/SC-003).
+const PAPER_FORMAT = 'paper';
+const NORMAL_FINISH = 'normal';
+const RETAIL_PRICE_TYPE = 'retail';
 
 // Project a raw DuckDB row (from `sdk.sql`) to the subset the record mapper
 // needs. DuckDB returns list columns as JS arrays and nullable text as null.
@@ -243,7 +260,7 @@ class MtgjsonProvider implements CardProvider {
       setName: setInfo?.name ?? null,
       cardNumber: card.number,
       typeLine: card.type,
-      oracle: card.originalText!,
+      oracle: card.text!,
       scryfallId,
     };
   }
@@ -298,38 +315,104 @@ class MtgjsonProvider implements CardProvider {
   }
 
   /**
-   * Spec 018 / FR-017 — latest observation per source for a single printing.
-   *
-   * Stub: real implementation lands in spec 018 / US3 (task T057) and fans
-   * out to `sdk.prices.today` per source. Until then this method throws so
-   * the price routes (also gated on US3) fail loudly if wired prematurely.
+   * Spec 020 / FR-017 — latest paper-retail observation per source for a
+   * single printing. Fans out one `sdk.prices.today` call per in-scope source
+   * (Card Kingdom, TCG Player), keeping the queries sequential because
+   * concurrent access to the SDK's shared DuckDB connection races. Only the
+   * `normal` finish, `retail` price type and `paper` format are kept (digital
+   * observations are excluded — FR-006/SC-003). A source with no observation
+   * yields `null`; MTG Goldfish is never emitted.
    *
    * @param uuid - MTGJSON printing UUID.
-   * @returns the latest per-source `CardPricesResponse`.
+   * @returns The latest per-source `CardPricesResponse` (`amountCents` wire unit).
    *
    * @example
-   *   const prices = await provider.getPrices('6ca7af0b-…');
+   * ```ts
+   * await provider.getPrices('6ca7af0b-…');
+   * // { printingId: '6ca7af0b-…',
+   * //   cardKingdom: { source: 'CARD_KINGDOM', amountCents: 1723, currency: 'USD', observedOn: '2026-05-22' },
+   * //   tcgPlayer:   { source: 'TCG_PLAYER',  amountCents: 1638, currency: 'USD', observedOn: '2026-05-22' } }
+   * ```
    */
   async getPrices(uuid: string): Promise<CardPricesResponse> {
-    throw new Error(`MtgjsonProvider.getPrices not implemented (pending spec 018 US3) — uuid=${uuid}`);
+    const cardKingdom = await this.latestQuote(uuid, 'CARD_KINGDOM');
+    const tcgPlayer = await this.latestQuote(uuid, 'TCG_PLAYER');
+    return { printingId: uuid, cardKingdom, tcgPlayer };
   }
 
   /**
-   * Spec 018 / FR-018 — per-source 30-day price series for a single printing.
-   *
-   * Stub: real implementation lands in spec 018 / US3 (task T057).
+   * Spec 020 / FR-018 — per-source paper-retail price series over the last
+   * `days` calendar days ending today. Fans out one `sdk.prices.history` call
+   * per in-scope source (sequential — see {@link getPrices}); keeps the
+   * `normal`/`retail`/`paper` slice only. Missing days are simply absent
+   * points (the mobile layer renders them as gaps). A source with no paper
+   * observation yields `[]`; MTG Goldfish is never emitted.
    *
    * @param uuid - MTGJSON printing UUID.
-   * @param days - history window length in days (1..365).
-   * @returns the per-source `CardPriceHistoryResponse`.
+   * @param days - History window length in days (1..365).
+   * @returns The per-source `CardPriceHistoryResponse` (`amountCents` wire unit).
    *
    * @example
-   *   const history = await provider.getPriceHistory('6ca7af0b-…', 30);
+   * ```ts
+   * await provider.getPriceHistory('6ca7af0b-…', 30);
+   * // { printingId: '6ca7af0b-…', days: 30,
+   * //   cardKingdom: [{ observedOn: '2026-04-23', amountCents: 1699 }, …],
+   * //   tcgPlayer:   [{ observedOn: '2026-04-23', amountCents: 1610 }, …] }
+   * ```
    */
   async getPriceHistory(uuid: string, days: number): Promise<CardPriceHistoryResponse> {
-    throw new Error(
-      `MtgjsonProvider.getPriceHistory not implemented (pending spec 018 US3) — uuid=${uuid} days=${days}`,
-    );
+    const { dateFrom, dateTo } = MtgjsonProvider.windowEndingToday(days);
+    const cardKingdom = await this.seriesFor(uuid, 'CARD_KINGDOM', dateFrom, dateTo);
+    const tcgPlayer = await this.seriesFor(uuid, 'TCG_PLAYER', dateFrom, dateTo);
+    return { printingId: uuid, days, cardKingdom, tcgPlayer };
+  }
+
+  /** Latest paper-retail/normal quote for one source, or `null` if absent. */
+  private async latestQuote(uuid: string, source: PriceSource): Promise<PriceQuote> {
+    const rows = await this.sdk.prices.today(uuid, {
+      provider: SOURCE_PROVIDER_KEY[source],
+      finish: NORMAL_FINISH,
+      priceType: RETAIL_PRICE_TYPE,
+    });
+    const row = rows.find((r) => r['source'] === PAPER_FORMAT && r['price'] != null);
+    if (row === undefined) return null;
+    return {
+      source,
+      amountCents: Math.round(Number(row['price']) * 100),
+      currency: typeof row['currency'] === 'string' ? row['currency'] : 'USD',
+      observedOn: String(row['date']),
+    };
+  }
+
+  /** Paper-retail/normal series for one source over the window. */
+  private async seriesFor(
+    uuid: string,
+    source: PriceSource,
+    dateFrom: string,
+    dateTo: string,
+  ): Promise<PricePoint[]> {
+    const rows = await this.sdk.prices.history(uuid, {
+      provider: SOURCE_PROVIDER_KEY[source],
+      finish: NORMAL_FINISH,
+      priceType: RETAIL_PRICE_TYPE,
+      dateFrom,
+      dateTo,
+    });
+    return rows
+      .filter((r) => r['source'] === PAPER_FORMAT && r['price'] != null)
+      .map((r) => ({
+        observedOn: String(r['date']),
+        amountCents: Math.round(Number(r['price']) * 100),
+      }));
+  }
+
+  /** Inclusive `[today - (days - 1), today]` window as `YYYY-MM-DD` strings. */
+  private static windowEndingToday(days: number): { dateFrom: string; dateTo: string } {
+    const to = new Date();
+    const from = new Date(to);
+    from.setUTCDate(from.getUTCDate() - (days - 1));
+    const iso = (d: Date): string => d.toISOString().slice(0, 10);
+    return { dateFrom: iso(from), dateTo: iso(to) };
   }
 
   private async collectCards(cards: MappableCard[]): Promise<CardRecord[]> {

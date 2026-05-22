@@ -6,6 +6,8 @@ import {
   UPDATE_CARD_BODY_SCHEMA,
   CARD_ID_PARAMS_SCHEMA,
   CARD_IMAGES_RESPONSE_SCHEMA,
+  CARD_PRICES_RESPONSE_SCHEMA,
+  CARD_PRICE_HISTORY_RESPONSE_SCHEMA,
   LEGALITY_QUERYSTRING_SCHEMA,
   LEGALITY_RESPONSE_SCHEMA,
   PATCH_CARD_BODY_SCHEMA,
@@ -28,12 +30,23 @@ import {
   checkCommanderLegality,
   searchCards,
   getCardImagesById,
+  getPrices,
+  getPriceHistory,
   NotFoundError,
   CardNotFoundError,
   ProviderUnavailableError,
 } from '@src/services/cardService';
 
 type LegalityQuerystring = { name: string; commander_colors?: string };
+type PriceHistoryQuerystring = { days?: number };
+
+// Spec 020 — `days` window for GET /cards/:id/prices/history (default 30).
+const PRICE_HISTORY_QUERYSTRING_SCHEMA = {
+  type: 'object',
+  properties: {
+    days: { type: 'integer', minimum: 1, maximum: 365, default: 30 },
+  },
+} as const;
 type SearchQuerystring = {
   name?: string; set?: string; colors?: string;
   cmc_min?: number; cmc_max?: number; page?: number; limit?: number;
@@ -112,6 +125,40 @@ export async function cardRoutes(fastify: FastifyInstance): Promise<void> {
   }, async (request, reply) => {
     const images = await getCardImagesById(request.params.id);
     return reply.code(HTTP_STATUS.OK).send(images);
+  });
+
+  // Spec 020 — registered before the generic `/cards/:id` so Fastify matches
+  // the literal `prices` / `prices/history` segments first.
+  fastify.get<{ Params: CardIdParams }>('/cards/:id/prices', {
+    preHandler: [fastify.authenticate],
+    schema: {
+      params: CARD_ID_PARAMS_SCHEMA,
+      response: {
+        200: CARD_PRICES_RESPONSE_SCHEMA,
+        404: ERROR_RESPONSE_SCHEMA,
+        503: ERROR_RESPONSE_SCHEMA,
+      },
+    },
+  }, async (request, reply) => {
+    const prices = await getPrices(request.params.id);
+    return reply.code(HTTP_STATUS.OK).send(prices);
+  });
+
+  fastify.get<{ Params: CardIdParams; Querystring: PriceHistoryQuerystring }>('/cards/:id/prices/history', {
+    preHandler: [fastify.authenticate],
+    schema: {
+      params: CARD_ID_PARAMS_SCHEMA,
+      querystring: PRICE_HISTORY_QUERYSTRING_SCHEMA,
+      response: {
+        200: CARD_PRICE_HISTORY_RESPONSE_SCHEMA,
+        404: ERROR_RESPONSE_SCHEMA,
+        503: ERROR_RESPONSE_SCHEMA,
+      },
+    },
+  }, async (request, reply) => {
+    const days = request.query.days ?? 30;
+    const history = await getPriceHistory(request.params.id, days);
+    return reply.code(HTTP_STATUS.OK).send(history);
   });
 
   fastify.get<{ Params: CardIdParams }>('/cards/:id', {

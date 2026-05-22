@@ -4,14 +4,7 @@ import { StyleSheet } from 'react-native';
 import { Colors, Radius, Spacing, Touch, Type } from '@src/constants/theme';
 
 export type CardDetailSheetViewStyles = {
-  root: Required<Pick<ViewStyle, 'flex' | 'backgroundColor'>>;
-  header: Required<
-    Pick<ViewStyle, 'flexDirection' | 'alignItems' | 'justifyContent' | 'paddingHorizontal' | 'paddingTop'>
-  >;
-  closeButton: Required<
-    Pick<ViewStyle, 'width' | 'height' | 'borderRadius' | 'alignItems' | 'justifyContent' | 'backgroundColor'>
-  >;
-  closeGlyph: Required<Pick<TextStyle, 'fontSize' | 'color' | 'lineHeight'>>;
+  root: Required<Pick<ViewStyle, 'flex' | 'backgroundColor' | 'paddingVertical'>>;
   scroll: Required<Pick<ViewStyle, 'paddingHorizontal' | 'paddingBottom' | 'gap'>>;
   hero: Required<Pick<ViewStyle, 'flexDirection' | 'gap' | 'alignItems'>>;
   heroImage: Required<Pick<ImageStyle, 'width' | 'height' | 'borderRadius' | 'backgroundColor'>>;
@@ -48,6 +41,11 @@ export type CardDetailSheetViewStyles = {
     Pick<ViewStyle, 'minHeight' | 'paddingHorizontal' | 'borderRadius' | 'borderWidth' | 'borderColor' | 'alignItems' | 'justifyContent'>
   >;
   retryLabel: Required<Pick<TextStyle, 'fontFamily' | 'fontSize' | 'color' | 'fontWeight'>>;
+  // Spec 020 — muted line used for the "no recent price data" annotation (FR-004)
+  // and the deferred-chart "coming soon" placeholder.
+  trendPlaceholder: Required<
+    Pick<TextStyle, 'fontFamily' | 'fontSize' | 'lineHeight' | 'color' | 'textAlign' | 'paddingVertical'>
+  >;
 };
 
 const HERO_IMAGE_W = 96;
@@ -57,26 +55,7 @@ const styles = StyleSheet.create<CardDetailSheetViewStyles>({
   root: {
     flex: 1,
     backgroundColor: Colors.dark.surfaceInverted,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-  },
-  closeButton: {
-    width: Touch.minTarget,
-    height: Touch.minTarget,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.06)',
-  },
-  closeGlyph: {
-    fontSize: 20,
-    lineHeight: 24,
-    color: Colors.dark.textInverted,
+    paddingVertical: Spacing.md,
   },
   scroll: {
     paddingHorizontal: Spacing.lg,
@@ -236,6 +215,14 @@ const styles = StyleSheet.create<CardDetailSheetViewStyles>({
     fontSize: Type.bodyStrong.size,
     color: Colors.dark.textInverted,
     fontWeight: Type.bodyStrong.weight,
+  },
+  trendPlaceholder: {
+    fontFamily: Type.body.font,
+    fontSize: Type.body.size,
+    lineHeight: Type.body.lineHeight,
+    color: Colors.dark.textMuted,
+    textAlign: 'center',
+    paddingVertical: Spacing.md,
   },
 });
 

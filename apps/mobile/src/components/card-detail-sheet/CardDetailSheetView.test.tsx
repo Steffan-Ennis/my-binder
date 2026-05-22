@@ -3,13 +3,19 @@
 // Covers identity (FR-001), three price rows incl. the disabled Goldfish
 // placeholder (FR-002), the `− N +` stepper with `−` disabled at 0 (FR-007),
 // skeleton placeholders while loading (FR-008), inline error + retry distinct
-// from the empty-data annotation (FR-009), the close control (FR-005), and a11y
-// labels (FR-010). `react-native-gifted-charts` is mocked in `jest.setup.ts`.
-// `render(...)` is only ever called inside `it(...)`; shared defaults live in
-// the module-scope `CardDetailSheetViewWithDefaults` wrapper (canonical
-// reference: `BinderHomeView.test.tsx`).
+// from the empty-data annotation (FR-009), and a11y labels (FR-010). The
+// 30-day trend chart is deferred (see the view header); the section renders the
+// "no recent price data" annotation when empty and a "coming soon" placeholder
+// otherwise. Dismissal is the form-sheet's native swipe-down, so there is no
+// in-sheet close control to test. `render(...)` is only ever called inside
+// `it(...)`; shared defaults live in the module-scope
+// `CardDetailSheetViewWithDefaults` wrapper (canonical reference:
+// `BinderHomeView.test.tsx`).
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render } from '@testing-library/react-native';
 import { FC } from 'react';
+
+import { useSessionStore } from '@src/stores/sessionStore';
 
 import { CARD_FIXTURE } from './fixtures';
 import CardDetailSheetView from './CardDetailSheetView';
@@ -19,6 +25,22 @@ import type {
   ChartSeries,
   PriceRowModel,
 } from './types';
+
+// The hero embeds <CardContainer />, which fetches its image via
+// useCardImagesQuery (TanStack + session). Mirror BinderHomeView.test.tsx:
+// drive useSession from the real store and wrap renders in a QueryClient whose
+// image data is pre-seeded, so the view stays a pure presentational render.
+jest.mock('@src/hooks/useSession', () => {
+  const { useSessionStore: store } = jest.requireActual('@src/stores/sessionStore');
+  return {
+    useSession: () => {
+      const s = store.getState();
+      return { status: s.status, userId: s.userId, email: s.email, jwt: s.jwt };
+    },
+  };
+});
+
+const CARD_ID = '6ca7af0b-4b6a-59ba-90be-6da4f62bcff1';
 
 const PRICE_ROWS: PriceRowModel[] = [
   { key: 'cardKingdom', label: 'Card Kingdom', display: '$17.23', swatchColor: '#c9a86b', disabled: false },
@@ -38,6 +60,7 @@ const CHART_LEGEND: ChartLegendEntry[] = [
 ];
 
 const defaults: CardDetailSheetViewProps = {
+  id: CARD_ID,
   error: null,
   isLoading: false,
   isSuccess: true,
@@ -45,7 +68,6 @@ const defaults: CardDetailSheetViewProps = {
   setLabel: 'The Lost Caverns of Ixalan · LCI',
   typeLine: CARD_FIXTURE.typeLine,
   oracle: 'Whenever an opponent loses life, you gain that much life.',
-  imageUrl: 'https://example/card.png',
   numberOwned: 2,
   canDecrement: true,
   onIncrement: jest.fn(),
@@ -60,9 +82,30 @@ const defaults: CardDetailSheetViewProps = {
   onClose: jest.fn(),
 };
 
+let client: QueryClient;
+
 const CardDetailSheetViewWithDefaults: FC<Partial<CardDetailSheetViewProps>> = (overrides) => (
-  <CardDetailSheetView {...defaults} {...overrides} />
+  <QueryClientProvider client={client}>
+    <CardDetailSheetView {...defaults} {...overrides} />
+  </QueryClientProvider>
 );
+
+beforeEach(() => {
+  useSessionStore.setState({ jwt: 'tok', iat: 1, userId: 'u', email: 'e@x.com', status: 'active' });
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // Pre-seed the hero image so <CardContainer /> resolves without a fetch.
+  client.setQueryData(['cards', 'images', CARD_ID], {
+    small: 'https://example/s.jpg',
+    medium: 'https://example/m.jpg',
+    large: 'https://example/l.jpg',
+  });
+});
+
+afterEach(() => {
+  client.cancelQueries();
+  client.clear();
+  client.unmount();
+});
 
 describe('CardDetailSheetView', () => {
   describe('identity header (FR-001)', () => {
@@ -189,12 +232,11 @@ describe('CardDetailSheetView', () => {
     });
   });
 
-  describe('close control (FR-005)', () => {
-    it('fires onClose when the close control is pressed', () => {
-      const onClose = jest.fn();
-      const screen = render(<CardDetailSheetViewWithDefaults onClose={onClose} />);
-      fireEvent.press(screen.getByLabelText('Close card details'));
-      expect(onClose).toHaveBeenCalledTimes(1);
+  describe('trend chart deferral (FR-003 deferred)', () => {
+    it('renders a "coming soon" placeholder instead of a chart when history is ready', () => {
+      const screen = render(<CardDetailSheetViewWithDefaults historyStatus="ready" />);
+      expect(screen.getByText('Price trend chart coming soon')).toBeTruthy();
+      expect(screen.queryByTestId('gifted-line-chart')).toBeNull();
     });
   });
 });

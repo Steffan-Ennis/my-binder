@@ -48,23 +48,9 @@ jest.mock('expo-image', () => {
   return { Image: View };
 });
 
-// Spec 020 — `react-native-gifted-charts` is a new third-party dependency, so
-// per the Mobile mocking convention (Principle III) its mock lands here. The
-// real `LineChart` renders an `react-native-svg` canvas we don't want to drive
-// in unit tests; instead `LineChart` becomes a `react-native` `View` that
-// records the props it received (data / data2 / axis labels), so
-// `PriceTrendChart.test.tsx` asserts the props passed to the chart rather than
-// the rendered SVG. A default `testID` is set first so the consumer can still
-// override it.
-jest.mock('react-native-gifted-charts', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { View } = require('react-native');
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const React = require('react');
-  const LineChart = (props: Record<string, unknown>) =>
-    React.createElement(View, { testID: 'gifted-line-chart', ...props });
-  return { __esModule: true, LineChart };
-});
+// Spec 020 — the 30-day price-trend chart (`react-native-gifted-charts`) is
+// deferred; the dependency was removed, so there is no chart mock here. The
+// price-history data layer (query + `priceSeriesToChartData`) is retained.
 
 jest.mock('react-native-pager-view', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports

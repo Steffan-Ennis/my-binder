@@ -2,28 +2,12 @@ import type {
   Card, CardList, CreateCardBody,
   UpdateCardBody, LegalityResult,
   SearchQuery, SearchResult, CardImages,
+  CardDetails, CardPricesResponse, CardPriceHistoryResponse,
 } from '@my-binder/core';
 import { getRepositories } from '@src/db/repositories';
 import type { AdjustNumberOwnedResult } from '@src/repositories/cardRepository';
 import { registry } from '@src/providers/registry';
 import { CardProvider } from "@src/providers/interface";
-
-async function enrichCard(card: Card, provider: CardProvider | null): Promise<Card> {
-  if (provider === null) return card;
-  try {
-    const details = await provider.getByUuid(card.id);
-    if (details === null) return card;
-    return {
-      ...card,
-      setCode: details.setCode,
-      ...(details.setName !== null && { setName: details.setName }),
-      typeLine: details.typeLine,
-    };
-  } catch (err) {
-    console.error(`[cardService] enrichment failed for card id=${card.id}`, err);
-    return card;
-  }
-}
 
 function getProviderOrNull(): CardProvider | null {
   try {
@@ -92,9 +76,7 @@ export async function getCards(userId: string): Promise<CardList> {
  * ```
  */
 export async function getCard(id: string, userId: string): Promise<Card> {
-
   let activeProvider: CardProvider;
-
   try {
     activeProvider = registry.getActive();
   } catch (error) {
@@ -102,24 +84,36 @@ export async function getCard(id: string, userId: string): Promise<Card> {
     throw new ProviderUnavailableError();
   }
 
+  // Combine the MTGJSON printing record (display metadata for the detail sheet)
+  // with the user's binder row (owned count + timestamps). A failed provider
+  // read degrades to the binder row alone rather than failing the request.
+  let mtgRecord: CardDetails | null = null;
+  try {
+    mtgRecord = await activeProvider.getByUuid(id);
+  } catch (error) {
+    console.error(`[cardService] getByUuid failed for id=${id}`, error);
+  }
+  const binderRecord = await getRepositories().card.findById(id, userId);
 
-
-  const mtgRecord = await activeProvider.getByUuid(id)
-  const binderRecord = await getRepositories().card.findById(id, userId)
-
-  const card = {
-    id: mtgRecord?.uuid!,
-    createdAt: binderRecord?.createdAt ?? '',
-    updatedAt: binderRecord?.updatedAt ?? '',
-    numberOwned: binderRecord?.numberOwned ?? 0,
-    name: mtgRecord?.name!,
-    setCode: mtgRecord?.setCode!,
-    setName: mtgRecord?.setName!,
-    typeLine: mtgRecord?.typeLine,
-    oracle: mtgRecord?.oracle!,
+  // Neither the catalogue (MTGJSON) nor the binder knows this id → 404.
+  if (mtgRecord === null && binderRecord === null) {
+    throw new NotFoundError(id);
   }
 
-  return enrichCard(card, getProviderOrNull());
+  return {
+    id,
+    name: mtgRecord?.name ?? binderRecord!.name,
+    numberOwned: binderRecord?.numberOwned ?? 0,
+    // createdAt/updatedAt only exist for owned (binder) rows; omit them
+    // entirely for an unowned catalogue printing so the response stays valid
+    // against the `date-time` format (an empty string would fail Ajv).
+    ...(binderRecord?.createdAt !== undefined && { createdAt: binderRecord.createdAt }),
+    ...(binderRecord?.updatedAt !== undefined && { updatedAt: binderRecord.updatedAt }),
+    ...(mtgRecord?.setCode !== undefined && { setCode: mtgRecord.setCode }),
+    ...(mtgRecord?.setName != null && { setName: mtgRecord.setName }),
+    ...(mtgRecord?.typeLine !== undefined && { typeLine: mtgRecord.typeLine }),
+    ...(mtgRecord?.oracle != null && { oracle: mtgRecord.oracle }),
+  };
 }
 
 /**
@@ -380,6 +374,97 @@ export async function getCardImagesById(id: string): Promise<CardImages> {
 
   if (images === null) throw new CardNotFoundError(id);
   return images;
+}
+
+/**
+ * Assert that a printing exists in the active provider's catalogue, raising
+ * `NotFoundError` (→ 404) for unknown ids. The price reads use this to
+ * distinguish an unknown printing (404) from a known printing that simply has
+ * no observation — the latter is a valid 200 with `null` slots / empty series.
+ */
+async function assertPrintingExists(provider: CardProvider, id: string): Promise<void> {
+  let details: CardDetails | null;
+  try {
+    details = await provider.getByUuid(id);
+  } catch (error) {
+    console.error(error);
+    throw new ProviderUnavailableError();
+  }
+  if (details === null) throw new NotFoundError(id);
+}
+
+/**
+ * Latest paper-retail price per source (Card Kingdom, TCG Player) for a single
+ * printing (spec 020 / FR-017). An unknown printing is a 404 (`NotFoundError`);
+ * a known printing with no observation returns `null` slots (a valid 200,
+ * FR-004). Any provider failure — including no active provider — becomes
+ * `ProviderUnavailableError` (503).
+ *
+ * @param id - MTGJSON printing UUID.
+ * @returns The per-source `CardPricesResponse`.
+ * @throws NotFoundError when the printing id is unknown.
+ * @throws ProviderUnavailableError on any provider failure or when no provider is active.
+ *
+ * @example
+ * ```ts
+ * const prices = await getPrices('6ca7af0b-…');
+ * // { printingId: '6ca7af0b-…', cardKingdom: { … }, tcgPlayer: null }
+ * ```
+ */
+export async function getPrices(id: string): Promise<CardPricesResponse> {
+  let provider: CardProvider;
+  try {
+    provider = registry.getActive();
+  } catch (error) {
+    console.error(error);
+    throw new ProviderUnavailableError();
+  }
+
+  await assertPrintingExists(provider, id);
+
+  try {
+    return await provider.getPrices(id);
+  } catch (error) {
+    console.error(error);
+    throw new ProviderUnavailableError();
+  }
+}
+
+/**
+ * Per-source paper-retail price series over the last `days` calendar days
+ * ending today (default 30) for a single printing (spec 020 / FR-018). Same
+ * not-found / unavailable semantics as {@link getPrices}; both series empty is
+ * a valid response (FR-004).
+ *
+ * @param id - MTGJSON printing UUID.
+ * @param days - History window length in days (default 30).
+ * @returns The per-source `CardPriceHistoryResponse`.
+ * @throws NotFoundError when the printing id is unknown.
+ * @throws ProviderUnavailableError on any provider failure or when no provider is active.
+ *
+ * @example
+ * ```ts
+ * const history = await getPriceHistory('6ca7af0b-…');     // last 30 days
+ * const week    = await getPriceHistory('6ca7af0b-…', 7);  // last 7 days
+ * ```
+ */
+export async function getPriceHistory(id: string, days = 30): Promise<CardPriceHistoryResponse> {
+  let provider: CardProvider;
+  try {
+    provider = registry.getActive();
+  } catch (error) {
+    console.error(error);
+    throw new ProviderUnavailableError();
+  }
+
+  await assertPrintingExists(provider, id);
+
+  try {
+    return await provider.getPriceHistory(id, days);
+  } catch (error) {
+    console.error(error);
+    throw new ProviderUnavailableError();
+  }
 }
 
 export async function searchCards(query: SearchQuery): Promise<SearchResult> {

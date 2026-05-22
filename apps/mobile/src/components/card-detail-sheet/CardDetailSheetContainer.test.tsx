@@ -32,6 +32,7 @@ beforeEach(() => {
 describe('CardDetailSheetContainer — named-props bridge', () => {
   it('wires every documented view-prop field to <CardDetailSheetView /> by name (no spread)', () => {
     const props: CardDetailSheetViewProps = {
+      id: '6ca7af0b-4b6a-59ba-90be-6da4f62bcff1',
       error: null,
       isLoading: false,
       isSuccess: true,
@@ -39,7 +40,6 @@ describe('CardDetailSheetContainer — named-props bridge', () => {
       setLabel: 'The Lost Caverns of Ixalan · LCI',
       typeLine: 'Legendary Creature — Demon',
       oracle: 'Whenever an opponent loses life, you gain that much life.',
-      imageUrl: 'https://example/card.png',
       numberOwned: 2,
       canDecrement: true,
       onIncrement: jest.fn(),

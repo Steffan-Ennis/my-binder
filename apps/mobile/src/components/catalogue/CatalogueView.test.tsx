@@ -54,6 +54,7 @@ const defaults: CatalogueViewProps = {
   onFilterSheetOpen: jest.fn(),
   onFilterClear: jest.fn(),
   onRefreshPress: jest.fn(),
+  onCardPress: jest.fn(),
 };
 
 const CatalogueViewWithDefaults: FC<Partial<CatalogueViewProps>> = (overrides) => (

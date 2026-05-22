@@ -1,11 +1,15 @@
-// Spec 020 — presentational sheet body (FR-001/002/004/005/007/008/009/010).
+// Spec 020 — presentational sheet body (FR-001/002/004/007/008/009/010).
 // `FC<CardDetailSheetViewProps>`, props-only: identity hero, the `− N +`
-// ownership stepper, three price rows (MTG Goldfish a disabled "coming soon"
-// placeholder), and the 30-day `<PriceTrendChart />`. Each data section maps
-// its four-state status to skeleton (loading) / inline error + retry (failure,
-// visually distinct from the empty annotation) / content. Styles live in
-// `CardDetailSheetView.theme.ts`; the chart geometry + empty annotation are the
-// chart's concern.
+// ownership stepper, and three price rows (MTG Goldfish a disabled "coming
+// soon" placeholder). Each data section maps its four-state status to skeleton
+// (loading) / inline error + retry (failure, visually distinct from the empty
+// annotation) / content. Dismissal is the form-sheet's native swipe-down.
+//
+// The 30-day price-trend CHART is deferred: the section keeps its loading /
+// error / "no recent price data" (FR-004) states, and shows a "coming soon"
+// placeholder where the chart will return. The `chartSeries` / `chartLegend`
+// props are still supplied by the hook (history data layer is intact) but not
+// yet rendered. Styles live in `CardDetailSheetView.theme.ts`.
 import type { FC } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
@@ -74,7 +78,6 @@ const CardDetailSheetView: FC<CardDetailSheetViewProps> = ({
   setLabel,
   typeLine,
   oracle,
-  imageUrl,
   numberOwned,
   canDecrement,
   onIncrement,
@@ -82,27 +85,13 @@ const CardDetailSheetView: FC<CardDetailSheetViewProps> = ({
   priceRows,
   pricesStatus,
   onRetryPrices,
-  chartSeries,
-  chartLegend,
   historyStatus,
   onRetryHistory,
-  onClose,
 }) => {
   const styles = useStyles();
 
   return (
     <View style={styles.root} testID="card-detail-sheet">
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Close card details"
-          onPress={onClose}
-          style={styles.closeButton}
-        >
-          <Text style={styles.closeGlyph}>✕</Text>
-        </Pressable>
-      </View>
-
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.hero}>
           <CardContainer
@@ -169,8 +158,10 @@ const CardDetailSheetView: FC<CardDetailSheetViewProps> = ({
               retryLabel="Retry loading price history"
               onRetry={onRetryHistory}
             />
+          ) : historyStatus === 'empty' ? (
+            <Text style={styles.trendPlaceholder}>no recent price data</Text>
           ) : (
-            <></>
+            <Text style={styles.trendPlaceholder}>Price trend chart coming soon</Text>
           )}
         </View>
       </ScrollView>
