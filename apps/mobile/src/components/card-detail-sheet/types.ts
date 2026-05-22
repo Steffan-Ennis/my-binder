@@ -71,7 +71,7 @@ export type CardDetailSheetViewProps = Pick<
   setLabel?: string;
   typeLine?: string;
   oracle?: string;
-  imageUrl?: string;
+  id: string;
 
   // Ownership stepper (FR-007).
   numberOwned: number;

@@ -82,6 +82,7 @@ export type CardDetails = {
   cardNumber: string;
   typeLine: string;
   scryfallId: string | null;
+  oracle: string | null;
 };
 
 // Scryfall CDN image URLs for a single printing at three sizes.

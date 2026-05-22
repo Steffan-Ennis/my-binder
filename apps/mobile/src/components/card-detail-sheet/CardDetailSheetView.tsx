@@ -6,12 +6,12 @@
 // visually distinct from the empty annotation) / content. Styles live in
 // `CardDetailSheetView.theme.ts`; the chart geometry + empty annotation are the
 // chart's concern.
-import { Image } from 'expo-image';
 import type { FC } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import useStyles from './CardDetailSheetView.theme';
 import type { CardDetailSheetViewProps, PriceRowModel } from './types';
+import CardContainer from "@src/components/card/CardContainer";
 
 const RetryBlock: FC<{ message: string; retryLabel: string; onRetry: () => void }> = ({
   message,
@@ -69,6 +69,7 @@ const PriceRow: FC<{ row: PriceRowModel }> = ({ row }) => {
 };
 
 const CardDetailSheetView: FC<CardDetailSheetViewProps> = ({
+  id,
   name,
   setLabel,
   typeLine,
@@ -104,15 +105,10 @@ const CardDetailSheetView: FC<CardDetailSheetViewProps> = ({
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.hero}>
-          {imageUrl ? (
-            <Image
-              style={styles.heroImage}
-              source={{ uri: imageUrl }}
-              accessibilityLabel={name ? `${name} card image` : 'Card image'}
-            />
-          ) : (
-            <View style={styles.heroImage} />
-          )}
+          <CardContainer
+            footprint={'pocket'}
+            id={id}
+          />
           <View style={styles.heroText}>
             {name ? <Text style={styles.name}>{name}</Text> : null}
             {setLabel ? <Text style={styles.setLabel}>{setLabel}</Text> : null}

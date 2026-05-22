@@ -243,6 +243,7 @@ class MtgjsonProvider implements CardProvider {
       setName: setInfo?.name ?? null,
       cardNumber: card.number,
       typeLine: card.type,
+      oracle: card.originalText!,
       scryfallId,
     };
   }

@@ -11,6 +11,7 @@ export interface Card {
   setName?: string;
   setCode?: string;
   typeLine?: string;
+  oracle?: string;
   // Spec 018 / FR-023: physical copies the signed-in user owns for this
   // printing. Present on all /cards responses (always >= 1 — the binder never
   // returns zero-count rows). May be absent on legacy fixtures.

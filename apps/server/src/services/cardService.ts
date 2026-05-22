@@ -92,8 +92,33 @@ export async function getCards(userId: string): Promise<CardList> {
  * ```
  */
 export async function getCard(id: string, userId: string): Promise<Card> {
-  const card = await getRepositories().card.findById(id, userId);
-  if (card === null) throw new NotFoundError(id);
+
+  let activeProvider: CardProvider;
+
+  try {
+    activeProvider = registry.getActive();
+  } catch (error) {
+    console.error(error);
+    throw new ProviderUnavailableError();
+  }
+
+
+
+  const mtgRecord = await activeProvider.getByUuid(id)
+  const binderRecord = await getRepositories().card.findById(id, userId)
+
+  const card = {
+    id: mtgRecord?.uuid!,
+    createdAt: binderRecord?.createdAt ?? '',
+    updatedAt: binderRecord?.updatedAt ?? '',
+    numberOwned: binderRecord?.numberOwned ?? 0,
+    name: mtgRecord?.name!,
+    setCode: mtgRecord?.setCode!,
+    setName: mtgRecord?.setName!,
+    typeLine: mtgRecord?.typeLine,
+    oracle: mtgRecord?.oracle!,
+  }
+
   return enrichCard(card, getProviderOrNull());
 }
 

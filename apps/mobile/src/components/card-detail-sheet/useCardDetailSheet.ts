@@ -183,14 +183,14 @@ const useCardDetailSheet = ({ printingId }: UseCardDetailSheetOptions): UseCardD
 
   return useMemo<UseCardDetailSheetResult>(
     () => ({
+      id: printingId,
       error: detailQuery.error,
       isLoading: detailQuery.isLoading,
       isSuccess: detailQuery.isSuccess,
       name: detailQuery.data?.name,
       setLabel,
       typeLine: detailQuery.data?.typeLine,
-      oracle: undefined,
-      imageUrl: undefined,
+      oracle: detailQuery.data?.oracle,
       numberOwned,
       canDecrement,
       onIncrement,
@@ -222,6 +222,7 @@ const useCardDetailSheet = ({ printingId }: UseCardDetailSheetOptions): UseCardD
       historyStatus,
       onRetryHistory,
       onClose,
+      printingId,
     ],
   );
 };

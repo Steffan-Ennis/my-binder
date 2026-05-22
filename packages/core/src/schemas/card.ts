@@ -14,6 +14,7 @@ export const CARD_RESPONSE_SCHEMA = {
     setName: { type: 'string' },
     setCode: { type: 'string' },
     typeLine: { type: 'string' },
+    oracle: { type: 'string' },
     // Spec 018 / FR-023 — owned-count per (id, userId). minimum: 0 here so the
     // catalogue path (which COALESCEs missing rows to 0) validates against
     // the same schema as /cards; the DB-layer CHECK >= 1 enforces the binder

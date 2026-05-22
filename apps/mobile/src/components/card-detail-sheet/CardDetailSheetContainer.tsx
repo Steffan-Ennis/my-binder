@@ -16,7 +16,6 @@ const CardDetailSheetContainer: FC<{ printingId: string }> = ({ printingId }) =>
     setLabel,
     typeLine,
     oracle,
-    imageUrl,
     numberOwned,
     canDecrement,
     onIncrement,
@@ -33,6 +32,7 @@ const CardDetailSheetContainer: FC<{ printingId: string }> = ({ printingId }) =>
 
   return (
     <CardDetailSheetView
+      id={printingId}
       error={error}
       isLoading={isLoading}
       isSuccess={isSuccess}
@@ -40,7 +40,6 @@ const CardDetailSheetContainer: FC<{ printingId: string }> = ({ printingId }) =>
       setLabel={setLabel}
       typeLine={typeLine}
       oracle={oracle}
-      imageUrl={imageUrl}
       numberOwned={numberOwned}
       canDecrement={canDecrement}
       onIncrement={onIncrement}
