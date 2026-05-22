@@ -37,7 +37,6 @@ const defaults: CatalogueViewProps = {
   totalPages: null,
   summaryCaption: '— MATCHES · — PER PAGE',
   error: null,
-  hasNextPage: false,
   isLoading: false,
   isFetchingNextPage: false,
   isError: false,
@@ -45,7 +44,6 @@ const defaults: CatalogueViewProps = {
   isSearchActive: false,
   searchQuery: '',
   hasActiveQuery: false,
-  filterPills: [],
   resultsAreStale: false,
   onSearchOpen: jest.fn(),
   onSearchChange: jest.fn(),
@@ -96,17 +94,6 @@ describe('CatalogueView', () => {
   });
 
   describe('page indicator (FR-010, FR-013)', () => {
-    it('renders italic "N of many" while hasNextPage=true', () => {
-      render(
-        <CatalogueViewWithDefaults
-          pages={[onePage([makeCard('1', 'a')])]}
-          currentPage={1}
-          totalPages={null}
-          hasNextPage
-        />,
-      );
-      expect(screen.getByTestId('catalogue-page-indicator')).toHaveTextContent('1 of many');
-    });
 
     it('renders italic "N of M" once the result set is exhausted', () => {
       render(
@@ -114,7 +101,6 @@ describe('CatalogueView', () => {
           pages={[onePage([makeCard('1', 'a')])]}
           currentPage={1}
           totalPages={3}
-          hasNextPage={false}
         />,
       );
       expect(screen.getByTestId('catalogue-page-indicator')).toHaveTextContent('1 of 3');
@@ -138,32 +124,6 @@ describe('CatalogueView', () => {
       expect(screen.getByTestId('catalogue-filter-pill-row')).toBeOnTheScreen();
       expect(screen.getByTestId('filter-opener-pill')).toBeOnTheScreen();
     });
-
-    it('renders one pill per active filter dimension', () => {
-      render(
-        <CatalogueViewWithDefaults
-          filterPills={[
-            { id: 'format:Modern', label: 'Format: Modern' },
-            { id: 'color:R', label: 'Colour: R' },
-          ]}
-        />,
-      );
-      expect(screen.getByTestId('filter-pill-format:Modern')).toBeOnTheScreen();
-      expect(screen.getByTestId('filter-pill-color:R')).toBeOnTheScreen();
-    });
-
-    it('tapping a pill fires onFilterPillRemove with the pill id', () => {
-      const onFilterPillRemove = jest.fn();
-      render(
-        <CatalogueViewWithDefaults
-          filterPills={[{ id: 'format:Modern', label: 'Format: Modern' }]}
-          onFilterPillRemove={onFilterPillRemove}
-        />,
-      );
-      fireEvent.press(screen.getByTestId('filter-pill-format:Modern'));
-      expect(onFilterPillRemove).toHaveBeenCalledWith('format:Modern');
-    });
-
     it('tapping the Filters opener fires onFilterSheetOpen', () => {
       const onFilterSheetOpen = jest.fn();
       render(<CatalogueViewWithDefaults onFilterSheetOpen={onFilterSheetOpen} />);
@@ -176,7 +136,6 @@ describe('CatalogueView', () => {
       render(
         <CatalogueViewWithDefaults
           isEmpty
-          filterPills={[{ id: 'format:Modern', label: 'Format: Modern' }]}
           onFilterClear={onFilterClear}
         />,
       );
