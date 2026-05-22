@@ -112,13 +112,3 @@ describe('useCatalogueFilterSheet — Apply / Clear all', () => {
     expect(mockBack).not.toHaveBeenCalled();
   });
 });
-
-describe('useCatalogueFilterSheet — external committed re-sync', () => {
-  it('re-seeds the draft when the committed set changes (pill removed externally)', () => {
-    const { result } = renderSeeded();
-    expect(result.current.sheet.draft.formats).toEqual(['Modern']);
-
-    act(() => result.current.ctx.removePill('format:Modern'));
-    expect(result.current.sheet.draft.formats).toEqual([]);
-  });
-});

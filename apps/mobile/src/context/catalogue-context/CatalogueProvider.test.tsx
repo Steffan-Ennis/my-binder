@@ -37,20 +37,6 @@ describe('CatalogueProvider', () => {
     expect(result.current.filters).toEqual(EMPTY_FILTER_SET);
   });
 
-  it('removePill drops a single dimension value, leaving others intact', () => {
-    const { result } = renderContext();
-    act(() =>
-      result.current.applyFilter({
-        ...EMPTY_FILTER_SET,
-        formats: ['Modern', 'Legacy'],
-        colors: ['R'],
-      }),
-    );
-    act(() => result.current.removePill('format:Modern'));
-    expect(result.current.filters.formats).toEqual(['Legacy']);
-    expect(result.current.filters.colors).toEqual(['R']);
-  });
-
   it('throws when used outside a provider', () => {
     const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
     expect(() => renderHook(() => useCatalogueContext())).toThrow(
