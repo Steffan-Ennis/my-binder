@@ -309,7 +309,8 @@ class MtgjsonProvider implements CardProvider {
     try {
       const cards = await this.sdk.cards.getByName('Lightning Bolt');
       return cards.length > 0;
-    } catch {
+    } catch (error) {
+      console.error(error)
       return false;
     }
   }

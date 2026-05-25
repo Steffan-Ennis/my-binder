@@ -75,8 +75,7 @@ export class MyBinderStack extends cdk.Stack {
     // Persistent storage for DuckDB database and MTGJSON parquet cache.
     const fileSystem = new efs.FileSystem(this, 'FileSystem', {
       vpc,
-      performanceMode: efs.PerformanceMode.GENERAL_PURPOSE,
-      throughputMode: efs.ThroughputMode.ELASTIC,
+      performanceMode: efs.PerformanceMode.MAX_IO,
       removalPolicy: cdk.RemovalPolicy.RETAIN, // Never delete data on stack destroy.
     });
 
@@ -222,7 +221,6 @@ export class MyBinderStack extends cdk.Stack {
       filesystem: lambda.FileSystem.fromEfsAccessPoint(accessPoint, '/mnt/data'),
       environment: {
         NODE_ENV: 'production',
-        DB_PATH: '/mnt/data/db/binder.duckdb',
         MTGJSON_CACHE_DIR: '/mnt/data/mtgjson-cache',
         CARD_PROVIDER: 'mtgjson',
         EFS_PATH: '/mnt/data',

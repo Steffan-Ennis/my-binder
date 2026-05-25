@@ -130,8 +130,6 @@ export class ProviderRegistry {
   async setActive(name: string): Promise<void> {
     const provider = this.providers.get(name);
     if (!provider) throw new ProviderRegistryNotFoundError(name);
-    const reachable = await provider.isReachable();
-    if (!reachable) throw new ProviderRegistryUnreachableError(name);
     this.activeName = name;
   }
 

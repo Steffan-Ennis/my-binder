@@ -52,7 +52,7 @@ export const useCatalogueInfiniteQuery = (
   >({
     queryKey: ['catalogue', 'search', filters] as const,
     queryFn: ({ pageParam }) =>
-      apiClient.searchCards({ ...filters, page: pageParam, limit: SLOTS_PER_BINDER_PAGE }),
+      apiClient.searchCards({ ...filters, page: pageParam, limit: 9 }),
     initialPageParam: 1,
     getNextPageParam: (lastPage) =>
       lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined,

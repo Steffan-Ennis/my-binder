@@ -1,6 +1,4 @@
-import { mkdir } from 'node:fs/promises';
-import { rmSync } from "node:fs";
-import { readdir } from 'node:fs/promises';
+import { mkdir, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
 /**
@@ -36,20 +34,43 @@ import { join } from 'node:path';
  */
 export async function initEfs(efsPath: string): Promise<void> {
   await Promise.all([
-    mkdir(join(efsPath, 'db'), { recursive: true }),
     mkdir(join(efsPath, 'mtgjson-cache'), { recursive: true }),
   ]);
 
-  try {
-    const mtgJSONCache = join(efsPath, 'mtgjson-cache', 'parquet')
-    const files = await readdir(
-      mtgJSONCache
-    );
-    files.forEach(f => rmSync(join(mtgJSONCache, f)))
-  }
-  catch (error) {
-    // Intentional swallow — see function-level JSDoc note (Principle VIII rationale).
-    console.error(error)
-  }
+  await logCacheContents(join(efsPath, 'mtgjson-cache'));
+}
 
+/**
+ * Recursively walk `dir`, logging every file's path and size in bytes. Used to
+ * inspect the MTGJSON SDK's parquet cache on the EFS mount at startup.
+ *
+ * Like {@link initEfs}'s cleanup step, this is best-effort and swallows errors
+ * with `console.error` (Principle VIII) — the directory may not exist on a fresh
+ * cold start, and a logging failure must never brick the Lambda.
+ *
+ * @param dir - Directory to walk (e.g. `<efsPath>/mtgjson-cache`).
+ *
+ * @example
+ * ```ts
+ * await logCacheContents('/mnt/efs/mtgjson-cache');
+ * // mtgjson-cache:
+ * //   /mnt/efs/mtgjson-cache/parquet/cards.parquet — 1048576 bytes
+ * ```
+ */
+async function logCacheContents(dir: string): Promise<void> {
+  try {
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const entryPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await logCacheContents(entryPath);
+      } else {
+        const { size } = await stat(entryPath);
+        console.log(`${entryPath} — ${size} bytes`);
+      }
+    }
+  } catch (error) {
+    // Intentional swallow — see function-level JSDoc note (Principle VIII rationale).
+    console.error(error);
+  }
 }
