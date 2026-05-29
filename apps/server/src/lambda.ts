@@ -10,8 +10,17 @@ import { buildApp } from './app';
 //   3. MTGJSON SDK parquet download/cache check
 //   4. Card import from parquet into DuckDB
 // Subsequent warm invocations reuse this context with no re-initialisation.
+// `parseCommaSeparatedQueryParams` defaults to `true` in @fastify/aws-lambda v6,
+// which auto-splits any comma-containing v2.0 query value into an array before it
+// reaches Fastify (e.g. `creature_types=Human, Dwarf` → ["Human", " Dwarf"]). Our
+// routes expect these filters as raw comma-separated *strings* (schema declares
+// `type: 'string'`; the handlers call `.split(',')` themselves), so we disable it
+// to make the Lambda path behave identically to local dev.
 const proxyPromise = buildApp().then(({ fastify }) =>
-  awsLambdaFastify(fastify, { callbackWaitsForEmptyEventLoop: false }),
+  awsLambdaFastify(fastify, {
+    callbackWaitsForEmptyEventLoop: false,
+    parseCommaSeparatedQueryParams: false,
+  }),
 );
 
 export async function handler(
