@@ -48,9 +48,22 @@ jest.mock('expo-image', () => {
   return { Image: View };
 });
 
-// Spec 020 — the 30-day price-trend chart (`react-native-gifted-charts`) is
-// deferred; the dependency was removed, so there is no chart mock here. The
-// price-history data layer (query + `priceSeriesToChartData`) is retained.
+// Spec 021 — the 30-day price-trend chart (`react-native-gifted-charts`) is
+// re-introduced (spec 020 deferred it and removed the dependency). Restore the
+// shared mock: render `LineChart` as a `react-native` View tagged
+// `testID="line-chart"` that records the props the chart hands the library
+// (`data`, `data2`, `width`, axis/legend props) so tests assert the prop
+// contract rather than the real SVG canvas. Per-test `jest.mock(...)` is
+// prohibited — tests use `jest.spyOn` against this shared mock.
+jest.mock('react-native-gifted-charts', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { View } = require('react-native');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const React = require('react');
+  const LineChart = (props: Record<string, unknown>) =>
+    React.createElement(View, { testID: 'line-chart', ...props });
+  return { __esModule: true, LineChart };
+});
 
 jest.mock('react-native-pager-view', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports

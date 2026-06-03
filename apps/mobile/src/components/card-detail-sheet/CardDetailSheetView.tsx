@@ -1,19 +1,19 @@
-// Spec 020 — presentational sheet body (FR-001/002/004/007/008/009/010).
+// Spec 020 / 021 — presentational sheet body (FR-001/002/004/007/008/009/010).
 // `FC<CardDetailSheetViewProps>`, props-only: identity hero, the `− N +`
 // ownership stepper, and three price rows (MTG Goldfish a disabled "coming
 // soon" placeholder). Each data section maps its four-state status to skeleton
 // (loading) / inline error + retry (failure, visually distinct from the empty
 // annotation) / content. Dismissal is the form-sheet's native swipe-down.
 //
-// The 30-day price-trend CHART is deferred: the section keeps its loading /
-// error / "no recent price data" (FR-004) states, and shows a "coming soon"
-// placeholder where the chart will return. The `chartSeries` / `chartLegend`
-// props are still supplied by the hook (history data layer is intact) but not
-// yet rendered. Styles live in `CardDetailSheetView.theme.ts`.
+// Spec 021 re-introduced the 30-day price-trend CHART: the section's `ready`
+// branch now renders <PriceTrendChart/> from the hook-supplied `chartSeries` /
+// `chartLegend`. The loading / error / "no recent price data" (FR-004) states
+// are unchanged. Styles live in `CardDetailSheetView.theme.ts`.
 import type { FC } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import useStyles from './CardDetailSheetView.theme';
+import PriceTrendChart from './PriceTrendChart';
 import type { CardDetailSheetViewProps, PriceRowModel } from './types';
 import CardContainer from "@src/components/card/CardContainer";
 
@@ -85,6 +85,8 @@ const CardDetailSheetView: FC<CardDetailSheetViewProps> = ({
   priceRows,
   pricesStatus,
   onRetryPrices,
+  chartSeries,
+  chartLegend,
   historyStatus,
   onRetryHistory,
 }) => {
@@ -161,7 +163,7 @@ const CardDetailSheetView: FC<CardDetailSheetViewProps> = ({
           ) : historyStatus === 'empty' ? (
             <Text style={styles.trendPlaceholder}>no recent price data</Text>
           ) : (
-            <Text style={styles.trendPlaceholder}>Price trend chart coming soon</Text>
+            <PriceTrendChart chartSeries={chartSeries} chartLegend={chartLegend} />
           )}
         </View>
       </ScrollView>
