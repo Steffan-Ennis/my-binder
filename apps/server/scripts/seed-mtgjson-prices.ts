@@ -18,7 +18,7 @@
 // Re-run whenever MTGJSON publishes a new daily version.
 
 import { createWriteStream, existsSync, statSync } from 'node:fs';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import {mkdir, readFile, rename, rm, writeFile} from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -99,13 +99,16 @@ async function downloadAttempt(
   tmp: string,
   total: number,
   supportsResume: boolean,
+  responseStream?: awslambda.HttpResponseStream
 ): Promise<void> {
   const existing = supportsResume && existsSync(tmp) ? statSync(tmp).size : 0;
   const headers = existing > 0 ? { Range: `bytes=${existing}-` } : undefined;
   const res = await fetch(PARQUET_URL, headers ? { headers } : undefined);
 
   let base: number;
-  let flags: 'a' | 'w';
+  // This is typed as string but expects the following
+  // https://nodejs.org/api/fs.html#file-system-flags
+  let flags:  'a' | 'w';
   if (res.status === 206) {
     base = existing; // server honoured the range — append
     flags = 'a';
@@ -134,6 +137,10 @@ async function downloadAttempt(
       `\r  ${formatBytes(downloaded)} / ${formatBytes(total)} (${pct}%)  ` +
         `${formatBytes(instSpeed)}/s  ETA ${formatDuration(eta)}      `,
     );
+    responseStream?.write(
+      `\r  ${formatBytes(downloaded)} / ${formatBytes(total)} (${pct}%)  ` +
+      `${formatBytes(instSpeed)}/s  ETA ${formatDuration(eta)}      `,
+    )
   }, 1000);
 
   try {
@@ -144,7 +151,7 @@ async function downloadAttempt(
   }
 }
 
-async function main(): Promise<void> {
+async function main(responseStream?: awslambda.HttpResponseStream ): Promise<void> {
   const force = process.argv.includes('--force');
   const cacheDir = resolve(resolveCacheDir());
   const parquetDir = join(cacheDir, 'parquet');
@@ -152,14 +159,14 @@ async function main(): Promise<void> {
   const tmp = `${dest}.tmp`;
   const versionFile = join(cacheDir, 'version.txt');
 
-  console.log(`Cache dir:   ${cacheDir}`);
-  console.log(`Target file: ${dest}`);
+  responseStream?.write(`Cache dir:   ${cacheDir}`);
+  responseStream?.write(`Target file: ${dest}`);
 
   const remoteVersion = await fetchRemoteVersion();
-  console.log(`Remote MTGJSON version: ${remoteVersion}`);
+  responseStream?.write(`Remote MTGJSON version: ${remoteVersion}`);
 
   const { total, supportsResume } = await probeSize();
-  console.log(
+  responseStream?.write(
     `AllPrices.parquet size: ${formatBytes(total)}` +
       (supportsResume ? '' : ' (server does not support resume — restarts on retry)'),
   );
@@ -172,7 +179,7 @@ async function main(): Promise<void> {
     statSync(dest).size === total &&
     localVersion === remoteVersion
   ) {
-    console.log('✓ Cache already up to date — nothing to download. (use --force to override)');
+    // responseStream?.write('✓ Cache already up to date — nothing to download. (use --force to override)');
     return;
   }
 
@@ -181,8 +188,8 @@ async function main(): Promise<void> {
   let lastErr: unknown;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      console.log(`Downloading (attempt ${attempt}/${MAX_ATTEMPTS})…`);
-      await downloadAttempt(tmp, total, supportsResume);
+      responseStream?.write(`Downloading (attempt ${attempt}/${MAX_ATTEMPTS})…`);
+      await downloadAttempt(tmp, total, supportsResume, responseStream);
       const got = existsSync(tmp) ? statSync(tmp).size : 0;
       if (got !== total) {
         throw new Error(`Size mismatch after download: got ${got}, expected ${total}`);
@@ -191,7 +198,7 @@ async function main(): Promise<void> {
       break;
     } catch (err) {
       lastErr = err;
-      console.warn(`  Attempt ${attempt} failed: ${(err as Error).message}`);
+      responseStream?.write(`  Attempt ${attempt} failed: ${(err as Error).message}`);
       if (!supportsResume) {
         // Can't resume — drop the partial so the next attempt starts clean.
         await rm(tmp, { force: true });
@@ -223,12 +230,9 @@ async function main(): Promise<void> {
     );
   }
 
-  console.log(`✓ Saved ${formatBytes(statSync(dest).size)} → ${dest}`);
-  console.log(`✓ Stamped version.txt = ${remoteVersion}`);
-  console.log('Re-run `pnpm seed:prices` whenever MTGJSON publishes a new daily version.');
+  responseStream?.write(`✓ Saved ${formatBytes(statSync(dest).size)} → ${dest}`);
+  responseStream?.write(`✓ Stamped version.txt = ${remoteVersion}`);
+  responseStream?.write('Re-run `pnpm seed:prices` whenever MTGJSON publishes a new daily version.');
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+export default main

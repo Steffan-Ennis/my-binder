@@ -1,32 +1,40 @@
 // Spec 021 — style tokens for the re-introduced price-trend chart (Style
 // co-location: no inline `StyleSheet.create` in `PriceTrendChart.tsx`). Sourced
 // from the global theme so the chart inherits the binder's dark surface. The
-// layout constants (`CHART_HEIGHT`, `Y_AXIS_GUTTER`, `MIN_CHART_WIDTH`,
-// `SHEET_HORIZONTAL_PADDING`) live here too so the chart's explicit `width`
-// math (FR-007) reads from one source rather than scattering magic numbers.
+// layout constants live here too so the chart's explicit `width` math (FR-007)
+// and native-axis config read from one source rather than scattering magic
+// numbers. The axis text styles below are handed to `react-native-gifted-charts`
+// (`xAxisLabelTextStyle` / `yAxisTextStyle`) so the library draws the dated
+// x-axis ticks and the 6 evenly-spaced y-axis labels in the binder's palette.
 import type { TextStyle, ViewStyle } from 'react-native';
 import { StyleSheet } from 'react-native';
 
 import { Colors, Radius, Spacing, Type } from '@src/constants/theme';
 
-// Plot height (px). The y-axis label column matches it so `$max`/`$min` frame
-// the plotted range top/bottom.
+// Plot height (px) — the line/area region, excluding the x-axis label band.
 export const CHART_HEIGHT = 180;
-// Horizontal space reserved for the y-axis label column + its gap.
-export const Y_AXIS_GUTTER = 48;
-// Floor so the explicit `width` is never ≤ 0 even if `useWindowDimensions`
+// Width reserved (inside the chart) for the native y-axis label column. Wide
+// enough for `$10`-class labels in the caption font.
+export const Y_AXIS_LABEL_WIDTH = 44;
+// Vertical band reserved below the plot for the rotated `M/D` date labels.
+export const X_AXIS_LABELS_HEIGHT = 38;
+// Gap before the first plotted point so the oldest date label clears the y-axis.
+export const INITIAL_SPACING = 4;
+// 5 sections → 6 evenly-spaced horizontal y-axis labels (per the design ask).
+export const NO_OF_SECTIONS = 5;
+// Floor so the explicit plot `width` is never ≤ 0 even if `useWindowDimensions`
 // reports 0 on first layout inside the native `formSheet` (FR-007).
 export const MIN_CHART_WIDTH = 160;
 // The detail sheet's `scroll` content padding is `Spacing.lg` on each side
 // (see CardDetailSheetView.theme.ts) — subtracted from the window width.
 export const SHEET_HORIZONTAL_PADDING = Spacing.lg * 2;
+// Hairline baseline under the date labels — subtle, anchors the x-axis.
+export const X_AXIS_COLOR = Colors.dark.border;
 
 export type PriceTrendChartStyles = {
   container: Required<Pick<ViewStyle, 'gap' | 'paddingTop'>>;
-  chartRow: Required<Pick<ViewStyle, 'flexDirection' | 'alignItems' | 'gap'>>;
-  yAxis: Required<Pick<ViewStyle, 'height' | 'justifyContent' | 'alignItems'>>;
-  axisLabel: Required<Pick<TextStyle, 'fontFamily' | 'fontSize' | 'lineHeight' | 'color'>>;
-  xAxisRow: Required<Pick<ViewStyle, 'flexDirection' | 'justifyContent' | 'marginLeft'>>;
+  xAxisLabelText: Required<Pick<TextStyle, 'fontFamily' | 'fontSize' | 'color'>>;
+  yAxisLabelText: Required<Pick<TextStyle, 'fontFamily' | 'fontSize' | 'color'>>;
   legendRow: Required<
     Pick<ViewStyle, 'flexDirection' | 'flexWrap' | 'alignItems' | 'gap' | 'paddingTop'>
   >;
@@ -42,26 +50,16 @@ const styles = StyleSheet.create<PriceTrendChartStyles>({
     gap: Spacing.sm,
     paddingTop: Spacing.xs,
   },
-  chartRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.xs,
-  },
-  yAxis: {
-    height: CHART_HEIGHT,
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  axisLabel: {
+  // Tiny rotated date ticks — one per day, so they must stay compact.
+  xAxisLabelText: {
     fontFamily: Type.caption.font,
-    fontSize: Type.caption.size,
-    lineHeight: Type.caption.lineHeight,
+    fontSize: 9,
     color: Colors.dark.textMuted,
   },
-  xAxisRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginLeft: Y_AXIS_GUTTER,
+  yAxisLabelText: {
+    fontFamily: Type.caption.font,
+    fontSize: Type.caption.size,
+    color: Colors.dark.textMuted,
   },
   legendRow: {
     flexDirection: 'row',

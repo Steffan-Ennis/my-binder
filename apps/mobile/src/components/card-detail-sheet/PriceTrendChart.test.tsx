@@ -2,7 +2,8 @@
 // PROP CONTRACT the component hands `react-native-gifted-charts` `LineChart`
 // (mocked in jest.setup.ts to a View tagged `testID="line-chart"` recording its
 // props), the 3-entry legend incl. the disabled MTG Goldfish entry (FR-003),
-// the `30d ago`/`today` + `$min`/`$max` axis labels (FR-002), colour-independent
+// the native axes — a rotated per-day M/D date tick on each point and 6
+// evenly-spaced whole-dollar y-axis labels (FR-002), colour-independent
 // text labels + screen-reader exposure (FR-006), the single-line case (AS4), the
 // single-observation crash guard (FR-007 / gifted-charts #484), the always-finite
 // `width` (FR-007), and gap markers carried through with no `$0` dip (FR-004).
@@ -19,14 +20,22 @@ const CK_SERIES: ChartSeries = {
   key: 'cardKingdom',
   label: 'Card Kingdom',
   color: '#c9a86b',
-  data: [{ value: 15 }, { value: 18 }, { value: 20 }],
+  data: [
+    { value: 15, label: '5/1' },
+    { value: 18, label: '5/2' },
+    { value: 20, label: '5/3' },
+  ],
 };
 
 const TCGP_SERIES: ChartSeries = {
   key: 'tcgPlayer',
   label: 'TCG Player',
   color: '#e9b5b5',
-  data: [{ value: 14 }, { value: 16 }, { value: 19 }],
+  data: [
+    { value: 14, label: '5/1' },
+    { value: 16, label: '5/2' },
+    { value: 19, label: '5/3' },
+  ],
 };
 
 const DEFAULT_LEGEND: ChartLegendEntry[] = [
@@ -91,18 +100,59 @@ describe('PriceTrendChart', () => {
     });
   });
 
-  describe('axis labels (FR-002)', () => {
-    it('labels the x-axis 30d ago → today', () => {
+  describe('x-axis date labels (FR-002)', () => {
+    it('rotates a per-day M/D date tick carried on each plotted point', () => {
       const screen = render(<PriceTrendChartWithDefaults />);
-      expect(screen.getByText('30d ago')).toBeTruthy();
-      expect(screen.getByText('today')).toBeTruthy();
+      const chart = screen.getByTestId('line-chart');
+      expect(chart.props.rotateLabel).toBe(true);
+      // The dates flow through from `priceSeriesToChartData` on each point and
+      // drive the native x-axis labels (one per day).
+      const data = chart.props.data as ChartSeries['data'];
+      expect(data.map((p) => p.label)).toEqual(['5/1', '5/2', '5/3']);
+    });
+  });
+
+  describe('y-axis labels (FR-002)', () => {
+    it('frames the observed range with 6 evenly-spaced whole-dollar labels', () => {
+      const screen = render(<PriceTrendChartWithDefaults />);
+      const chart = screen.getByTestId('line-chart');
+      // 5 sections → 6 labels. Range is [14,20]: a nice $2 step from a round
+      // baseline (floor(14/2)=14) spans $14–$24 (offset-relative maxValue = 10),
+      // covering max=20 with no clipping.
+      expect(chart.props.noOfSections).toBe(5);
+      expect(chart.props.yAxisLabelTexts).toEqual(['$14', '$16', '$18', '$20', '$22', '$24']);
+      expect(chart.props.yAxisOffset).toBe(14);
+      expect(chart.props.maxValue).toBe(10);
+      expect(chart.props.stepValue).toBe(2);
     });
 
-    it('bounds the y-axis to the observed $min / $max across both series', () => {
-      const screen = render(<PriceTrendChartWithDefaults />);
-      // min across [15,18,20] + [14,16,19] = 14; max = 20.
-      expect(screen.getByText('$14')).toBeTruthy();
-      expect(screen.getByText('$20')).toBeTruthy();
+    it('anchors the baseline at $0 when the data starts near zero', () => {
+      const lowSeries: ChartSeries = {
+        key: 'cardKingdom',
+        label: 'Card Kingdom',
+        color: '#c9a86b',
+        data: [{ value: 0 }, { value: 5 }, { value: 9 }],
+      };
+      const screen = render(<PriceTrendChartWithDefaults chartSeries={[lowSeries]} />);
+      const chart = screen.getByTestId('line-chart');
+      expect(chart.props.yAxisLabelTexts).toEqual(['$0', '$2', '$4', '$6', '$8', '$10']);
+    });
+
+    it('grows the step to the next nice value so the top point never clips', () => {
+      // [3,13]: a $2 step from baseline $2 spans only $2–$12 (< 13). The y-axis
+      // must widen to a $5 step so max=13 stays inside the band.
+      const tightSeries: ChartSeries = {
+        key: 'cardKingdom',
+        label: 'Card Kingdom',
+        color: '#c9a86b',
+        data: [{ value: 3 }, { value: 8 }, { value: 13 }],
+      };
+      const screen = render(<PriceTrendChartWithDefaults chartSeries={[tightSeries]} />);
+      const chart = screen.getByTestId('line-chart');
+      expect(chart.props.stepValue).toBe(5);
+      expect(chart.props.yAxisLabelTexts).toEqual(['$0', '$5', '$10', '$15', '$20', '$25']);
+      // max (13) − offset (0) = 13 ≤ maxValue (25): inside the plotted band.
+      expect(chart.props.maxValue).toBeGreaterThanOrEqual(13);
     });
   });
 
