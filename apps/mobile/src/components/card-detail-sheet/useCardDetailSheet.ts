@@ -52,6 +52,15 @@ const CHART_LEGEND: ChartLegendEntry[] = [
 const formatQuote = (quote: { amountCents: number } | null | undefined): string =>
   quote ? `$${(quote.amountCents / 100).toFixed(2)}` : '—';
 
+// Collapse a query's (error / no-data / empty / ready) state into the shared
+// four-state SectionStatus the view renders off of.
+const toSectionStatus = (isError: boolean, hasData: boolean, isEmpty: boolean): SectionStatus => {
+  if (isError) return 'error';
+  if (!hasData) return 'loading';
+  if (isEmpty) return 'empty';
+  return 'ready';
+};
+
 export type UseCardDetailSheetResult = CardDetailSheetViewProps;
 
 /**
@@ -142,21 +151,17 @@ const useCardDetailSheet = ({ printingId }: UseCardDetailSheetOptions): UseCardD
     return series;
   }, [historyQuery.data]);
 
-  const pricesStatus: SectionStatus = pricesQuery.isError
-    ? 'error'
-    : !pricesQuery.data
-      ? 'loading'
-      : pricesQuery.data.cardKingdom === null && pricesQuery.data.tcgPlayer === null
-        ? 'empty'
-        : 'ready';
+  const pricesStatus = toSectionStatus(
+    pricesQuery.isError,
+    !!pricesQuery.data,
+    pricesQuery.data?.cardKingdom === null && pricesQuery.data?.tcgPlayer === null,
+  );
 
-  const historyStatus: SectionStatus = historyQuery.isError
-    ? 'error'
-    : !historyQuery.data
-      ? 'loading'
-      : historyQuery.data.cardKingdom.length === 0 && historyQuery.data.tcgPlayer.length === 0
-        ? 'empty'
-        : 'ready';
+  const historyStatus = toSectionStatus(
+    historyQuery.isError,
+    !!historyQuery.data,
+    historyQuery.data?.cardKingdom.length === 0 && historyQuery.data?.tcgPlayer.length === 0,
+  );
 
   const { refetch: refetchPrices } = pricesQuery;
   const { refetch: refetchHistory } = historyQuery;
@@ -210,6 +215,7 @@ const useCardDetailSheet = ({ printingId }: UseCardDetailSheetOptions): UseCardD
       detailQuery.isSuccess,
       detailQuery.data?.name,
       detailQuery.data?.typeLine,
+      detailQuery.data?.oracle,
       setLabel,
       numberOwned,
       canDecrement,

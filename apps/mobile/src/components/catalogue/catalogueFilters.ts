@@ -5,7 +5,7 @@
 
 import type { CatalogueQueryShape } from '@src/hooks/useCatalogueInfiniteQuery';
 
-import type { CatalogueFilterSet, ColorChip } from './types';
+import type { CatalogueFilterSet } from './types';
 
 const CMC_UNCONSTRAINED_MAX = 20;
 

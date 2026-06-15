@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { FC } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
-import IconSmall from '@src/components/icons/IconSmall';
+import { IconSmall } from '@src/components/icons/IconSmall';
 import { Colors } from '@src/constants/theme';
 
 import useStyles from './Masthead.theme';

@@ -12,6 +12,11 @@ const DEFAULT_DAYS = 30;
 
 const toIsoDay = (date: Date): string => date.toISOString().slice(0, 10);
 
+// Compact `M/D` x-axis label for one axis day (UTC parts, matching `toIsoDay`'s
+// UTC day boundaries). Rendered rotated under every point so each day reads as
+// a dated tick rather than an anonymous position.
+const toDayLabel = (date: Date): string => `${date.getUTCMonth() + 1}/${date.getUTCDate()}`;
+
 /**
  * Align a price series to a `days`-long axis ending at `endDate` (default
  * today) and convert it to gifted-charts `LineChart` data.
@@ -22,6 +27,8 @@ const toIsoDay = (date: Date): string => date.toISOString().slice(0, 10);
  *  - Every axis day yields a point. Observed days carry `amountCents / 100`.
  *  - Missing days carry the last-known value with `hideDataPoint: true` (gap),
  *    never `0`. Leading gaps carry the earliest observation forward.
+ *  - Every point carries a compact `M/D` `label` for its axis day so the chart
+ *    can render a dated x-axis tick under each one.
  *
  * @param points - the source's observations (any order; keyed by `observedOn`).
  * @param options - `days` (axis length, default 30) and `endDate` (default now).
@@ -29,7 +36,7 @@ const toIsoDay = (date: Date): string => date.toISOString().slice(0, 10);
  *
  * @example
  *   priceSeriesToChartData(history.cardKingdom, { days: 30 });
- *   // → [{ value: 16.99 }, { value: 17.0, hideDataPoint: true }, …]
+ *   // → [{ value: 16.99, label: '5/4' }, { value: 17.0, label: '5/5', hideDataPoint: true }, …]
  */
 export const priceSeriesToChartData = (
   points: ReadonlyArray<PricePoint>,
@@ -53,12 +60,13 @@ export const priceSeriesToChartData = (
     const day = new Date(
       Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate() - offset),
     );
+    const label = toDayLabel(day);
     const observedCents = centsByDay.get(toIsoDay(day));
     if (observedCents !== undefined) {
       lastKnownCents = observedCents;
-      data.push({ value: observedCents / 100 });
+      data.push({ value: observedCents / 100, label });
     } else {
-      data.push({ value: lastKnownCents / 100, hideDataPoint: true });
+      data.push({ value: lastKnownCents / 100, label, hideDataPoint: true });
     }
   }
   return data;

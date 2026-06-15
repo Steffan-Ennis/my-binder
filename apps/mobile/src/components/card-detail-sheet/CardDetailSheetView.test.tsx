@@ -196,7 +196,7 @@ describe('CardDetailSheetView', () => {
       expect(screen.getByTestId('prices-skeleton')).toBeTruthy();
       expect(screen.getByTestId('chart-skeleton')).toBeTruthy();
       expect(screen.queryByTestId('price-row-cardKingdom')).toBeNull();
-      expect(screen.queryByTestId('gifted-line-chart')).toBeNull();
+      expect(screen.queryByTestId('line-chart')).toBeNull();
     });
   });
 
@@ -232,11 +232,11 @@ describe('CardDetailSheetView', () => {
     });
   });
 
-  describe('trend chart deferral (FR-003 deferred)', () => {
-    it('renders a "coming soon" placeholder instead of a chart when history is ready', () => {
+  describe('trend chart (FR-001)', () => {
+    it('renders the price-trend chart (not the "coming soon" placeholder) when history is ready', () => {
       const screen = render(<CardDetailSheetViewWithDefaults historyStatus="ready" />);
-      expect(screen.getByText('Price trend chart coming soon')).toBeTruthy();
-      expect(screen.queryByTestId('gifted-line-chart')).toBeNull();
+      expect(screen.getByTestId('line-chart')).toBeTruthy();
+      expect(screen.queryByText('Price trend chart coming soon')).toBeNull();
     });
   });
 });

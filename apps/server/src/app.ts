@@ -49,7 +49,7 @@ export async function buildApp(): Promise<AppResult> {
   //      b) Copy the parquets to /tmp (local ephemeral storage)
   //      c) Point the SDK at /tmp for queries
   let sdkCacheDir = config.mtgjsonCacheDir;
-  const sdk = await MtgjsonSDK.create({ cacheDir: sdkCacheDir });
+  const sdk = await MtgjsonSDK.create({ cacheDir: sdkCacheDir, offline: true });
 
   // 5. Register the card provider backed by the SDK.
   const mtgjsonProvider = new MtgjsonProvider(sdk);

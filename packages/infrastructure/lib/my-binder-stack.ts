@@ -10,6 +10,7 @@ import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as rds from 'aws-cdk-lib/aws-rds'
 import { Duration } from "aws-cdk-lib"
 import { Construct } from 'constructs';
+import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 
 export interface MyBinderStackProps extends cdk.StackProps {
   /**
@@ -52,6 +53,7 @@ export class MyBinderStack extends cdk.Stack {
     const googleClientIdsSecretName = `my-binder-${env}/GOOGLE_CLIENT_IDS`;
     const googleWebClientIdSecretName = `my-binder-${env}/GOOGLE_WEB_CLIENT_ID`;
     const lambdaFunctionName = `my-binder-server-${env}`;
+    const seedPricesFunctionName = `my-binder-seed-prices-${env}`
     const databaseName = `my_binder_${env}`;
 
     // ─── VPC ────────────────────────────────────────────────────────────────
@@ -236,6 +238,27 @@ export class MyBinderStack extends cdk.Stack {
       },
     });
 
+    const seedMTGPrices = new NodejsFunction(this, 'SeedMTGPrices', {
+      functionName: seedPricesFunctionName,
+      runtime: lambda.Runtime.NODEJS_24_X,
+      vpc,
+      timeout: Duration.seconds(900),
+      handler: 'handler',
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      filesystem: lambda.FileSystem.fromEfsAccessPoint(accessPoint, '/mnt/data'),
+      environment: {
+        NODE_ENV: 'production',
+        MTGJSON_CACHE_DIR: '/mnt/data/mtgjson-cache',
+        FORCE_DOWNLOAD: 'true',
+      },
+      entry: path.join(__dirname, '..', '..', '..', 'apps', 'server', 'scripts', 'seed-prices-handler', 'index.ts'),
+    })
+
+    seedMTGPrices.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.AWS_IAM,
+      invokeMode: lambda.InvokeMode.RESPONSE_STREAM
+    })
+
     // Grant Lambda read access to the secrets.
     jwtSecret.grantRead(serverFunction);
     googleClientIds.grantRead(serverFunction);
@@ -273,5 +296,11 @@ export class MyBinderStack extends cdk.Stack {
       description: 'Lambda function name',
       exportName: `MyBinderLambdaFunctionName-${env}`,
     });
+
+    new cdk.CfnOutput(this, 'LambdaSeedName', {
+      value: seedMTGPrices.functionName,
+      description: 'Seed MTG Prices function name',
+      exportName: `MyBinderSeedMTGPricesName-${env}`
+    })
   }
 }

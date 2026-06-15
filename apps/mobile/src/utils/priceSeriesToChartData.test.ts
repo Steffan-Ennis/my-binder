@@ -35,8 +35,21 @@ describe('priceSeriesToChartData', () => {
         { observedOn: '2026-05-22', amountCents: 2000 },
       ];
       const data = priceSeriesToChartData(points, { days: 2, endDate: END });
-      // Oldest-first: 05-21 → $13, 05-22 → $20.
-      expect(data).toEqual([{ value: 13 }, { value: 20 }]);
+      // Oldest-first: 05-21 → $13, 05-22 → $20; each tagged with its M/D label.
+      expect(data).toEqual([
+        { value: 13, label: '5/21' },
+        { value: 20, label: '5/22' },
+      ]);
+    });
+
+    it('tags every axis day with a compact M/D label, oldest-first', () => {
+      const points: PricePoint[] = [
+        { observedOn: '2026-05-21', amountCents: 1300 },
+        { observedOn: '2026-05-22', amountCents: 2000 },
+      ];
+      const data = priceSeriesToChartData(points, { days: 3, endDate: END });
+      // Axis days for END=05-22, days=3: 05-20, 05-21, 05-22.
+      expect(data.map((point) => point.label)).toEqual(['5/20', '5/21', '5/22']);
     });
   });
 
@@ -65,8 +78,8 @@ describe('priceSeriesToChartData', () => {
         endDate: END,
       });
       expect(data).toHaveLength(30);
-      // Last axis day is the observed one — visible.
-      expect(data[29]).toEqual({ value: 20 });
+      // Last axis day is the observed one — visible, tagged with its date.
+      expect(data[29]).toEqual({ value: 20, label: '5/22' });
       // Earlier days are carried-back gap markers, never zero.
       expect(data[0]!.hideDataPoint).toBe(true);
       expect(data[0]!.value).toBe(20);

@@ -10,6 +10,7 @@
     "dev": "node --env-file=.env.local --import tsx --watch index.ts",
     "start": "node --env-file=.env.local dist/index.js",
     "seed:cards": "node --env-file=.env.local --import tsx scripts/seed-cards-for-user.ts",
+    "seed:prices": "node --env-file=.env.local --import tsx scripts/seed-mtgjson-prices-run.ts",
     "test": "jest",
     "typecheck": "tsc --noEmit"
   },

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react-native';
 
-import CatalogueContainer from './CatalogueContainer';
+import { CatalogueContainer } from './CatalogueContainer';
 import type { CatalogueViewProps } from './types';
 
 const mockUseCatalogue = jest.fn();

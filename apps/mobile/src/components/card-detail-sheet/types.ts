@@ -51,6 +51,13 @@ export type ChartSeries = {
 // Legend entry — three entries; the Goldfish entry is disabled with no line.
 export type ChartLegendEntry = { label: string; color: string; disabled: boolean };
 
+// Spec 021 — props for the re-created presentational price-trend chart. The
+// chart consumes the (unchanged) hook-derived view models directly.
+export type PriceTrendChartProps = {
+  chartSeries: ChartSeries[]; // 0–2 live series (MTG Goldfish never present)
+  chartLegend: ChartLegendEntry[]; // exactly 3 entries (CK, Goldfish disabled, TCGP)
+};
+
 // Hook options (Principle X rule 6).
 export type UseCardDetailSheetOptions = { printingId: string };
 

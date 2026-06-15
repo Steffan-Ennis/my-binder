@@ -230,7 +230,6 @@ const useBinderHome = (): UseBinderHomeResult => {
       onRetryPress,
       onCardPress,
       handlePagerSelected,
-      hasActiveQuery,
       mastheadProps,
     ],
   );

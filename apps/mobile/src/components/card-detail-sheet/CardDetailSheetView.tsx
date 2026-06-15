@@ -1,20 +1,26 @@
-// Spec 020 — presentational sheet body (FR-001/002/004/007/008/009/010).
+// Spec 020 / 021 — presentational sheet body (FR-001/002/004/007/008/009/010).
 // `FC<CardDetailSheetViewProps>`, props-only: identity hero, the `− N +`
 // ownership stepper, and three price rows (MTG Goldfish a disabled "coming
 // soon" placeholder). Each data section maps its four-state status to skeleton
 // (loading) / inline error + retry (failure, visually distinct from the empty
 // annotation) / content. Dismissal is the form-sheet's native swipe-down.
 //
-// The 30-day price-trend CHART is deferred: the section keeps its loading /
-// error / "no recent price data" (FR-004) states, and shows a "coming soon"
-// placeholder where the chart will return. The `chartSeries` / `chartLegend`
-// props are still supplied by the hook (history data layer is intact) but not
-// yet rendered. Styles live in `CardDetailSheetView.theme.ts`.
+// Spec 021 re-introduced the 30-day price-trend CHART: the section's `ready`
+// branch now renders <PriceTrendChart/> from the hook-supplied `chartSeries` /
+// `chartLegend`. The loading / error / "no recent price data" (FR-004) states
+// are unchanged. Styles live in `CardDetailSheetView.theme.ts`.
 import type { FC } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import useStyles from './CardDetailSheetView.theme';
-import type { CardDetailSheetViewProps, PriceRowModel } from './types';
+import PriceTrendChart from './PriceTrendChart';
+import type {
+  CardDetailSheetViewProps,
+  ChartLegendEntry,
+  ChartSeries,
+  PriceRowModel,
+  SectionStatus,
+} from './types';
 import CardContainer from "@src/components/card/CardContainer";
 
 const RetryBlock: FC<{ message: string; retryLabel: string; onRetry: () => void }> = ({
@@ -72,6 +78,61 @@ const PriceRow: FC<{ row: PriceRowModel }> = ({ row }) => {
   );
 };
 
+// PRICES section body — maps the four-state status to skeleton / retry / rows
+// via early returns (no nested ternary, no render function).
+const PricesSection: FC<{
+  status: SectionStatus;
+  priceRows: PriceRowModel[];
+  onRetry: () => void;
+}> = ({ status, priceRows, onRetry }) => {
+  if (status === 'loading') {
+    return <SectionSkeleton testID="prices-skeleton" rows={3} />;
+  }
+  if (status === 'error') {
+    return (
+      <RetryBlock
+        message="Couldn’t load prices."
+        retryLabel="Retry loading prices"
+        onRetry={onRetry}
+      />
+    );
+  }
+  return (
+    <>
+      {priceRows.map((row) => (
+        <PriceRow key={row.key} row={row} />
+      ))}
+    </>
+  );
+};
+
+// 30-DAY TREND section body — skeleton / retry / empty annotation / chart
+// (FR-004) via early returns (no nested ternary, no render function).
+const TrendSection: FC<{
+  status: SectionStatus;
+  chartSeries: ChartSeries[];
+  chartLegend: ChartLegendEntry[];
+  onRetry: () => void;
+}> = ({ status, chartSeries, chartLegend, onRetry }) => {
+  const styles = useStyles();
+  if (status === 'loading') {
+    return <SectionSkeleton testID="chart-skeleton" rows={4} />;
+  }
+  if (status === 'error') {
+    return (
+      <RetryBlock
+        message="Couldn’t load price history."
+        retryLabel="Retry loading price history"
+        onRetry={onRetry}
+      />
+    );
+  }
+  if (status === 'empty') {
+    return <Text style={styles.trendPlaceholder}>no recent price data</Text>;
+  }
+  return <PriceTrendChart chartSeries={chartSeries} chartLegend={chartLegend} />;
+};
+
 const CardDetailSheetView: FC<CardDetailSheetViewProps> = ({
   id,
   name,
@@ -85,6 +146,8 @@ const CardDetailSheetView: FC<CardDetailSheetViewProps> = ({
   priceRows,
   pricesStatus,
   onRetryPrices,
+  chartSeries,
+  chartLegend,
   historyStatus,
   onRetryHistory,
 }) => {
@@ -135,34 +198,17 @@ const CardDetailSheetView: FC<CardDetailSheetViewProps> = ({
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>PRICES</Text>
-          {pricesStatus === 'loading' ? (
-            <SectionSkeleton testID="prices-skeleton" rows={3} />
-          ) : pricesStatus === 'error' ? (
-            <RetryBlock
-              message="Couldn’t load prices."
-              retryLabel="Retry loading prices"
-              onRetry={onRetryPrices}
-            />
-          ) : (
-            priceRows.map((row) => <PriceRow key={row.key} row={row} />)
-          )}
+          <PricesSection status={pricesStatus} priceRows={priceRows} onRetry={onRetryPrices} />
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>30-DAY TREND</Text>
-          {historyStatus === 'loading' ? (
-            <SectionSkeleton testID="chart-skeleton" rows={4} />
-          ) : historyStatus === 'error' ? (
-            <RetryBlock
-              message="Couldn’t load price history."
-              retryLabel="Retry loading price history"
-              onRetry={onRetryHistory}
-            />
-          ) : historyStatus === 'empty' ? (
-            <Text style={styles.trendPlaceholder}>no recent price data</Text>
-          ) : (
-            <Text style={styles.trendPlaceholder}>Price trend chart coming soon</Text>
-          )}
+          <TrendSection
+            status={historyStatus}
+            chartSeries={chartSeries}
+            chartLegend={chartLegend}
+            onRetry={onRetryHistory}
+          />
         </View>
       </ScrollView>
     </View>

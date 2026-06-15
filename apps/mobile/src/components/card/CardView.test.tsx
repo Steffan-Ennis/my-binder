@@ -140,7 +140,7 @@ describe('CardView — outer dimensions invariant (FR-011, SC-004)', () => {
       />,
     );
     const styleOf = (id: string, query: ReturnType<typeof render>) =>
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       (query.getByTestId(id) as any).props.style;
 
     expect(styleOf('card-loading', loading)).toEqual(styleOf('card-loaded', loaded));

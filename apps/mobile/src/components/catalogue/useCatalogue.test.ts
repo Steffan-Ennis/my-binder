@@ -309,7 +309,7 @@ describe('useCatalogue', () => {
         .mockResolvedValue(makePage(1, [makeCard('1', 'a')], 1, 1));
 
       const { result, rerender } = renderHook(
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+         
         (_key: number) => useCatalogue(),
         { wrapper, initialProps: 0 },
       );

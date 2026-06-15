@@ -362,10 +362,15 @@ class MtgjsonProvider implements CardProvider {
    * ```
    */
   async getPriceHistory(uuid: string, days: number): Promise<CardPriceHistoryResponse> {
-    const { dateFrom, dateTo } = MtgjsonProvider.windowEndingToday(days);
-    const cardKingdom = await this.seriesFor(uuid, 'CARD_KINGDOM', dateFrom, dateTo);
-    const tcgPlayer = await this.seriesFor(uuid, 'TCG_PLAYER', dateFrom, dateTo);
-    return { printingId: uuid, days, cardKingdom, tcgPlayer };
+    try {
+      const { dateFrom, dateTo } = MtgjsonProvider.windowEndingToday(days);
+      const cardKingdomPricePoints = await this.seriesFor(uuid, 'CARD_KINGDOM', dateFrom, dateTo);
+      const tcgPlayerPricerPionts = await this.seriesFor(uuid, 'TCG_PLAYER', dateFrom, dateTo);
+      return { printingId: uuid, days, cardKingdom: cardKingdomPricePoints, tcgPlayer: tcgPlayerPricerPionts };
+    } catch (error){
+      console.log('Failed to retrieve price points for', uuid, days)
+      throw error
+    }
   }
 
   /** Latest paper-retail/normal quote for one source, or `null` if absent. */
@@ -392,6 +397,8 @@ class MtgjsonProvider implements CardProvider {
     dateFrom: string,
     dateTo: string,
   ): Promise<PricePoint[]> {
+
+    console.log('Retrieving series for', uuid, source, dateFrom, dateTo, SOURCE_PROVIDER_KEY[source], NORMAL_FINISH, RETAIL_PRICE_TYPE)
     const rows = await this.sdk.prices.history(uuid, {
       provider: SOURCE_PROVIDER_KEY[source],
       finish: NORMAL_FINISH,
