@@ -27,7 +27,7 @@ export type BinderHomeViewStyles = {
   binderPage: Required<
     Pick<
       ViewStyle,
-      'flex' | 'backgroundColor' | 'borderRadius' | 'padding' | 'paddingLeft'
+      'flex' | 'backgroundColor' | 'borderRadius' | 'paddingVertical' | 'paddingHorizontal'
     >
   >;
   ringColumn: Required<
@@ -74,8 +74,10 @@ const styles = StyleSheet.create<BinderHomeViewStyles>({
     flex: 1,
     backgroundColor: Colors.dark.surfaceInverted,
     borderRadius: Radius.xl,
-    padding: Spacing.lg,
-    paddingLeft: Spacing.xxl,
+    // Symmetric horizontal padding keeps the centred 3×3 grid true; `xl` clears
+    // the absolutely-positioned ring column (left: xs + ring width sm = 20pt).
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
   },
   ringColumn: {
     position: 'absolute',

@@ -1,4 +1,4 @@
-import { pageCount, slotIndex } from './pageMath';
+import { computeSlotSize, pageCount, slotIndex } from './pageMath';
 
 describe('pageMath.pageCount', () => {
   it('returns 1 for an empty collection (always at least one page)', () => {
@@ -45,5 +45,37 @@ describe('pageMath.slotIndex', () => {
 
   it('places card 999 at page 112 slot 0 (single-card overflow page in a 1000-card collection)', () => {
     expect(slotIndex(999)).toEqual({ pageNumber: 112, slot: 0 });
+  });
+});
+
+describe('pageMath.computeSlotSize', () => {
+  const GRID = { cols: 3, rows: 3, gap: 8, aspect: 5 / 7 };
+
+  it('returns a zero footprint before the box is measured', () => {
+    expect(computeSlotSize({ width: 0, height: 0 }, GRID)).toEqual({ width: 0, height: 0 });
+    expect(computeSlotSize({ width: 300, height: 0 }, GRID)).toEqual({ width: 0, height: 0 });
+  });
+
+  it('is width-limited on a narrow, tall box (three cards span the width with gaps)', () => {
+    const { width, height } = computeSlotSize({ width: 320, height: 2000 }, GRID);
+    // (320 - 2*8) / 3 = 101.33 → floored to 101
+    expect(width).toBe(101);
+    expect(width * 3 + GRID.gap * 2).toBeLessThanOrEqual(320);
+    expect(height).toBeCloseTo(width / GRID.aspect);
+  });
+
+  it('is height-limited on a wide, short box — the bug case the grid used to ignore', () => {
+    const { width, height } = computeSlotSize({ width: 900, height: 300 }, GRID);
+    // cellHeight = (300 - 16) / 3 = 94.67; width = 94.67 * 5/7 = 67.6 → floored 67
+    expect(width).toBe(67);
+    // three rows of cards plus gaps must fit the 300px height
+    expect(height * 3 + GRID.gap * 2).toBeLessThanOrEqual(300);
+    // and it is the height, not the width, that constrains the card here
+    expect(width).toBeLessThan((900 - GRID.gap * 2) / 3);
+  });
+
+  it('honors an optional maxWidth cap on very large viewports', () => {
+    const { width } = computeSlotSize({ width: 3000, height: 3000 }, { ...GRID, maxWidth: 200 });
+    expect(width).toBe(200);
   });
 });

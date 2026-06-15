@@ -42,3 +42,40 @@ export const slotIndex = (cardIndex: number): { pageNumber: number; slot: number
 });
 
 export const SLOTS_PER_BINDER_PAGE = SLOTS_PER_PAGE;
+
+/** Concrete pixel footprint for one binder pocket. */
+export type SlotSize = { width: number; height: number };
+
+/**
+ * Compute the largest card that fits a `cols × rows` grid inside the measured
+ * `box`, honoring a fixed `gap` between cells and the card `aspect` (width / height).
+ *
+ * The card is limited by whichever axis is tighter, so the whole grid always fits
+ * within BOTH the available width and height — this is what lets the binder scale
+ * evenly on phone, tablet, and in landscape rather than only with the viewport width.
+ *
+ * Returns `{ width: 0, height: 0 }` until the box is measured (`onLayout`), so the
+ * caller can hold off rendering pockets until a real size is known. The width is
+ * floored so three cells plus their gaps never round up past the container and wrap.
+ *
+ * @example
+ *   // wide/short box → height-limited card (the bug case)
+ *   computeSlotSize({ width: 900, height: 300 }, { cols: 3, rows: 3, gap: 8, aspect: 5 / 7 })
+ */
+export const computeSlotSize = (
+  box: { width: number; height: number },
+  opts: { cols: number; rows: number; gap: number; aspect: number; maxWidth?: number },
+): SlotSize => {
+  const { cols, rows, gap, aspect, maxWidth } = opts;
+  if (box.width <= 0 || box.height <= 0) return { width: 0, height: 0 };
+
+  const cellWidth = (box.width - gap * (cols - 1)) / cols;
+  const cellHeight = (box.height - gap * (rows - 1)) / rows;
+
+  let width = Math.min(cellWidth, cellHeight * aspect);
+  if (maxWidth !== undefined) width = Math.min(width, maxWidth);
+  width = Math.floor(width);
+  if (width <= 0) return { width: 0, height: 0 };
+
+  return { width, height: width / aspect };
+};
