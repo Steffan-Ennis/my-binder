@@ -2,7 +2,7 @@
 // Per Principle X v1.26.0 sub-rule #7, feature-local types live with the
 // feature and MUST NOT be re-declared in `@my-binder/core`.
 
-import type {Card, CardRecord} from '@my-binder/core';
+import type {CardRecord} from '@my-binder/core';
 
 import type { UseCatalogueInfiniteQueryResult } from '@src/hooks/useCatalogueInfiniteQuery';
 

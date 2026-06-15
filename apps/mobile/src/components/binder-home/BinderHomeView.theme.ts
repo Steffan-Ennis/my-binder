@@ -37,28 +37,9 @@ export type BinderHomeViewStyles = {
     >
   >;
   ring: Required<Pick<ViewStyle, 'width' | 'height' | 'borderRadius' | 'backgroundColor'>>;
-  errorState: Required<Pick<ViewStyle, 'flex' | 'alignItems' | 'justifyContent' | 'gap'>>;
-  errorMessage: Required<
-    Pick<TextStyle, 'fontFamily' | 'fontSize' | 'lineHeight' | 'color' | 'textAlign'>
-  >;
-  retryButton: Required<
-    Pick<
-      ViewStyle,
-      | 'minHeight'
-      | 'paddingHorizontal'
-      | 'borderRadius'
-      | 'backgroundColor'
-      | 'alignItems'
-      | 'justifyContent'
-    >
-  >;
-  retryLabel: Required<
-    Pick<TextStyle, 'fontFamily' | 'fontSize' | 'color' | 'fontWeight'>
-  >;
   pageNavigator: Required<
     Pick<ViewStyle, 'flexDirection' | 'alignItems' | 'justifyContent' | 'paddingTop'>
   >;
-  pager: Required<Pick<ViewStyle, 'flex'>>;
   pageOf: Required<
     Pick<
       TextStyle,
@@ -110,41 +91,11 @@ const styles = StyleSheet.create<BinderHomeViewStyles>({
     borderRadius: Radius.pill,
     backgroundColor: Colors.dark.border,
   },
-  errorState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.md,
-  },
-  errorMessage: {
-    fontFamily: Type.body.font,
-    fontSize: Type.body.size,
-    lineHeight: Type.body.lineHeight,
-    color: Colors.dark.textOnAccent,
-    textAlign: 'center',
-  },
-  retryButton: {
-    minHeight: 44,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.dark.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  retryLabel: {
-    fontFamily: Type.bodyStrong.font,
-    fontSize: Type.bodyStrong.size,
-    color: Colors.dark.accent,
-    fontWeight: Type.bodyStrong.weight,
-  },
   pageNavigator: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingTop: Spacing.md,
-  },
-  pager: {
-    flex: 1,
   },
   pageOf: {
     fontFamily: Type.subtitleItalic.font,

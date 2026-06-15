@@ -1,8 +1,7 @@
-import { Ionicons } from '@expo/vector-icons';
 import type { FC } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import IconLarge from '@src/components/icons/IconLarge';
+import { IconLarge } from '@src/components/icons/IconLarge';
 
 import useStyles from './LoginView.theme';
 

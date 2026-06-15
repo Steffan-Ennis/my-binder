@@ -4,7 +4,6 @@ import { useInfiniteQuery, type UseInfiniteQueryResult } from '@tanstack/react-q
 
 import { apiClient } from '@src/services/api/apiClient';
 import type { ApiError } from '@src/services/api/ApiError';
-import { SLOTS_PER_BINDER_PAGE } from '@src/utils/pageMath';
 
 import { useSession } from './useSession';
 

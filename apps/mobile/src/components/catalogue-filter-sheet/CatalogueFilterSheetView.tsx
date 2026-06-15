@@ -1,8 +1,5 @@
-import { Ionicons } from '@expo/vector-icons';
 import type { FC } from 'react';
 import {Pressable, ScrollView, Text, TextInput, View} from 'react-native';
-
-import { Colors } from '@src/constants/theme';
 
 import useStyles from './CatalogueFilterSheetView.theme';
 import {
@@ -14,8 +11,6 @@ import {
   type CatalogueFilterSheetViewProps,
   type ColorChip,
 } from './types';
-
-const SNAP_POINTS = ['78%'];
 
 const Chip: FC<{
   label: string;

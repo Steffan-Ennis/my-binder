@@ -76,7 +76,7 @@ describe('useLogin', () => {
   it('exposes a stable onSignInPress that calls GoogleSignin.signIn', async () => {
     mockedSignIn.mockResolvedValue(cancelledResponse());
 
-    const { result, rerender } = renderHook(() => useLogin(), { wrapper });
+    const { result } = renderHook(() => useLogin(), { wrapper });
     await act(async () => {
       await result.current.onSignInPress();
     });

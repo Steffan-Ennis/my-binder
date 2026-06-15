@@ -1,11 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { FC } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import PagerView, { type PagerViewProps } from 'react-native-pager-view';
 import Masthead from '@src/components/masthead/Masthead';
+import CatalogueBody from './CatalogueBody';
 import useStyles, { type CatalogueViewStyles } from './CatalogueView.theme';
 import type { CatalogueViewProps } from './types';
-import BinderPage from "@src/components/binder-page/BinderPage";
 
 const RING_COUNT = 3;
 const SEARCH_PLACEHOLDER = 'Search the catalogue';
@@ -51,10 +50,6 @@ const CatalogueView: FC<CatalogueViewProps> = ({
   onRefreshPress,
 }) => {
   const styles = useStyles();
-
-  const handlePageSelected: Required<PagerViewProps>['onPageSelected'] = (event) => {
-    onPagerSelected(event.nativeEvent.position + 1);
-  };
 
   return (
     <View style={styles.root} testID="catalogue-root">
@@ -104,51 +99,16 @@ const CatalogueView: FC<CatalogueViewProps> = ({
             ))}
           </View>
 
-          {isError ? (
-            <View style={styles.errorState}>
-              <Text style={styles.errorMessage}>
-                We couldn’t load the catalogue.
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Retry loading the catalogue"
-                onPress={onRetryPress}
-                style={styles.retryButton}
-              >
-                <Text style={styles.retryLabel}>Retry</Text>
-              </Pressable>
-            </View>
-          ) : isEmpty ? (
-            <View style={styles.errorState} testID="catalogue-empty-state">
-              <Text style={styles.errorMessage}>no cards match these filters</Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Clear filters"
-                onPress={onFilterClear}
-                style={styles.retryButton}
-              >
-                <Text style={styles.retryLabel}>Clear filters</Text>
-              </Pressable>
-            </View>
-          ) : isLoading || pages.length === 0 ? (
-             <BinderPage pageIndex={0} cards={[]} isLoading={true} />
-          ) : (
-            <PagerView
-              style={styles.pager}
-              testID="catalogue-pager"
-              offscreenPageLimit={1}
-              onPageSelected={handlePageSelected}
-            >
-              {pages.map((page, pageIndex) => (
-                <BinderPage
-                  pageIndex={pageIndex}
-                  cards={page.cards}
-                  isLoading={isLoading}
-                  onCardPress={onCardPress}
-                />
-              ))}
-            </PagerView>
-          )}
+          <CatalogueBody
+            pages={pages}
+            isLoading={isLoading}
+            isError={isError}
+            isEmpty={isEmpty}
+            onPagerSelected={onPagerSelected}
+            onRetryPress={onRetryPress}
+            onCardPress={onCardPress}
+            onFilterClear={onFilterClear}
+          />
         </View>
 
         <View style={styles.pageNavigator}>

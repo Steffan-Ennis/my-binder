@@ -152,7 +152,7 @@ async function downloadAttempt(
 }
 
 async function main(responseStream?: awslambda.HttpResponseStream ): Promise<void> {
-  const force = process.argv.includes('--force');
+  const force = process.argv.includes('--force') || !!process.env.FORCE_DOWNLOAD;
   const cacheDir = resolve(resolveCacheDir());
   const parquetDir = join(cacheDir, 'parquet');
   const dest = join(parquetDir, 'AllPrices.parquet');

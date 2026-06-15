@@ -1,14 +1,13 @@
 import type { Card } from '@my-binder/core';
 import type { FC } from 'react';
-import { Pressable, Text, View } from 'react-native';
-import PagerView, { PagerViewProps } from 'react-native-pager-view';
+import { Text, View } from 'react-native';
+import type { PagerViewProps } from 'react-native-pager-view';
 
 import Masthead from '@src/components/masthead/Masthead';
 import type { MastheadProps } from '@src/components/masthead/types';
-import { SLOTS_PER_BINDER_PAGE } from '@src/utils/pageMath';
 
+import BinderBody from './BinderBody';
 import useStyles from './BinderHomeView.theme';
-import BinderPage from '@src/components/binder-page/BinderPage';
 
 const RING_COUNT = 3;
 
@@ -60,45 +59,17 @@ const BinderHomeView: FC<BinderHomeViewProps> = ({
             ))}
           </View>
 
-          {isError ? (
-            <View style={styles.errorState}>
-              <Text style={styles.errorMessage}>
-                We couldn’t load your binder.
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Retry loading binder"
-                onPress={onRetryPress}
-                style={styles.retryButton}
-              >
-                <Text style={styles.retryLabel}>Retry</Text>
-              </Pressable>
-            </View>
-          ) : noMatches ? (
-            <View style={styles.errorState}>
-              <Text style={styles.errorMessage}>no matches in your binder</Text>
-            </View>
-          ) : isLoading || matchedCards.length === 0 ? (
-            <BinderPage pageIndex={0} cards={[]} isLoading={true} />
-          ) : (
-            <PagerView
-              style={styles.pager}
-              testID="binder-pager"
-              offscreenPageLimit={1}
-              onPageSelected={handlePagerSelected}
-            >
-              {Array.from({ length: totalPages }).map((_, pageIdx) => {
-                const start = pageIdx * SLOTS_PER_BINDER_PAGE;
-                const pageCards = matchedCards.slice(
-                  start,
-                  start + SLOTS_PER_BINDER_PAGE,
-                );
-                return (pageIdx + 1 === currentPage)
-                  ? <BinderPage pageIndex={pageIdx} cards={pageCards} isLoading={isLoading} onCardPress={onCardPress} />
-                  : <></>
-              })}
-            </PagerView>
-          )}
+          <BinderBody
+            matchedCards={matchedCards}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            noMatches={noMatches}
+            isLoading={isLoading}
+            isError={isError}
+            onRetryPress={onRetryPress}
+            onCardPress={onCardPress}
+            handlePagerSelected={handlePagerSelected}
+          />
         </View>
 
         <View style={styles.pageNavigator}>

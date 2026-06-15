@@ -7,7 +7,6 @@ import { SLOTS_PER_BINDER_PAGE } from '@src/utils/pageMath';
 
 import { filtersToQuery } from './catalogueFilters';
 import {
-  type CatalogueFilterSet,
   type CataloguePage,
   type CatalogueViewProps,
 } from './types';
@@ -24,18 +23,6 @@ const formatFiniteCaption = (total: number, totalPages: number): string => {
   const matchNoun = total === 1 ? 'MATCH' : 'MATCHES';
   const pageNoun = totalPages === 1 ? 'PAGE' : 'PAGES';
   return `${total} ${matchNoun} · ${totalPages} ${pageNoun}`;
-};
-
-const hasAnyFilterDimension = (filters: CatalogueFilterSet): boolean => {
-  if (filters.name.trim().length > 0) return true;
-  if (filters.formats.length > 0) return true;
-  if (filters.superTypes.length > 0) return true;
-  if (filters.subTypes.length > 0) return true;
-  if (filters.creatureTypes.length > 0) return true;
-  if (filters.colors.length > 0) return true;
-  if (filters.cmcMin > 0 || filters.cmcMax < 20) return true;
-  if (filters.missingOnly) return true;
-  return false;
 };
 
 // The committed filter set + Apply now live in the shared catalogue context
@@ -64,11 +51,6 @@ export type UseCatalogueResult = CatalogueViewProps;
 const useCatalogue = (): UseCatalogueResult => {
   const router = useRouter();
   const queryClient = useQueryClient();
-  // Only `mutate` is needed from the binder mutation; it is reference-stable
-  // per TanStack docs so `onPocketAddPress` below stays identity-stable
-  // across re-renders (Principle X v1.16.0).
-  const { mutate: mutateBinder } = { mutate: () => {} };
-
   const { filters, applyFilter, clearFilters } = useCatalogueContext();
 
   const [isSearchActive, setIsSearchActive] = useState(false);
@@ -122,8 +104,6 @@ const useCatalogue = (): UseCatalogueResult => {
     fetchNextPage,
     refetch,
   } = useCatalogueInfiniteQuery(queryShape);
-
-  const hasActiveFilter = useMemo(() => hasAnyFilterDimension(filters), [filters]);
 
   const pages = useMemo<ReadonlyArray<CataloguePage>>(() => {
     if (!data) return [];

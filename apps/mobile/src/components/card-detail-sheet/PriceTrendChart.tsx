@@ -44,8 +44,10 @@ const niceCeil = (x: number): number => {
   if (x <= 1) return 1;
   const pow = Math.pow(10, Math.floor(Math.log10(x)));
   const n = x / pow;
-  const nice = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
-  return nice * pow;
+  if (n <= 1) return pow;
+  if (n <= 2) return 2 * pow;
+  if (n <= 5) return 5 * pow;
+  return 10 * pow;
 };
 
 // Next "nice" step after a nice value: 1→2→5→10→20→… Used to widen the band

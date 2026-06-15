@@ -1,7 +1,5 @@
 import type { FC } from 'react';
 
-import type { CatalogueFilterSet } from '@src/components/catalogue/types';
-
 import CatalogueFilterSheetView from './CatalogueFilterSheetView';
 import { useCatalogueFilterSheet } from './useCatalogueFilterSheet';
 

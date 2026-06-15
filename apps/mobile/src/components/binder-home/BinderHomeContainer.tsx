@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 
 import BinderHomeView from './BinderHomeView';
-import useBinderHome from './useBinderHome';
+import { useBinderHome } from './useBinderHome';
 
 const BinderHomeContainer: FC = () => {
   const {

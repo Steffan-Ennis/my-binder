@@ -3,9 +3,10 @@ import { render, screen } from '@testing-library/react-native';
 import Catalogue from './catalogue';
 
 jest.mock('@src/components/catalogue/CatalogueContainer', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { View } = require('react-native');
   return {
-    // @ts-expect-error
-    CatalogueContainer: () => <div testID={'catalogue-container'} />,
+    CatalogueContainer: () => <View testID="catalogue-container" />,
   };
 });
 

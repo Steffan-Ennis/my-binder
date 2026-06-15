@@ -249,6 +249,7 @@ export class MyBinderStack extends cdk.Stack {
       environment: {
         NODE_ENV: 'production',
         MTGJSON_CACHE_DIR: '/mnt/data/mtgjson-cache',
+        FORCE_DOWNLOAD: 'true',
       },
       entry: path.join(__dirname, '..', '..', '..', 'apps', 'server', 'scripts', 'seed-prices-handler', 'index.ts'),
     })

@@ -31,7 +31,7 @@ export const useCard = ({ id, footprint }: UseCardOptions): CardViewProps => {
     if(isSuccess) {
       return variantForFootprint(footprint, data)
     }
-  }, [data, isSuccess])
+  }, [data, isSuccess, footprint])
 
   const pulseRef = useRef(new Animated.Value(PULSE_MIN));
 

@@ -1,7 +1,7 @@
 import type { TextStyle, ViewStyle } from 'react-native';
 import { StyleSheet } from 'react-native';
 
-import { Colors, Radius, Spacing, Touch, Type } from '@src/constants/theme';
+import { Colors, Radius, Spacing, Type } from '@src/constants/theme';
 
 export type CatalogueViewStyles = {
   root: Required<Pick<ViewStyle, 'flex' | 'backgroundColor'>>;
@@ -31,7 +31,6 @@ export type CatalogueViewStyles = {
     Pick<ViewStyle, 'position' | 'left' | 'top' | 'bottom' | 'justifyContent' | 'paddingVertical'>
   >;
   ring: Required<Pick<ViewStyle, 'width' | 'height' | 'borderRadius' | 'backgroundColor'>>;
-  pager: Required<Pick<ViewStyle, 'flex'>>;
   grid: Required<
     Pick<ViewStyle, 'flex' | 'flexDirection' | 'flexWrap' | 'justifyContent' | 'alignContent'>
   >;
@@ -54,22 +53,6 @@ export type CatalogueViewStyles = {
       'fontFamily' | 'fontSize' | 'lineHeight' | 'color' | 'fontWeight'
     >
   >;
-  errorState: Required<Pick<ViewStyle, 'flex' | 'alignItems' | 'justifyContent' | 'gap'>>;
-  errorMessage: Required<
-    Pick<TextStyle, 'fontFamily' | 'fontSize' | 'lineHeight' | 'color' | 'textAlign'>
-  >;
-  retryButton: Required<
-    Pick<
-      ViewStyle,
-      | 'minHeight'
-      | 'paddingHorizontal'
-      | 'borderRadius'
-      | 'backgroundColor'
-      | 'alignItems'
-      | 'justifyContent'
-    >
-  >;
-  retryLabel: Required<Pick<TextStyle, 'fontFamily' | 'fontSize' | 'color' | 'fontWeight'>>;
   // Filter-pill row in the masthead slot.
   filterPillRow: Required<
     Pick<ViewStyle, 'flexDirection' | 'flexWrap' | 'gap' | 'paddingHorizontal' | 'paddingBottom'>
@@ -206,9 +189,6 @@ const styles = StyleSheet.create<CatalogueViewStyles>({
     borderRadius: Radius.pill,
     backgroundColor: Colors.dark.border,
   },
-  pager: {
-    flex: 1,
-  },
   grid: {
     flex: 1,
     flexDirection: 'row',
@@ -245,33 +225,6 @@ const styles = StyleSheet.create<CatalogueViewStyles>({
     lineHeight: Type.subtitleItalic.lineHeight,
     color: Colors.dark.textMuted,
     fontWeight: Type.subtitleItalic.weight,
-  },
-  errorState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.md,
-  },
-  errorMessage: {
-    fontFamily: Type.body.font,
-    fontSize: Type.body.size,
-    lineHeight: Type.body.lineHeight,
-    color: Colors.dark.textOnAccent,
-    textAlign: 'center',
-  },
-  retryButton: {
-    minHeight: Touch.minTarget,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.dark.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  retryLabel: {
-    fontFamily: Type.bodyStrong.font,
-    fontSize: Type.bodyStrong.size,
-    color: Colors.dark.accent,
-    fontWeight: Type.bodyStrong.weight,
   },
   filterPillRow: {
     flexDirection: 'row',
