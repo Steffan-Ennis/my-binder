@@ -91,6 +91,65 @@ jest.mock('react-native-pager-view', () => {
   return { __esModule: true, default: PagerView };
 });
 
+// Spec 022 — on-device ML Kit text recognition. The real module links the
+// Google ML Kit native SDK and runs only in a dev client, so the shared default
+// mock returns a canned Latin `{ text, blocks }` shape (the upstream `Text`
+// contract). Per-test behaviour is set with `jest.spyOn` against this mock;
+// in-file `jest.mock(...)` is prohibited (Principle III mobile mocking rule).
+jest.mock('@infinitered/react-native-mlkit-text-recognition', () => ({
+  __esModule: true,
+  recognizeText: jest.fn(async () => ({
+    text: 'Lightning Bolt',
+    blocks: [
+      {
+        text: 'Lightning Bolt',
+        frame: { left: 12, top: 16, right: 320, bottom: 64 },
+        recognizedLanguages: ['en'],
+        lines: [],
+      },
+    ],
+  })),
+}));
+
+// Spec 022 — `expo-camera` live viewfinder. `CameraView` becomes a `View` stub
+// (testID `camera-view`) that forwards its ref so the View layer can mount it;
+// the capture method is exercised in the hook test by assigning a stub to the
+// returned `cameraRef.current`. `useCameraPermissions` defaults to granted so
+// the View renders the viewfinder; permission-denied/undetermined branches are
+// set per-test via `jest.spyOn`.
+jest.mock('expo-camera', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { View } = require('react-native');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const React = require('react');
+  const CameraView = React.forwardRef(
+    (props: Record<string, unknown>, ref: unknown) =>
+      React.createElement(View, { testID: 'camera-view', ...props, ref }),
+  );
+  CameraView.displayName = 'CameraView';
+  return {
+    __esModule: true,
+    CameraView,
+    useCameraPermissions: jest.fn(() => [
+      { granted: true, status: 'granted', canAskAgain: true },
+      jest.fn(async () => ({ granted: true, status: 'granted', canAskAgain: true })),
+    ]),
+    PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' },
+  };
+});
+
+// Spec 022 — `expo-image-picker` gallery import. `launchImageLibraryAsync`
+// defaults to a successful single-asset pick; the cancelled branch is set
+// per-test via `jest.spyOn`.
+jest.mock('expo-image-picker', () => ({
+  __esModule: true,
+  launchImageLibraryAsync: jest.fn(async () => ({
+    canceled: false,
+    assets: [{ uri: 'file:///picked-card.jpg' }],
+  })),
+  PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' },
+}));
+
 jest.mock('expo-router', () => {
   const Redirect = ({ href }: { href: string }) => `Redirect(${href})`;
 

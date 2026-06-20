@@ -9,7 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Scan cards with the camera.",
+        "NSPhotoLibraryUsageDescription": "Import a photo to scan a card."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -47,6 +51,26 @@
           "dark": {
             "backgroundColor": "#000000"
           }
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow my-binder to use the camera to scan cards.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow my-binder to import a photo to scan a card."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": { "deploymentTarget": "15.1" },
+          "android": { "compileSdkVersion": 35 }
         }
       ]
     ],

@@ -93,6 +93,35 @@ const config: Config = {
       lines: 90,
       statements: 90,
     },
+    // Spec 022 — single-card scan. Pure name heuristic + the palette-only
+    // reticle are held to 100%; the native-wrapping service/hook carry
+    // slightly lower floors for the device-only branches that cannot execute
+    // under mocks. The `card-scanner/` orchestration feature lands its own
+    // threshold when that directory is created.
+    './src/utils/parseCardName.ts': {
+      branches: 100,
+      functions: 100,
+      lines: 100,
+      statements: 100,
+    },
+    './src/components/scan-reticle/': {
+      branches: 100,
+      functions: 100,
+      lines: 100,
+      statements: 100,
+    },
+    './src/services/scan/': {
+      branches: 90,
+      functions: 95,
+      lines: 95,
+      statements: 95,
+    },
+    './src/hooks/useCardCapture.ts': {
+      branches: 90,
+      functions: 95,
+      lines: 95,
+      statements: 95,
+    },
   },
 };
 
