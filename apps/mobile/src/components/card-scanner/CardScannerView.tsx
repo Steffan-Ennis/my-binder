@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { CardRecord } from '@my-binder/core';
 import { CameraView } from 'expo-camera';
 import type { FC } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import ScanReticle from '@src/components/scan-reticle/ScanReticle';
 import { Colors } from '@src/constants/theme';
@@ -18,6 +18,8 @@ import type { CardScannerViewProps, ScanMode, ScanStatus } from './types';
 
 const ICON_SIZE = 22;
 const CAPTURE_ICON_SIZE = 30;
+// ~60fps scroll-offset sampling so the dismiss gesture's at-top check stays current.
+const SCROLL_EVENT_THROTTLE = 16;
 
 // Capture is locked out while a still is being taken / read / searched.
 const isBusy = (status: ScanStatus): boolean =>
@@ -132,22 +134,36 @@ const ScanMessage: FC<{
 const MatchList: FC<{
   styles: CardScannerViewStyles;
   matches: ReadonlyArray<CardRecord>;
+  matchListPanHandlers: CardScannerViewProps['matchListPanHandlers'];
+  onMatchListScroll: CardScannerViewProps['onMatchListScroll'];
   onSelectMatch: (printingId: string) => void;
-}> = ({ styles, matches, onSelectMatch }) => (
-  <View style={styles.matchList} testID="scan-status-matches">
-    {matches.map((match) => (
-      <Pressable
-        key={match.id}
-        accessibilityRole="button"
-        accessibilityLabel={`Open ${match.name}`}
-        onPress={() => onSelectMatch(match.id)}
-        testID={`scan-match-${match.id}`}
-        style={styles.matchRow}
-      >
-        <Text style={styles.matchName}>{match.name}</Text>
-        <Text style={styles.matchMeta}>{`${match.set} · #${match.cardNumber}`}</Text>
-      </Pressable>
-    ))}
+}> = ({ styles, matches, matchListPanHandlers, onMatchListScroll, onSelectMatch }) => (
+  // The wrapper carries the pull-to-dismiss pan handlers; the inner ScrollView
+  // owns the height cap + scrolling. The pan only intercepts at the top (gated in
+  // the hook), so normal scrolling stays with the ScrollView.
+  <View style={styles.matchListWrapper} testID="scan-match-list" {...matchListPanHandlers}>
+    <ScrollView
+      style={styles.matchList}
+      contentContainerStyle={styles.matchListContent}
+      testID="scan-status-matches"
+      onScroll={onMatchListScroll}
+      scrollEventThrottle={SCROLL_EVENT_THROTTLE}
+      keyboardShouldPersistTaps="handled"
+    >
+      {matches.map((match) => (
+        <Pressable
+          key={match.id}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${match.name}`}
+          onPress={() => onSelectMatch(match.id)}
+          testID={`scan-match-${match.id}`}
+          style={styles.matchRow}
+        >
+          <Text style={styles.matchName}>{match.name}</Text>
+          <Text style={styles.matchMeta}>{`${match.set} · #${match.cardNumber}`}</Text>
+        </Pressable>
+      ))}
+    </ScrollView>
   </View>
 );
 
@@ -156,9 +172,20 @@ const ScanStatusOverlay: FC<{
   status: ScanStatus;
   candidateName?: string;
   matches: ReadonlyArray<CardRecord>;
+  matchListPanHandlers: CardScannerViewProps['matchListPanHandlers'];
+  onMatchListScroll: CardScannerViewProps['onMatchListScroll'];
   onSelectMatch: (printingId: string) => void;
   onRetry: () => void;
-}> = ({ styles, status, candidateName, matches, onSelectMatch, onRetry }) => {
+}> = ({
+  styles,
+  status,
+  candidateName,
+  matches,
+  matchListPanHandlers,
+  onMatchListScroll,
+  onSelectMatch,
+  onRetry,
+}) => {
   switch (status) {
     case 'capturing':
       return <ScanProgress styles={styles} label="Capturing…" testID="scan-status-capturing" />;
@@ -194,7 +221,15 @@ const ScanStatusOverlay: FC<{
         />
       );
     case 'matches':
-      return <MatchList styles={styles} matches={matches} onSelectMatch={onSelectMatch} />;
+      return (
+        <MatchList
+          styles={styles}
+          matches={matches}
+          matchListPanHandlers={matchListPanHandlers}
+          onMatchListScroll={onMatchListScroll}
+          onSelectMatch={onSelectMatch}
+        />
+      );
     default:
       return null;
   }
@@ -206,6 +241,8 @@ const CardScannerView: FC<CardScannerViewProps> = ({
   reticleTone,
   candidateName,
   matches,
+  matchListPanHandlers,
+  onMatchListScroll,
   cameraRef,
   torchEnabled,
   onCapture,
@@ -261,6 +298,8 @@ const CardScannerView: FC<CardScannerViewProps> = ({
         status={status}
         candidateName={candidateName}
         matches={matches}
+        matchListPanHandlers={matchListPanHandlers}
+        onMatchListScroll={onMatchListScroll}
         onSelectMatch={onSelectMatch}
         onRetry={onRetry}
       />

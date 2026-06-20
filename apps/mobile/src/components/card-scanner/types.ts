@@ -7,6 +7,7 @@
 import type { CardRecord } from '@my-binder/core';
 import type { CameraView } from 'expo-camera';
 import type { RefObject } from 'react';
+import type { GestureResponderHandlers, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 
 import type { ReticleTone } from '@src/components/scan-reticle/ScanReticle';
 import type {
@@ -56,6 +57,14 @@ export type CardScannerViewProps = Pick<
   candidateName?: string;
   // The catalogue matches for `candidateName`, flattened from the query pages.
   matches: ReadonlyArray<CardRecord>;
+
+  // Pull-to-dismiss for the match list. `matchListPanHandlers` wraps the scroll
+  // container and `onMatchListScroll` tracks the offset so the gesture only
+  // dismisses once scrolled to the top. Both are constructed in the hook and
+  // surfaced as stable handles (Principle X — Data-fetching rule 4: gestures
+  // live in the hook, not the view).
+  matchListPanHandlers: GestureResponderHandlers;
+  onMatchListScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
 
   // Camera surface (from the shared `useCardCapture` hook)
   cameraRef: RefObject<CameraView | null>;

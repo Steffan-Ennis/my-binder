@@ -24,6 +24,8 @@ const defaults: CardScannerViewProps = {
   reticleTone: 'idle',
   candidateName: undefined,
   matches: [],
+  matchListPanHandlers: {},
+  onMatchListScroll: jest.fn(),
   cameraRef: { current: null } as RefObject<CameraView | null>,
   permissionStatus: 'granted',
   torchEnabled: false,

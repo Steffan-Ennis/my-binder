@@ -46,7 +46,8 @@ describe('(tabs) layout', () => {
       expect((captured.binder as { headerShown?: boolean }).headerShown).toBe(false);
       // Spec 018 T033 — Catalogue renders its own crimson masthead edge-to-edge.
       expect((captured.catalogue as { headerShown?: boolean }).headerShown).toBe(false);
-      expect((captured.scan as { headerShown?: boolean }).headerShown).toBeUndefined();
+      // Spec 022 T031 — Scan hosts a full-bleed camera viewfinder via its own stack.
+      expect((captured.scan as { headerShown?: boolean }).headerShown).toBe(false);
       expect((captured.profile as { headerShown?: boolean }).headerShown).toBeUndefined();
     } finally {
       (Tabs as unknown as { Screen: typeof original }).Screen = original;

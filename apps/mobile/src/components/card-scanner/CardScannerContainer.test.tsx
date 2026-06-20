@@ -43,6 +43,8 @@ describe('CardScannerContainer — named-props bridge', () => {
       reticleTone: 'idle',
       candidateName: undefined,
       matches: [],
+      matchListPanHandlers: {},
+      onMatchListScroll: jest.fn(),
       cameraRef,
       permissionStatus: 'granted',
       torchEnabled: false,

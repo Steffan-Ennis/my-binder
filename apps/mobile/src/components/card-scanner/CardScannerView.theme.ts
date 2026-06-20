@@ -53,9 +53,9 @@ export type CardScannerViewStyles = {
   >;
   retryLabel: Required<Pick<TextStyle, 'fontFamily' | 'fontSize' | 'fontWeight' | 'color'>>;
 
-  matchList: Required<
-    Pick<ViewStyle, 'position' | 'left' | 'right' | 'bottom' | 'maxHeight' | 'padding' | 'gap' | 'borderRadius' | 'backgroundColor'>
-  >;
+  matchListWrapper: Required<Pick<ViewStyle, 'position' | 'left' | 'right' | 'bottom'>>;
+  matchList: Required<Pick<ViewStyle, 'maxHeight' | 'borderRadius' | 'backgroundColor'>>;
+  matchListContent: Required<Pick<ViewStyle, 'padding' | 'gap'>>;
   matchRow: Required<Pick<ViewStyle, 'paddingVertical' | 'paddingHorizontal' | 'borderRadius' | 'minHeight' | 'justifyContent'>>;
   matchName: Required<Pick<TextStyle, 'fontFamily' | 'fontSize' | 'fontWeight' | 'color'>>;
   matchMeta: Required<Pick<TextStyle, 'fontFamily' | 'fontSize' | 'color'>>;
@@ -68,6 +68,8 @@ export type CardScannerViewStyles = {
 const CAPTURE_SIZE = 72;
 const CAPTURE_BORDER = 4;
 const BANNER_OFFSET = 132;
+// Caps the results window so it can't cover the viewfinder; overflow scrolls.
+const MATCH_LIST_MAX_HEIGHT = 280;
 
 const styles = StyleSheet.create<CardScannerViewStyles>({
   root: {
@@ -185,16 +187,20 @@ const styles = StyleSheet.create<CardScannerViewStyles>({
     color: Colors.dark.textOnAccent,
   },
 
-  matchList: {
+  matchListWrapper: {
     position: 'absolute',
     left: Spacing.xl,
     right: Spacing.xl,
     bottom: BANNER_OFFSET,
-    maxHeight: 280,
-    padding: Spacing.xs,
-    gap: Spacing.xxs,
+  },
+  matchList: {
+    maxHeight: MATCH_LIST_MAX_HEIGHT,
     borderRadius: Radius.lg,
     backgroundColor: Colors.dark.backgroundElevated,
+  },
+  matchListContent: {
+    padding: Spacing.xs,
+    gap: Spacing.xxs,
   },
   matchRow: {
     paddingVertical: Spacing.sm,

@@ -5,11 +5,11 @@
 import { recognizeText } from '@infinitered/react-native-mlkit-text-recognition';
 import { Platform } from 'react-native';
 
-import { parseCardName } from '@src/utils/parseCardName';
+import { parseCardNameCandidates } from '@src/utils/parseCardName';
 
 /** Typed result of one card-name recognition attempt. */
 export type CardTextRecognitionResult =
-  | { kind: 'recognized'; candidateName: string }
+  | { kind: 'recognized'; candidateNames: string[] }
   | { kind: 'noText' }
   | { kind: 'unsupported' };
 
@@ -28,23 +28,24 @@ export class TextRecognitionError extends Error {
 }
 
 /**
- * Recognise the most prominent card name from a captured image on-device.
+ * Recognise candidate card names from a captured image on-device.
  *
  * Guards `Platform.OS === 'web'` (no on-device recognizer exists there) and
  * never calls the native module on web. Otherwise it delegates to ML Kit's
- * `recognizeText`, runs the {@link parseCardName} heuristic, and returns a
- * typed result.
+ * `recognizeText`, runs the {@link parseCardNameCandidates} heuristic, and
+ * returns the ordered candidates (most name-like first) so the caller can try
+ * each against the catalogue rather than betting on a single block.
  *
  * @param uri - local file URI of the captured/imported still.
- * @returns `{ kind: 'recognized', candidateName }` on a confident read,
- *   `{ kind: 'noText' }` when nothing usable is found, or
+ * @returns `{ kind: 'recognized', candidateNames }` with at least one candidate
+ *   on a confident read, `{ kind: 'noText' }` when nothing usable is found, or
  *   `{ kind: 'unsupported' }` on web.
  * @throws {TextRecognitionError} when the native recognizer rejects — the
  *   original error is logged first and attached as `cause`.
  *
  * @example
  *   const result = await recognizeCardName(photo.uri);
- *   if (result.kind === 'recognized') search(result.candidateName);
+ *   if (result.kind === 'recognized') searchEach(result.candidateNames);
  */
 export const recognizeCardName = async (uri: string): Promise<CardTextRecognitionResult> => {
   if (Platform.OS === 'web') {
@@ -52,6 +53,7 @@ export const recognizeCardName = async (uri: string): Promise<CardTextRecognitio
   }
 
   let recognized;
+
   try {
     recognized = await recognizeText(uri);
   } catch (error) {
@@ -60,6 +62,9 @@ export const recognizeCardName = async (uri: string): Promise<CardTextRecognitio
     throw new TextRecognitionError('On-device text recognition failed', { cause: error });
   }
 
-  const candidateName = parseCardName(recognized);
-  return candidateName ? { kind: 'recognized', candidateName } : { kind: 'noText' };
+  console.log(`The Text, ${recognized.text}`)
+  const candidateNames = parseCardNameCandidates(recognized);
+  return candidateNames.length > 0
+    ? { kind: 'recognized', candidateNames }
+    : { kind: 'noText' };
 };

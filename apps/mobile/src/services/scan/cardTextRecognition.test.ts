@@ -28,11 +28,36 @@ describe('recognizeCardName', () => {
   });
 
   describe('recognition pipeline (FR-004)', () => {
-    it('delegates to recognizeText with the uri and returns the parsed candidate', async () => {
+    it('delegates to recognizeText with the uri and returns the parsed candidates', async () => {
       const result = await recognizeCardName('file:///card.jpg');
 
       expect(recognizeTextSpy).toHaveBeenCalledWith('file:///card.jpg');
-      expect(result).toEqual({ kind: 'recognized', candidateName: 'Lightning Bolt' });
+      expect(result).toEqual({ kind: 'recognized', candidateNames: ['Lightning Bolt'] });
+    });
+
+    it('returns every recognised line as an ordered candidate (top-most first)', async () => {
+      recognizeTextSpy.mockResolvedValue({
+        text: 'Survival of the Fittest\nEnchantment',
+        blocks: [
+          {
+            text: 'Survival of the Fittest',
+            frame: { left: 20, top: 40, right: 320, bottom: 90 },
+            recognizedLanguages: ['en'],
+            lines: [],
+          },
+          {
+            text: 'Enchantment',
+            frame: { left: 20, top: 100, right: 200, bottom: 130 },
+            recognizedLanguages: ['en'],
+            lines: [],
+          },
+        ],
+      });
+
+      await expect(recognizeCardName('file:///survival.jpg')).resolves.toEqual({
+        kind: 'recognized',
+        candidateNames: ['Survival of the Fittest', 'Enchantment'],
+      });
     });
 
     it('returns noText when the heuristic finds no usable name', async () => {

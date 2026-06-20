@@ -36,6 +36,9 @@ const TabsLayout: FC = () => (
     <Tabs.Screen
       name="scan"
       options={{
+        // Spec 022 — Scan hosts a full-bleed camera viewfinder rendered by its own
+        // stack; the tab navigator MUST NOT inject a header on top of it.
+        headerShown: false,
         tabBarLabel: 'Scan',
         tabBarIcon: ({ color, size }) => <Ionicons name="scan-outline" size={size} color={color} />,
       }}

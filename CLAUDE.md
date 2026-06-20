@@ -23,32 +23,38 @@ This is a **pnpm + Turborepo monorepo**. Workspaces:
 my-binder/
 ├── apps/
 │   ├── mobile/                         # @my-binder/mobile — React Native 0.81.5 + Expo SDK ~54.0 + React 19.1 (spec 002, re-bootstrapped 2026-05-02)
-│   │   ├── app/                        # Expo Router 6 file-based routes (Root Stack → auth gate → 4-tab)
-│   │   │   ├── _layout.tsx             # Root Stack — providers, QueryClientProvider, error boundary
-│   │   │   ├── index.tsx               # <Redirect /> based on useSession() status
-│   │   │   ├── login.tsx               # PUBLIC — <LoginContainer />
-│   │   │   ├── access-denied.tsx       # PUBLIC — <AccessDeniedContainer />
-│   │   │   └── (authenticated)/
-│   │   │       ├── _layout.tsx         # Auth gate — <Redirect /> when no active session
-│   │   │       └── (tabs)/             # Bottom-tab navigator (4 tabs per v3 wireframe)
-│   │   │           ├── _layout.tsx     # <Tabs /> — Binder is initial route
-│   │   │           ├── binder.tsx      # PRIVATE — <BinderHomeContainer />
-│   │   │           └── {search,scan,profile}.tsx  # STUBS — <ComingSoonContainer />
-│   │   ├── assets/                     # Bootstrap-supplied dir; future Playfair Display custom font lands here
-│   │   ├── constants/
-│   │   │   └── theme.ts                # Wireframe v3 design tokens — Colors, Type, Spacing, Radius, Elevation, Motion, Touch
-│   │   ├── src/
+│   │   ├── src/                        # ALL app source lives under src/ (routes, assets, constants included)
+│   │   │   ├── app/                    # Expo Router 6 file-based routes (Root Stack → auth gate → 4-tab)
+│   │   │   │   ├── _layout.tsx         # Root Stack — providers, QueryClientProvider, error boundary
+│   │   │   │   ├── index.tsx           # <Redirect /> based on useSession() status
+│   │   │   │   ├── login.tsx           # PUBLIC — <LoginContainer />
+│   │   │   │   ├── access-denied.tsx   # PUBLIC — <AccessDeniedContainer />
+│   │   │   │   └── (authenticated)/
+│   │   │   │       ├── _layout.tsx     # Auth gate — <Redirect /> when no active session
+│   │   │   │       └── (tabs)/         # Bottom-tab navigator (4 tabs per v3 wireframe)
+│   │   │   │           ├── _layout.tsx # <Tabs /> — Binder is initial route
+│   │   │   │           ├── binder/     # PRIVATE — <BinderHomeContainer/> stack + card-detail sheet (spec 020)
+│   │   │   │           ├── catalogue/  # PRIVATE — <CatalogueContainer/> stack + card-detail/filter sheets (spec 018/020)
+│   │   │   │           ├── scan/       # PRIVATE — <CardScannerContainer/> stack + card-detail sheet (spec 022)
+│   │   │   │           └── profile.tsx # STUB — <ComingSoonContainer />
+│   │   │   ├── assets/                 # Bootstrap-supplied dir; future Playfair Display custom font lands here
+│   │   │   ├── constants/
+│   │   │   │   └── theme.ts            # Wireframe v3 design tokens — Colors, Type, Spacing, Radius, Elevation, Motion, Touch
 │   │   │   ├── components/             # Feature components (Container → Hook → View per Principle X)
 │   │   │   │   ├── login/{LoginContainer,LoginView,useLogin}.tsx
 │   │   │   │   ├── binder-home/{BinderHomeContainer,BinderHomeView,useBinderHome}.tsx
 │   │   │   │   ├── access-denied/{AccessDeniedContainer,AccessDeniedView,useAccessDenied}.tsx
-│   │   │   │   └── coming-soon/{ComingSoonContainer,ComingSoonView,useComingSoon}.tsx
-│   │   │   ├── hooks/                  # Cross-feature TanStack hooks + useSession
+│   │   │   │   ├── coming-soon/{ComingSoonContainer,ComingSoonView,useComingSoon}.tsx
+│   │   │   │   ├── card-scanner/{CardScannerContainer,useCardScanner,CardScannerView,types}  # spec 022
+│   │   │   │   └── scan-reticle/{ScanReticle,ScanReticle.theme}    # spec 022 — shared framing reticle
+│   │   │   ├── context/                # React context providers (e.g. catalogue-context)
+│   │   │   ├── hooks/                  # Cross-feature TanStack hooks + useSession + useCardCapture (spec 022)
 │   │   │   ├── services/
 │   │   │   │   ├── api/{ApiError,apiClient,queryClient,schemas,index}.ts
-│   │   │   │   └── auth/{googleAuth,sessionStorage,index}.ts
+│   │   │   │   ├── auth/{googleAuth,sessionStorage,index}.ts
+│   │   │   │   └── scan/cardTextRecognition.ts                     # spec 022 — on-device OCR wrapper
 │   │   │   ├── stores/{sessionStore,binderStore}.ts
-│   │   │   └── utils/pageMath.ts
+│   │   │   └── utils/{pageMath,parseCardName}.ts                   # parseCardName — spec 022
 │   │   ├── app.config.ts | app.json | eslint.config.js | jest.config.ts | jest.setup.ts | tsconfig.json | expo-env.d.ts
 │   │   └── package.json
 │   └── server/                         # @my-binder/server — Fastify API
@@ -194,9 +200,9 @@ Required Postgres vars: `DATABASE_URL` (hostname, despite the name), `DATABASE_P
 - **Google OAuth (`google-auth-library`)** — sign-in with allowlist gate stored in the `allowed_users` table (spec 011)
 - **AWS Lambda + API Gateway HTTP API** — production runtime, defined via CDK (spec 009)
 - **React Native 0.81.5 + Expo SDK ~54.0 on React 19.1** — `apps/mobile` framework (spec 002, re-bootstrapped 2026-05-02 via `npx create-expo-app` after the first SDK 52 attempt was abandoned); managed workflow with EAS Build for store artifacts. Pinned by constitution v1.15.0 (supersedes the v1.13.1 SDK 52 / RN 0.76 pin)
-- **Expo Router ~6.0** (file-based routing built on `@react-navigation/native-stack` 7 + `@react-navigation/bottom-tabs` 7) — `apps/mobile` routes live in `apps/mobile/app/` at the workspace root with a three-level hierarchy: Root Stack → `(authenticated)/_layout.tsx` (auth gate) → `(authenticated)/(tabs)/_layout.tsx` (4-tab bar matching the v3 wireframe: Binder live, Search/Scan/Profile as `<ComingSoonContainer />` stubs deferred to specs 003+) (spec 002). Constitution v1.13.2 aligned Principle X with Expo Router conventions; v1.15.0 re-pinned the major version to 6.
+- **Expo Router ~6.0** (file-based routing built on `@react-navigation/native-stack` 7 + `@react-navigation/bottom-tabs` 7) — `apps/mobile` routes live in `apps/mobile/src/app/` with a three-level hierarchy: Root Stack → `(authenticated)/_layout.tsx` (auth gate) → `(authenticated)/(tabs)/_layout.tsx` (4-tab bar matching the v3 wireframe: Binder live, Search/Scan/Profile as `<ComingSoonContainer />` stubs deferred to specs 003+) (spec 002). Constitution v1.13.2 aligned Principle X with Expo Router conventions; v1.15.0 re-pinned the major version to 6.
 - **`@expo/vector-icons` (Ionicons)** — tab-bar glyphs for Binder/Search/Scan/Profile, matching the iOS-style wireframe language (spec 002).
-- **TanStack Query 5** (`@tanstack/react-query@5`) — `apps/mobile` server-state layer; provides caching, request deduplication, and exponential-back-off retry on top of `apiClient.ts` (which remains the typed fetch + Ajv-validation queryFn body). Default policy: queries retry 3× on 5xx/network with `1s → 2s → 4s` back-off (cap 30s) and skip 4xx; mutations `retry: 0`; `refetchOnWindowFocus: false`. `<QueryClientProvider />` is mounted at the Root Stack in `apps/mobile/app/_layout.tsx`. Per-endpoint hooks: `useCardsInfiniteQuery`, `useMeQuery`, `useGoogleSignInMutation`, `useSignOutMutation` (spec 002).
+- **TanStack Query 5** (`@tanstack/react-query@5`) — `apps/mobile` server-state layer; provides caching, request deduplication, and exponential-back-off retry on top of `apiClient.ts` (which remains the typed fetch + Ajv-validation queryFn body). Default policy: queries retry 3× on 5xx/network with `1s → 2s → 4s` back-off (cap 30s) and skip 4xx; mutations `retry: 0`; `refetchOnWindowFocus: false`. `<QueryClientProvider />` is mounted at the Root Stack in `apps/mobile/src/app/_layout.tsx`. Per-endpoint hooks: `useCardsInfiniteQuery`, `useMeQuery`, `useGoogleSignInMutation`, `useSignOutMutation` (spec 002).
 - **Zustand 5** with `subscribeWithSelector` — `apps/mobile` UI/auth state stores (`sessionStore`; `binderStore` holds `currentPage` only); server state lives in the TanStack cache. Selectors keep the four-layer Principle X view-store boundary clean (spec 002)
 - **`expo-auth-session/providers/google`** — Google OAuth 2.0 flow inside an in-app browser (ASWebAuthenticationSession on iOS, Custom Tabs on Android); satisfies FR-003 of spec 002
 - **`expo-secure-store`** — session JWT persistence on `apps/mobile` (Keychain on iOS, EncryptedSharedPreferences on Android); 7-day TTL via `SESSION_JWT_TTL_DAYS` from `@my-binder/core` (spec 002)
@@ -208,7 +214,9 @@ Required Postgres vars: `DATABASE_URL` (hostname, despite the name), `DATABASE_P
 - TypeScript 5.9 (`strict: true`) on Node 22 (build/test toolchain) — mobile + server + core. + React Native 0.81.5 + Expo SDK ~54 on React 19.1; Expo Router ~6; TanStack Query 5; **`react-native-gifted-charts@^1.4.77`** (chart — NEW; built on the already-installed `react-native-svg@15.12.1`); `react-native-screens`/Expo Router `formSheet` (sheet, already installed); server: Fastify v4 + `mtgjson-sdk@0.1.1`. (020-card-detail-prices)
 - No new persistence. Prices are read-through from the MTGJSON SDK paper-retail dataset (no DuckDB replica, no migration). The in-memory TanStack cache holds query responses. (020-card-detail-prices)
 - TypeScript ~5.9 (`strict: true`), Node 22 (build/test toolchain only) + React Native 0.81.5 + Expo SDK ~54.0 on React 19.1; Expo Router ~6; TanStack Query 5; **`react-native-gifted-charts@^1.4.77`** (chart — re-introduced for the deferred trend chart) + peers **`react-native-svg@15.12.1`** + **`expo-linear-gradient`**, all installed via **`expo install react-native-gifted-charts expo-linear-gradient react-native-svg`** (SVG-based, all Expo SDK modules in the Expo Go bundle → **no native module outside Expo Go, Expo Go preserved**). NOT Skia/`react-native-graph` (rejected — forces a dev build). (021-price-trend-chart)
-- No new persistence. The price-history data layer (history query, route, provider, `priceSeriesToChartData`, `chartSeries`/`chartLegend`) shipped by spec 020 is reused unchanged; prices read through the existing TanStack in-memory cache. (021-price-trend-chart)
+- No new persistence. The price-history data layer (history query, route, provider, `priceSeriesToChartData`, `chartSeries`/`chartLegend`) shipped by spec 020 is reused unchanged; prices read through the existing TanStack in-memory cache. (022-card-scan-text reuses this unchanged too). (021-price-trend-chart)
+- **On-device card scanning** — `@infinitered/react-native-mlkit-text-recognition ^5.0.1` (Google ML Kit text recognition), `expo-camera ~17`, `expo-image-picker ~17`, `expo-build-properties ~1` (all via `expo install`). The Scan tab is a live `expo-camera` viewfinder that reads one card's printed name **on-device**, then searches the name via the reused `useCatalogueInfiniteQuery` (`GET /cards/search`) and opens the reused card-detail form sheet on a match. Read-only: the image never leaves the device (only the derived name is searched); no collection write. Confined to a service (`src/services/scan/cardTextRecognition.ts`), a shared hook (`src/hooks/useCardCapture.ts`), a pure util (`src/utils/parseCardName.ts`), a shared leaf (`src/components/scan-reticle/`), and the `card-scanner` feature; the `scan/` route is a Stack hosting the form sheet (mirrors `binder/`/`catalogue/`). See `apps/mobile/docs/card-scanner.md`. (022-card-scan-text)
+- **Dev-client note (supersedes the "Expo Go preserved" wording in earlier specs)** — the mobile app has required a **custom dev client** since `@react-native-google-signin/google-signin` landed (spec 002/007); spec 022's ML Kit + `expo-camera` native modules do not change that (still managed workflow, no `expo eject`). Earlier "no native module outside Expo Go / Expo Go preserved" notes (e.g. spec 021) describe only that spec's own JS/SVG deps — the project as a whole does **not** run in Expo Go. Recognition + camera preview are **physical-device only** (web renders an unsupported state; the iOS simulator cannot run ML Kit). (022-card-scan-text)
 
 ## Recent Changes
 - **002-mobile-binder-app (re-bootstrap, 2026-05-02)**: First implementation attempt was abandoned after build failures and `apps/mobile/` was re-bootstrapped via `npx create-expo-app` on **Expo SDK 54.0.33 / React Native 0.81.5 / React 19.1 / Expo Router 6.0.23 / TypeScript 5.9.2**. Constitution amended to **v1.15.0** (re-pins the mobile tech stack, supersedes the v1.13.1 SDK 52 / RN 0.76 pin) and **v1.16.0** (adds Hook return-value memoisation rule to Principle X — `useCallback` for returned functions, `useMemo` for non-primitives, exhaustive deps; primitives exempt; values from Zustand selectors/TanStack Query results are already stable, derived values must be memoised at the hook boundary). `spec.md` Clarifications §2026-05-02 records the re-bootstrap and version-pin decisions. Bootstrap-cleanup tracked as Phase 1 of the regenerated `tasks.md` (delete `package-lock.json` → pnpm install; rewrite `tsconfig.json` paths from `@/*` to `@root/*` + `@src/*`; delete leftover template files `app/modal.tsx`, `hooks/use-color-scheme*.ts`, `hooks/use-theme-color.ts`, `scripts/reset-project.js`). `apps/mobile/constants/theme.ts` rewritten with the wireframe v3 design tokens (deep crimson cover + warm dusty-gold accent + display-serif `Type` roles + 4-pt `Spacing` + `Radius` + `Elevation` + `Motion` + `Touch`); `tsc --strict` passes. The four template directories `app/(tabs)`, `assets/images`, `components`, `components/ui` were stripped of their demo files (22 PNG/TSX deletions) and stand empty awaiting feature work.

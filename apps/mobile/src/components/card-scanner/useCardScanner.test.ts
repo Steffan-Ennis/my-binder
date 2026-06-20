@@ -3,6 +3,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 import { createElement } from 'react';
+import { PanResponder } from 'react-native';
+import type {
+  GestureResponderEvent,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  PanResponderCallbacks,
+  PanResponderGestureState,
+} from 'react-native';
 
 import * as apiModule from '@src/services/api/apiClient';
 import * as captureModule from '@src/hooks/useCardCapture';
@@ -64,6 +72,25 @@ const setCapture = (overrides: Partial<captureModule.UseCardCaptureResult>) => {
 
 const captured = (uri = 'file:///shot.jpg'): CaptureResult => ({ kind: 'captured', uri });
 
+const gesture = (dy: number, dx = 0): PanResponderGestureState =>
+  ({
+    stateID: 1,
+    moveX: 0,
+    moveY: 0,
+    x0: 0,
+    y0: 0,
+    dx,
+    dy,
+    vx: 0,
+    vy: 0,
+    numberActiveTouches: 1,
+  }) as unknown as PanResponderGestureState;
+
+const scrollTo = (y: number): NativeSyntheticEvent<NativeScrollEvent> =>
+  ({ nativeEvent: { contentOffset: { y } } }) as unknown as NativeSyntheticEvent<NativeScrollEvent>;
+
+const noEvent = {} as GestureResponderEvent;
+
 beforeEach(() => {
   mockNavigate.mockReset();
   useSessionStore.setState({ jwt: 'tok', iat: 1, userId: 'u', email: 'e@x.com', status: 'active' });
@@ -81,7 +108,7 @@ beforeEach(() => {
   captureSpy = jest.spyOn(captureModule, 'useCardCapture').mockReturnValue(captureValue);
   recognizeSpy = jest
     .spyOn(recognitionModule, 'recognizeCardName')
-    .mockResolvedValue({ kind: 'recognized', candidateName: 'Lightning Bolt' });
+    .mockResolvedValue({ kind: 'recognized', candidateNames: ['Lightning Bolt'] });
   jest.spyOn(apiModule.apiClient, 'searchCards').mockResolvedValue(makePage([makeCard('1', 'Lightning Bolt')]));
 });
 
@@ -111,6 +138,33 @@ describe('useCardScanner', () => {
       );
       expect(result.current.matches).toEqual([makeCard('1', 'Lightning Bolt')]);
       expect(result.current.reticleTone).toBe('aligned');
+    });
+
+    it('probes each recognised block and matches on a later candidate when the first misses', async () => {
+      // The OCR's top line is the rules/type text; the real card name is a later
+      // candidate. Each block is searched until one hits (the Mishra's Workshop /
+      // Survival of the Fittest bug).
+      recognizeSpy.mockResolvedValue({
+        kind: 'recognized',
+        candidateNames: ['Enchantment', 'Survival of the Fittest'],
+      });
+      jest
+        .spyOn(apiModule.apiClient, 'searchCards')
+        .mockImplementation(async (query) =>
+          query.name === 'Survival of the Fittest'
+            ? makePage([makeCard('9', 'Survival of the Fittest')])
+            : makePage([]),
+        );
+
+      const { result } = renderHook(() => useCardScanner(), { wrapper });
+
+      await act(async () => {
+        await result.current.onCapture();
+      });
+
+      await waitFor(() => expect(result.current.status).toBe('matches'));
+      expect(result.current.candidateName).toBe('Survival of the Fittest');
+      expect(result.current.matches).toEqual([makeCard('9', 'Survival of the Fittest')]);
     });
 
     it('imports from the gallery through the same recognise → search tail', async () => {
@@ -227,6 +281,63 @@ describe('useCardScanner', () => {
     });
   });
 
+  describe('pull-to-dismiss the match list', () => {
+    const driveToMatches = async () => {
+      const createSpy = jest.spyOn(PanResponder, 'create');
+      const rendered = renderHook(() => useCardScanner(), { wrapper });
+      await act(async () => {
+        await rendered.result.current.onCapture();
+      });
+      await waitFor(() => expect(rendered.result.current.status).toBe('matches'));
+      const config = createSpy.mock.calls.at(-1)![0] as PanResponderCallbacks;
+      return { ...rendered, config };
+    };
+
+    it('captures a downward pull only when scrolled to the top', async () => {
+      const { result, config } = await driveToMatches();
+      const pull = gesture(120, 4);
+
+      // Scrolled down into the list → the ScrollView keeps the gesture.
+      act(() => result.current.onMatchListScroll(scrollTo(500)));
+      expect(config.onMoveShouldSetPanResponderCapture!(noEvent, pull)).toBe(false);
+
+      // At the top → the downward drag is taken over for dismissal.
+      act(() => result.current.onMatchListScroll(scrollTo(0)));
+      expect(config.onMoveShouldSetPanResponderCapture!(noEvent, pull)).toBe(true);
+    });
+
+    it('does not capture a mostly-horizontal drag at the top', async () => {
+      const { result, config } = await driveToMatches();
+      act(() => result.current.onMatchListScroll(scrollTo(0)));
+      // dx dominates dy → a horizontal swipe, not a pull-down.
+      expect(config.onMoveShouldSetPanResponderCapture!(noEvent, gesture(30, 80))).toBe(false);
+    });
+
+    it('dismisses to the viewfinder when a committed pull is released', async () => {
+      const { result, config } = await driveToMatches();
+      act(() => result.current.onMatchListScroll(scrollTo(0)));
+
+      act(() => {
+        config.onPanResponderRelease!(noEvent, gesture(120));
+      });
+
+      expect(result.current.status).toBe('ready');
+      expect(result.current.candidateName).toBeUndefined();
+    });
+
+    it('keeps the results when the pull is too short to dismiss', async () => {
+      const { result, config } = await driveToMatches();
+      act(() => result.current.onMatchListScroll(scrollTo(0)));
+
+      act(() => {
+        config.onPanResponderRelease!(noEvent, gesture(40));
+      });
+
+      expect(result.current.status).toBe('matches');
+      expect(result.current.candidateName).toBe('Lightning Bolt');
+    });
+  });
+
   describe('navigation + mode + torch', () => {
     it('onSelectMatch navigates to the scan card-detail route with the printing id (FR-006)', () => {
       const { result } = renderHook(() => useCardScanner(), { wrapper });
@@ -281,6 +392,8 @@ describe('useCardScanner', () => {
       expect(result.current.onSelectMatch).toBe(first.onSelectMatch);
       expect(result.current.onSelectMode).toBe(first.onSelectMode);
       expect(result.current.cameraRef).toBe(first.cameraRef);
+      expect(result.current.matchListPanHandlers).toBe(first.matchListPanHandlers);
+      expect(result.current.onMatchListScroll).toBe(first.onMatchListScroll);
     });
   });
 });

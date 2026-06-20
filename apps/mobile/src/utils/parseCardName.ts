@@ -1,9 +1,10 @@
 // Spec 022 — pure name heuristic (Layer = Utility: no React, no side effects).
-// The on-device recognizer hands us a `Text` result; we reduce it to a
-// best-guess card name. The recognizer's full `Text`/`Block` shape is NOT
-// imported here so the util stays pure and trivially testable — we consume the
-// minimal local shape below, which the native `Text` is structurally
-// assignable to.
+// The on-device recognizer hands us a `Text` result; we reduce it to an ordered
+// list of candidate names (most name-like first) so the caller can try each one
+// against the catalogue rather than betting everything on a single block. The
+// recognizer's full `Text`/`Block` shape is NOT imported here so the util stays
+// pure and trivially testable — we consume the minimal local shape below, which
+// the native `Text` is structurally assignable to.
 
 /** Pixel rectangle of a recognised block, mirroring ML Kit's `Rect`. */
 export type RecognizedFrame = {
@@ -34,14 +35,8 @@ const NON_NAME_CHARS = /[^A-Za-z0-9\s'’,.&!:\-]/g;
 // A standalone integer token (a bare collector number / set count).
 const STANDALONE_NUMBER = /(^|\s)\d+(?=\s|$)/g;
 
-const cleanName = (raw: string): string => {
-  const firstLine =
-    raw
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .find((line) => line.length > 0) ?? '';
-
-  const cleaned = firstLine
+const cleanLine = (raw: string): string => {
+  const cleaned = raw
     .replace(COLLECTOR_FRACTION, ' ')
     .replace(NON_NAME_CHARS, ' ')
     .replace(STANDALONE_NUMBER, ' ')
@@ -54,44 +49,66 @@ const cleanName = (raw: string): string => {
 
 type Candidate = {
   name: string;
-  area: number;
   top: number;
-  index: number;
+  blockIndex: number;
+  lineIndex: number;
 };
 
-const frameArea = (frame?: RecognizedFrame): number =>
-  frame ? Math.max(0, frame.right - frame.left) * Math.max(0, frame.bottom - frame.top) : 0;
-
 /**
- * Reduce a recognised `Text` result to the most likely card name, or
- * `undefined` when nothing usable is present.
+ * Reduce a recognised `Text` result to an ordered list of candidate card names.
  *
- * Heuristic (deliberately simple, per research D5): clean each block to a
- * candidate name, discard the empties, then pick the **most prominent** block —
- * largest frame area, tie-broken by the top-most block. Set-symbol and
- * collector-number noise is stripped; non-Latin / garbage yields `undefined`.
+ * Every non-empty line of every block becomes a candidate (set-symbol and
+ * collector-number noise stripped; non-Latin / garbage dropped). Candidates are
+ * ordered **top-most first** — a card's printed name sits at the top, so the
+ * highest line is the most likely name — then by block and line order; the list
+ * is de-duplicated case-insensitively.
+ *
+ * The caller tries each candidate against the catalogue and keeps the first that
+ * matches. This is deliberate: a card whose largest text block is its rules box
+ * (e.g. Mishra's Workshop) would otherwise resolve to its reminder text, and a
+ * card name that is not the first recognised block (placement varies) would be
+ * missed if only the single most-prominent block were used.
+ *
+ * @param recognizedText - the minimal `Text` shape the on-device recognizer returns.
+ * @returns candidate names, most name-like first; `[]` when nothing usable is found.
+ *
+ * @example
+ *   const names = parseCardNameCandidates(recognized); // ['Survival of the Fittest', 'Enchantment', …]
+ *   for (const name of names) if (await catalogueHasMatch(name)) return name;
  */
-export const parseCardName = (recognizedText: RecognizedText): string | undefined => {
+export const parseCardNameCandidates = (recognizedText: RecognizedText): string[] => {
   const candidates: Candidate[] = [];
 
-  recognizedText.blocks.forEach((block, index) => {
-    const name = cleanName(block.text);
-    if (name.length === 0) return;
-    candidates.push({
-      name,
-      area: frameArea(block.frame),
-      top: block.frame ? block.frame.top : Number.POSITIVE_INFINITY,
-      index,
+  recognizedText.blocks.forEach((block, blockIndex) => {
+    const top = block.frame ? block.frame.top : Number.POSITIVE_INFINITY;
+    block.text.split(/\r?\n/).forEach((line, lineIndex) => {
+      const name = cleanLine(line);
+      if (name.length === 0) return;
+      candidates.push({ name, top, blockIndex, lineIndex });
     });
   });
 
-  if (candidates.length === 0) return undefined;
-
   candidates.sort((a, b) => {
-    if (b.area !== a.area) return b.area - a.area; // largest frame first
-    if (a.top !== b.top) return a.top - b.top; // tie-break: top-most
-    return a.index - b.index; // stable: first block wins
+    if (a.top !== b.top) return a.top - b.top; // top-most first (the name sits highest)
+    if (a.blockIndex !== b.blockIndex) return a.blockIndex - b.blockIndex;
+    return a.lineIndex - b.lineIndex; // stable, top-to-bottom within a block
   });
 
-  return candidates[0]!.name;
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  candidates.forEach((candidate) => {
+    const key = candidate.name.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    ordered.push(candidate.name);
+  });
+  return ordered;
 };
+
+/**
+ * The single best-guess card name — the top-most usable line — or `undefined`
+ * when nothing usable is present. Convenience accessor over
+ * {@link parseCardNameCandidates}.
+ */
+export const parseCardName = (recognizedText: RecognizedText): string | undefined =>
+  parseCardNameCandidates(recognizedText)[0];
