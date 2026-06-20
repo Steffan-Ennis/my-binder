@@ -9,13 +9,10 @@
 import type { CardRecord } from '@my-binder/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import type { ComponentRef, ComponentType, RefObject } from 'react';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import {
-  PanResponder,
-  Platform,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from 'react-native';
+import { Platform, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { Gesture, type ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 
 import { apiClient } from '@src/services/api/apiClient';
 import { recognizeCardName } from '@src/services/scan/cardTextRecognition';
@@ -60,11 +57,24 @@ const MAX_SCAN_CANDIDATES = 8;
 const PROBE_STALE_MS = 60_000;
 
 // Pull-to-dismiss tuning for the match list (Principle V — no magic literal).
-// Treat a near-zero scroll offset as "at the top"; only then may a downward drag
-// take over from the scroll, and only a drag past the dismiss distance closes it.
+// Treat a near-zero scroll offset as "at the top"; the pan only activates after a
+// downward drag of `PULL_ACTIVATE_DISTANCE`, and only a drag past the dismiss
+// distance (released) closes the results.
 const SCROLL_TOP_EPSILON = 4;
 const PULL_ACTIVATE_DISTANCE = 24;
 const PULL_DISMISS_DISTANCE = 96;
+
+/** The match list is "at the top" when its scroll offset is at/near zero. */
+export const isMatchListAtTop = (scrollOffsetY: number): boolean =>
+  scrollOffsetY <= SCROLL_TOP_EPSILON;
+
+/**
+ * A pull dismisses the results only when the drag began at the top of the list
+ * and travelled far enough downward — pure so the threshold logic is unit-tested
+ * without simulating a native gesture.
+ */
+export const shouldDismissOnPull = (startedAtTop: boolean, translationY: number): boolean =>
+  startedAtTop && translationY > PULL_DISMISS_DISTANCE;
 
 const toReticleTone = (status: ScanStatus): ReticleTone => {
   if (status === 'matches') return 'aligned';
@@ -108,6 +118,13 @@ const useCardScanner = (): UseCardScannerResult => {
   // can tell whether the list is at the top. A ref (not state) — it changes every
   // scroll frame and must not re-render.
   const matchScrollOffset = useRef(0);
+  // Captured at gesture start: only a pull that BEGAN at the top dismisses, so a
+  // drag that merely scrolls up to the top mid-gesture never closes the results.
+  const dismissStartedAtTop = useRef(false);
+  // Attached to the match ScrollView; lets the pan run simultaneously with the
+  // native scroll instead of fighting it (the PanResponder approach lost this
+  // fight on Android — the native ScrollView swallowed the touch).
+  const matchScrollRef = useRef<ComponentRef<typeof GestureScrollView>>(null);
 
   // Empty filter object ⇒ the catalogue hook self-gates `enabled` off (lodash
   // `isEmpty({}) === true`), so no request is issued until a name is recognised.
@@ -239,22 +256,26 @@ const useCardScanner = (): UseCardScannerResult => {
     [],
   );
 
-  // Pull-to-dismiss: at the top of the list, a committed downward drag dismisses
-  // the results back to the viewfinder (same effect as Retry). The capture gate
-  // only steals the touch from the ScrollView when the list is already at the
-  // top and the finger is travelling down, so normal scrolling is untouched.
-  const matchListPanResponder = useMemo(
+  // Pull-to-dismiss (react-native-gesture-handler): a downward pan that begins at
+  // the top of the list and travels far enough dismisses the results back to the
+  // viewfinder (same effect as Retry). It runs *simultaneously* with the native
+  // scroll (`simultaneousWithExternalGesture`), so normal scrolling is untouched
+  // and only an at-top pull is treated as a dismiss. `runOnJS` keeps the callbacks
+  // on the JS thread so they can read the scroll-offset ref and call `onRetry`.
+  const matchListDismissGesture = useMemo(
     () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponderCapture: (_event, gesture) =>
-          matchScrollOffset.current <= SCROLL_TOP_EPSILON &&
-          gesture.dy > PULL_ACTIVATE_DISTANCE &&
-          gesture.dy > Math.abs(gesture.dx),
-        onPanResponderRelease: (_event, gesture) => {
-          if (gesture.dy > PULL_DISMISS_DISTANCE) onRetry();
-        },
-        onPanResponderTerminationRequest: () => false,
-      }),
+      Gesture.Pan()
+        .runOnJS(true)
+        .activeOffsetY(PULL_ACTIVATE_DISTANCE)
+        .onBegin(() => {
+          dismissStartedAtTop.current = isMatchListAtTop(matchScrollOffset.current);
+        })
+        .onEnd((event) => {
+          if (shouldDismissOnPull(dismissStartedAtTop.current, event.translationY)) onRetry();
+        })
+        // RNGH's `GestureRef` types want a component-type ref; the ScrollView ref
+        // is an instance ref, so this resolves at runtime but needs a cast.
+        .simultaneousWithExternalGesture(matchScrollRef as unknown as RefObject<ComponentType>),
     [onRetry],
   );
 
@@ -284,7 +305,8 @@ const useCardScanner = (): UseCardScannerResult => {
       reticleTone,
       candidateName,
       matches,
-      matchListPanHandlers: matchListPanResponder.panHandlers,
+      matchListDismissGesture,
+      matchScrollRef,
       onMatchListScroll,
       cameraRef,
       permissionStatus,
@@ -306,7 +328,8 @@ const useCardScanner = (): UseCardScannerResult => {
       reticleTone,
       candidateName,
       matches,
-      matchListPanResponder,
+      matchListDismissGesture,
+      matchScrollRef,
       onMatchListScroll,
       cameraRef,
       permissionStatus,

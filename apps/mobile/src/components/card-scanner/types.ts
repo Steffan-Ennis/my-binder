@@ -6,8 +6,9 @@
 // `CameraPermissionStatus` from the shared capture hook, `CardRecord` from core.
 import type { CardRecord } from '@my-binder/core';
 import type { CameraView } from 'expo-camera';
-import type { RefObject } from 'react';
-import type { GestureResponderHandlers, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
+import type { ComponentRef, RefObject } from 'react';
+import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
+import type { GestureType, ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 
 import type { ReticleTone } from '@src/components/scan-reticle/ScanReticle';
 import type {
@@ -58,12 +59,15 @@ export type CardScannerViewProps = Pick<
   // The catalogue matches for `candidateName`, flattened from the query pages.
   matches: ReadonlyArray<CardRecord>;
 
-  // Pull-to-dismiss for the match list. `matchListPanHandlers` wraps the scroll
-  // container and `onMatchListScroll` tracks the offset so the gesture only
-  // dismisses once scrolled to the top. Both are constructed in the hook and
-  // surfaced as stable handles (Principle X — Data-fetching rule 4: gestures
-  // live in the hook, not the view).
-  matchListPanHandlers: GestureResponderHandlers;
+  // Pull-to-dismiss for the match list (react-native-gesture-handler).
+  // `matchListDismissGesture` wraps the scroll container in a `<GestureDetector>`,
+  // `matchScrollRef` lets the pan run simultaneously with the native scroll, and
+  // `onMatchListScroll` tracks the offset so the gesture only dismisses once
+  // scrolled to the top. All three are constructed in the hook and surfaced as
+  // stable handles (Principle X — Data-fetching rule 4: gestures live in the hook,
+  // not the view).
+  matchListDismissGesture: GestureType;
+  matchScrollRef: RefObject<ComponentRef<typeof GestureScrollView> | null>;
   onMatchListScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
 
   // Camera surface (from the shared `useCardCapture` hook)

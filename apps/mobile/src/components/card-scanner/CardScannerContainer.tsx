@@ -17,7 +17,8 @@ const CardScannerContainer: FC = () => {
     reticleTone,
     candidateName,
     matches,
-    matchListPanHandlers,
+    matchListDismissGesture,
+    matchScrollRef,
     onMatchListScroll,
     cameraRef,
     permissionStatus,
@@ -41,7 +42,8 @@ const CardScannerContainer: FC = () => {
       reticleTone={reticleTone}
       candidateName={candidateName}
       matches={matches}
-      matchListPanHandlers={matchListPanHandlers}
+      matchListDismissGesture={matchListDismissGesture}
+      matchScrollRef={matchScrollRef}
       onMatchListScroll={onMatchListScroll}
       cameraRef={cameraRef}
       permissionStatus={permissionStatus}

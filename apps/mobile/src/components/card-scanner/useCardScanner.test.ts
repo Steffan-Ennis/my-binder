@@ -3,14 +3,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 import { createElement } from 'react';
-import { PanResponder } from 'react-native';
-import type {
-  GestureResponderEvent,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  PanResponderCallbacks,
-  PanResponderGestureState,
-} from 'react-native';
 
 import * as apiModule from '@src/services/api/apiClient';
 import * as captureModule from '@src/hooks/useCardCapture';
@@ -18,7 +10,7 @@ import type { CameraPermissionStatus, CaptureResult } from '@src/hooks/useCardCa
 import * as recognitionModule from '@src/services/scan/cardTextRecognition';
 import { useSessionStore } from '@src/stores/sessionStore';
 
-import useCardScanner from './useCardScanner';
+import useCardScanner, { isMatchListAtTop, shouldDismissOnPull } from './useCardScanner';
 
 const mockNavigate = jest.fn();
 jest.mock('expo-router', () => {
@@ -71,25 +63,6 @@ const setCapture = (overrides: Partial<captureModule.UseCardCaptureResult>) => {
 };
 
 const captured = (uri = 'file:///shot.jpg'): CaptureResult => ({ kind: 'captured', uri });
-
-const gesture = (dy: number, dx = 0): PanResponderGestureState =>
-  ({
-    stateID: 1,
-    moveX: 0,
-    moveY: 0,
-    x0: 0,
-    y0: 0,
-    dx,
-    dy,
-    vx: 0,
-    vy: 0,
-    numberActiveTouches: 1,
-  }) as unknown as PanResponderGestureState;
-
-const scrollTo = (y: number): NativeSyntheticEvent<NativeScrollEvent> =>
-  ({ nativeEvent: { contentOffset: { y } } }) as unknown as NativeSyntheticEvent<NativeScrollEvent>;
-
-const noEvent = {} as GestureResponderEvent;
 
 beforeEach(() => {
   mockNavigate.mockReset();
@@ -281,60 +254,23 @@ describe('useCardScanner', () => {
     });
   });
 
-  describe('pull-to-dismiss the match list', () => {
-    const driveToMatches = async () => {
-      const createSpy = jest.spyOn(PanResponder, 'create');
-      const rendered = renderHook(() => useCardScanner(), { wrapper });
-      await act(async () => {
-        await rendered.result.current.onCapture();
-      });
-      await waitFor(() => expect(rendered.result.current.status).toBe('matches'));
-      const config = createSpy.mock.calls.at(-1)![0] as PanResponderCallbacks;
-      return { ...rendered, config };
-    };
-
-    it('captures a downward pull only when scrolled to the top', async () => {
-      const { result, config } = await driveToMatches();
-      const pull = gesture(120, 4);
-
-      // Scrolled down into the list → the ScrollView keeps the gesture.
-      act(() => result.current.onMatchListScroll(scrollTo(500)));
-      expect(config.onMoveShouldSetPanResponderCapture!(noEvent, pull)).toBe(false);
-
-      // At the top → the downward drag is taken over for dismissal.
-      act(() => result.current.onMatchListScroll(scrollTo(0)));
-      expect(config.onMoveShouldSetPanResponderCapture!(noEvent, pull)).toBe(true);
+  describe('pull-to-dismiss gating (pure logic)', () => {
+    it('treats only a near-zero scroll offset as "at the top"', () => {
+      expect(isMatchListAtTop(0)).toBe(true);
+      expect(isMatchListAtTop(4)).toBe(true);
+      expect(isMatchListAtTop(40)).toBe(false);
     });
 
-    it('does not capture a mostly-horizontal drag at the top', async () => {
-      const { result, config } = await driveToMatches();
-      act(() => result.current.onMatchListScroll(scrollTo(0)));
-      // dx dominates dy → a horizontal swipe, not a pull-down.
-      expect(config.onMoveShouldSetPanResponderCapture!(noEvent, gesture(30, 80))).toBe(false);
+    it('dismisses only when the pull began at the top and travelled far enough', () => {
+      expect(shouldDismissOnPull(true, 120)).toBe(true); // at top + long pull
+      expect(shouldDismissOnPull(true, 40)).toBe(false); // at top but too short
+      expect(shouldDismissOnPull(false, 300)).toBe(false); // long pull but not from the top
     });
 
-    it('dismisses to the viewfinder when a committed pull is released', async () => {
-      const { result, config } = await driveToMatches();
-      act(() => result.current.onMatchListScroll(scrollTo(0)));
-
-      act(() => {
-        config.onPanResponderRelease!(noEvent, gesture(120));
-      });
-
-      expect(result.current.status).toBe('ready');
-      expect(result.current.candidateName).toBeUndefined();
-    });
-
-    it('keeps the results when the pull is too short to dismiss', async () => {
-      const { result, config } = await driveToMatches();
-      act(() => result.current.onMatchListScroll(scrollTo(0)));
-
-      act(() => {
-        config.onPanResponderRelease!(noEvent, gesture(40));
-      });
-
-      expect(result.current.status).toBe('matches');
-      expect(result.current.candidateName).toBe('Lightning Bolt');
+    it('exposes a stable dismiss gesture and scroll ref for the view', () => {
+      const { result } = renderHook(() => useCardScanner(), { wrapper });
+      expect(result.current.matchListDismissGesture).toBeDefined();
+      expect(result.current.matchScrollRef).toEqual({ current: null });
     });
   });
 
@@ -392,7 +328,8 @@ describe('useCardScanner', () => {
       expect(result.current.onSelectMatch).toBe(first.onSelectMatch);
       expect(result.current.onSelectMode).toBe(first.onSelectMode);
       expect(result.current.cameraRef).toBe(first.cameraRef);
-      expect(result.current.matchListPanHandlers).toBe(first.matchListPanHandlers);
+      expect(result.current.matchListDismissGesture).toBe(first.matchListDismissGesture);
+      expect(result.current.matchScrollRef).toBe(first.matchScrollRef);
       expect(result.current.onMatchListScroll).toBe(first.onMatchListScroll);
     });
   });

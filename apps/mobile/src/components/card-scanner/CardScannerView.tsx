@@ -8,7 +8,8 @@ import { Ionicons } from '@expo/vector-icons';
 import type { CardRecord } from '@my-binder/core';
 import { CameraView } from 'expo-camera';
 import type { FC } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { GestureDetector, ScrollView } from 'react-native-gesture-handler';
 
 import ScanReticle from '@src/components/scan-reticle/ScanReticle';
 import { Colors } from '@src/constants/theme';
@@ -134,36 +135,41 @@ const ScanMessage: FC<{
 const MatchList: FC<{
   styles: CardScannerViewStyles;
   matches: ReadonlyArray<CardRecord>;
-  matchListPanHandlers: CardScannerViewProps['matchListPanHandlers'];
+  matchListDismissGesture: CardScannerViewProps['matchListDismissGesture'];
+  matchScrollRef: CardScannerViewProps['matchScrollRef'];
   onMatchListScroll: CardScannerViewProps['onMatchListScroll'];
   onSelectMatch: (printingId: string) => void;
-}> = ({ styles, matches, matchListPanHandlers, onMatchListScroll, onSelectMatch }) => (
-  // The wrapper carries the pull-to-dismiss pan handlers; the inner ScrollView
-  // owns the height cap + scrolling. The pan only intercepts at the top (gated in
-  // the hook), so normal scrolling stays with the ScrollView.
-  <View style={styles.matchListWrapper} testID="scan-match-list" {...matchListPanHandlers}>
-    <ScrollView
-      style={styles.matchList}
-      contentContainerStyle={styles.matchListContent}
-      testID="scan-status-matches"
-      onScroll={onMatchListScroll}
-      scrollEventThrottle={SCROLL_EVENT_THROTTLE}
-      keyboardShouldPersistTaps="handled"
-    >
-      {matches.map((match) => (
-        <Pressable
-          key={match.id}
-          accessibilityRole="button"
-          accessibilityLabel={`Open ${match.name}`}
-          onPress={() => onSelectMatch(match.id)}
-          testID={`scan-match-${match.id}`}
-          style={styles.matchRow}
-        >
-          <Text style={styles.matchName}>{match.name}</Text>
-          <Text style={styles.matchMeta}>{`${match.set} · #${match.cardNumber}`}</Text>
-        </Pressable>
-      ))}
-    </ScrollView>
+}> = ({ styles, matches, matchListDismissGesture, matchScrollRef, onMatchListScroll, onSelectMatch }) => (
+  // The wrapper positions the overlay; the GestureDetector attaches the
+  // pull-to-dismiss pan to the ScrollView. The pan runs simultaneously with the
+  // native scroll (via `matchScrollRef` in the hook) and only dismisses an at-top
+  // pull, so normal scrolling is untouched.
+  <View style={styles.matchListWrapper} testID="scan-match-list">
+    <GestureDetector gesture={matchListDismissGesture}>
+      <ScrollView
+        ref={matchScrollRef}
+        style={styles.matchList}
+        contentContainerStyle={styles.matchListContent}
+        testID="scan-status-matches"
+        onScroll={onMatchListScroll}
+        scrollEventThrottle={SCROLL_EVENT_THROTTLE}
+        keyboardShouldPersistTaps="handled"
+      >
+        {matches.map((match) => (
+          <Pressable
+            key={match.id}
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${match.name}`}
+            onPress={() => onSelectMatch(match.id)}
+            testID={`scan-match-${match.id}`}
+            style={styles.matchRow}
+          >
+            <Text style={styles.matchName}>{match.name}</Text>
+            <Text style={styles.matchMeta}>{`${match.set} · #${match.cardNumber}`}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </GestureDetector>
   </View>
 );
 
@@ -172,7 +178,8 @@ const ScanStatusOverlay: FC<{
   status: ScanStatus;
   candidateName?: string;
   matches: ReadonlyArray<CardRecord>;
-  matchListPanHandlers: CardScannerViewProps['matchListPanHandlers'];
+  matchListDismissGesture: CardScannerViewProps['matchListDismissGesture'];
+  matchScrollRef: CardScannerViewProps['matchScrollRef'];
   onMatchListScroll: CardScannerViewProps['onMatchListScroll'];
   onSelectMatch: (printingId: string) => void;
   onRetry: () => void;
@@ -181,7 +188,8 @@ const ScanStatusOverlay: FC<{
   status,
   candidateName,
   matches,
-  matchListPanHandlers,
+  matchListDismissGesture,
+  matchScrollRef,
   onMatchListScroll,
   onSelectMatch,
   onRetry,
@@ -225,7 +233,8 @@ const ScanStatusOverlay: FC<{
         <MatchList
           styles={styles}
           matches={matches}
-          matchListPanHandlers={matchListPanHandlers}
+          matchListDismissGesture={matchListDismissGesture}
+          matchScrollRef={matchScrollRef}
           onMatchListScroll={onMatchListScroll}
           onSelectMatch={onSelectMatch}
         />
@@ -241,7 +250,8 @@ const CardScannerView: FC<CardScannerViewProps> = ({
   reticleTone,
   candidateName,
   matches,
-  matchListPanHandlers,
+  matchListDismissGesture,
+  matchScrollRef,
   onMatchListScroll,
   cameraRef,
   torchEnabled,
@@ -298,7 +308,8 @@ const CardScannerView: FC<CardScannerViewProps> = ({
         status={status}
         candidateName={candidateName}
         matches={matches}
-        matchListPanHandlers={matchListPanHandlers}
+        matchListDismissGesture={matchListDismissGesture}
+        matchScrollRef={matchScrollRef}
         onMatchListScroll={onMatchListScroll}
         onSelectMatch={onSelectMatch}
         onRetry={onRetry}

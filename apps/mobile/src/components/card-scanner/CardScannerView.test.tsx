@@ -1,7 +1,8 @@
 import type { CardRecord } from '@my-binder/core';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import type { CameraView } from 'expo-camera';
-import type { FC, RefObject } from 'react';
+import type { ComponentRef, FC, RefObject } from 'react';
+import { Gesture, type ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 
 import CardScannerView from './CardScannerView';
 import type { CardScannerViewProps } from './types';
@@ -24,7 +25,8 @@ const defaults: CardScannerViewProps = {
   reticleTone: 'idle',
   candidateName: undefined,
   matches: [],
-  matchListPanHandlers: {},
+  matchListDismissGesture: Gesture.Pan(),
+  matchScrollRef: { current: null } as RefObject<ComponentRef<typeof GestureScrollView> | null>,
   onMatchListScroll: jest.fn(),
   cameraRef: { current: null } as RefObject<CameraView | null>,
   permissionStatus: 'granted',

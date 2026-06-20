@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react-native';
 import type { CameraView } from 'expo-camera';
-import type { RefObject } from 'react';
+import type { ComponentRef, RefObject } from 'react';
+import { Gesture, type ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 
 import { CardScannerContainer } from './CardScannerContainer';
 import type { CardScannerViewProps } from './types';
@@ -43,7 +44,8 @@ describe('CardScannerContainer — named-props bridge', () => {
       reticleTone: 'idle',
       candidateName: undefined,
       matches: [],
-      matchListPanHandlers: {},
+      matchListDismissGesture: Gesture.Pan(),
+      matchScrollRef: { current: null } as RefObject<ComponentRef<typeof GestureScrollView> | null>,
       onMatchListScroll: jest.fn(),
       cameraRef,
       permissionStatus: 'granted',
