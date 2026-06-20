@@ -122,6 +122,13 @@ const config: Config = {
       lines: 95,
       statements: 95,
     },
+    // Spec 022 — the card-scanner orchestration feature (Container/Hook/View).
+    './src/components/card-scanner/': {
+      branches: 85,
+      functions: 90,
+      lines: 90,
+      statements: 90,
+    },
   },
 };
 
