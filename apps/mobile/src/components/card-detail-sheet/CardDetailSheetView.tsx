@@ -157,10 +157,12 @@ const CardDetailSheetView: FC<CardDetailSheetViewProps> = ({
     <View style={styles.root} testID="card-detail-sheet">
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.hero}>
-          <CardContainer
-            footprint={'pocket'}
-            id={id}
-          />
+          <View style={styles.heroCard}>
+            <CardContainer
+              footprint={'pocket'}
+              id={id}
+            />
+          </View>
           <View style={styles.heroText}>
             {name ? <Text style={styles.name}>{name}</Text> : null}
             {setLabel ? <Text style={styles.setLabel}>{setLabel}</Text> : null}

@@ -1,4 +1,4 @@
-import type { ImageStyle, TextStyle, ViewStyle } from 'react-native';
+import type { TextStyle, ViewStyle } from 'react-native';
 import { StyleSheet } from 'react-native';
 
 import { Colors, Radius, Spacing, Touch, Type } from '@src/constants/theme';
@@ -7,7 +7,7 @@ export type CardDetailSheetViewStyles = {
   root: Required<Pick<ViewStyle, 'flex' | 'backgroundColor' | 'paddingVertical'>>;
   scroll: Required<Pick<ViewStyle, 'paddingHorizontal' | 'paddingBottom' | 'gap'>>;
   hero: Required<Pick<ViewStyle, 'flexDirection' | 'gap' | 'alignItems'>>;
-  heroImage: Required<Pick<ImageStyle, 'width' | 'height' | 'borderRadius' | 'backgroundColor'>>;
+  heroCard: Required<Pick<ViewStyle, 'width' | 'aspectRatio' | 'borderRadius' | 'overflow'>>;
   heroText: Required<Pick<ViewStyle, 'flex' | 'gap'>>;
   name: Required<Pick<TextStyle, 'fontFamily' | 'fontSize' | 'lineHeight' | 'color' | 'fontWeight'>>;
   setLabel: Required<Pick<TextStyle, 'fontFamily' | 'fontSize' | 'letterSpacing' | 'color' | 'fontWeight'>>;
@@ -67,11 +67,13 @@ const styles = StyleSheet.create<CardDetailSheetViewStyles>({
     gap: Spacing.md,
     alignItems: 'flex-start',
   },
-  heroImage: {
+  // Fixed-size box that gives the hero <Card /> its footprint (the card itself
+  // fills 100% of whatever box it is handed).
+  heroCard: {
     width: HERO_IMAGE_W,
-    height: HERO_IMAGE_W * 1.4,
+    aspectRatio: 5 / 7,
     borderRadius: Radius.md,
-    backgroundColor: Colors.dark.pocketEmpty,
+    overflow: 'hidden',
   },
   heroText: {
     flex: 1,

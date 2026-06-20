@@ -1,39 +1,28 @@
-import type { ImageStyle, ViewStyle } from 'react-native';
-import { Colors, Radius, Spacing } from '@src/constants/theme';
+import type { ViewStyle } from 'react-native';
+import { Colors, Radius } from '@src/constants/theme';
 
+// The pocket footprint (width/height) is computed per-page from the measured grid
+// box and passed in as a `size` prop — see `BinderPage.tsx` / `computeSlotSize`.
+// These tokens carry only the pocket's visual treatment.
 export type CardPocketStyles = {
-  pocket: Required<
-    Pick<
-      ViewStyle,
-      'width' | 'height' | 'aspectRatio' | 'borderRadius' | 'overflow' | 'marginBottom'
-    >
-  >;
+  pocket: Required<Pick<ViewStyle, 'borderRadius' | 'overflow'>>;
   pocketEmpty: Required<
     Pick<ViewStyle, 'borderWidth' | 'borderStyle' | 'borderColor' | 'backgroundColor'>
   >;
-  pocketImage: Required<Pick<ImageStyle, 'width' | 'height'>>;
 };
 
 const useStyles = (): CardPocketStyles => {
 
   return {
     pocket: {
-      width: '32%',
-      height: '100%',
-      aspectRatio: 5 / 7,
       borderRadius: Radius.md,
       overflow: 'hidden',
-      marginBottom: Spacing.xs,
     },
     pocketEmpty: {
       borderWidth: 1,
       borderStyle: 'dashed',
       borderColor: Colors.dark.pocketEmpty,
       backgroundColor: 'transparent',
-    },
-    pocketImage: {
-      width: '100%',
-      height: '100%',
     },
   }
 };

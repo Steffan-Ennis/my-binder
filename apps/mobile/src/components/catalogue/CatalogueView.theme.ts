@@ -25,7 +25,7 @@ export type CatalogueViewStyles = {
     >
   >;
   binderPage: Required<
-    Pick<ViewStyle, 'flex' | 'backgroundColor' | 'borderRadius' | 'padding' | 'paddingLeft'>
+    Pick<ViewStyle, 'flex' | 'backgroundColor' | 'borderRadius' | 'paddingVertical' | 'paddingHorizontal'>
   >;
   ringColumn: Required<
     Pick<ViewStyle, 'position' | 'left' | 'top' | 'bottom' | 'justifyContent' | 'paddingVertical'>
@@ -172,8 +172,10 @@ const styles = StyleSheet.create<CatalogueViewStyles>({
     flex: 1,
     backgroundColor: Colors.dark.surfaceInverted,
     borderRadius: Radius.xl,
-    padding: Spacing.lg,
-    paddingLeft: Spacing.xxl,
+    // Symmetric horizontal padding keeps the centred 3×3 grid true; `xl` clears
+    // the absolutely-positioned ring column (left: xs + ring width sm = 20pt).
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
   },
   ringColumn: {
     position: 'absolute',

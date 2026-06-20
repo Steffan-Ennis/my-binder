@@ -11,9 +11,7 @@ import { Colors, Radius, Spacing, Touch, Type } from '@src/constants/theme';
 // one place.
 
 export type CardViewStyles = {
-  root: Required<
-    Pick<ViewStyle, 'width' | 'height' | 'aspectRatio' | 'borderRadius' | 'overflow' | 'marginBottom'>
-  >;
+  root: Required<Pick<ViewStyle, 'width' | 'height' | 'borderRadius' | 'overflow'>>;
   frame: Required<
     Pick<ViewStyle, 'flex' | 'borderWidth' | 'borderStyle' | 'borderColor' | 'backgroundColor' | 'alignItems' | 'justifyContent'>
   >;
@@ -30,13 +28,13 @@ export type CardViewStyles = {
 };
 
 const styles = StyleSheet.create<CardViewStyles>({
+  // The card fills whatever sized box its consumer provides (a binder pocket or
+  // the detail-sheet hero slot); the footprint itself is owned by the parent.
   root: {
-    width: '32%',
+    width: '100%',
     height: '100%',
-    aspectRatio: 5 / 7,
     borderRadius: Radius.md,
     overflow: 'hidden',
-    marginBottom: Spacing.xs,
   },
   frame: {
     flex: 1,
